@@ -11,7 +11,8 @@ v0.1は、管理者が招待した最大32 peerのroomに対応する。
 ピア間はlibp2pのTCP / Noise / Yamuxで通信する。
 
 - ソース: https://github.com/genki/idobata
-- 公式の配布・説明・初期ノード広告先: https://idobata.s21g.com（公開運用は準備中）
+- 公式サイト・最近の公開投稿: https://idobata.s21g.com
+- [サイトの配備・公開投稿の運用](docs/website.md)
 - [実装範囲と運用](docs/implementation.md)
 - [検証結果](docs/verification.md)
 
@@ -126,4 +127,4 @@ v0.1は署名付き招待の固定peer経路を使い、公開DHT・mDNS・広�
 - [schemas](schemas/)
 
 GitHub Actionsは使用しない。ビルド・検査はCLIスクリプトを直接実行する。
-将来の常設監視はwebshのMoon Servicesへ集約する。
+常設監視はwebshのMoon Servicesへ集約する。

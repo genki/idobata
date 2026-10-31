@@ -2,7 +2,7 @@ use clap::{CommandFactory, Parser, Subcommand, ValueEnum};
 use idobata::{
     config, crypto, daemon,
     error::{Error, INVALID, NETWORK, Result},
-    ipc,
+    ipc, publication,
     scanner::Scanner,
     types::*,
     util,
@@ -41,6 +41,11 @@ enum Command {
     },
     Daemon,
     Profile,
+    /// 管理者が明示的に公開する投稿。P2P受信箱とは独立。
+    Public {
+        #[command(subcommand)]
+        command: PublicCommand,
+    },
     Info,
     Room {
         #[command(subcommand)]
@@ -124,6 +129,26 @@ enum RoomCommand {
         output: PathBuf,
     },
 }
+#[derive(Subcommand)]
+enum PublicCommand {
+    Publish {
+        #[arg(long)]
+        feed: PathBuf,
+        #[arg(long)]
+        stdin: bool,
+        #[arg(long, default_value = "json")]
+        input: InputFormat,
+        #[arg(long)]
+        confirm_public: bool,
+    },
+    Verify {
+        #[arg(long)]
+        feed: PathBuf,
+        /// 信頼済みの経路で確認した公開鍵(JSON文字列)のファイル。
+        #[arg(long)]
+        trust_publisher: PathBuf,
+    },
+}
 #[derive(Clone, Copy, ValueEnum)]
 enum InputFormat {
     Text,
@@ -188,6 +213,63 @@ async fn execute(cli: Cli) -> Result<i32> {
         }
         Command::Profile => {
             print(&json!({"policy_id":Scanner::policy_id(),"profile":Scanner::profile()}));
+            return Ok(0);
+        }
+        Command::Public { command } => {
+            match command {
+                PublicCommand::Publish {
+                    feed,
+                    stdin,
+                    input,
+                    confirm_public,
+                } => {
+                    if !confirm_public {
+                        return Err(Error::new(30, "confirm_public_required"));
+                    }
+                    let draft = stdin_draft(stdin, input)?;
+                    util::protected(&cli.home)?;
+                    // 同じ公開ファイルの更新を直列化する。daemonの状態は開かない。
+                    let lock = std::fs::OpenOptions::new()
+                        .read(true)
+                        .open(cli.home.join("identity.key"))
+                        .map_err(|_| INVALID)?;
+                    fs2::FileExt::try_lock_exclusive(&lock).map_err(|_| INVALID)?;
+                    let existing = if feed.exists() {
+                        Some(
+                            serde_json::from_slice::<publication::Feed>(&util::read_bounded(
+                                &feed,
+                                publication::MAX_FEED_BYTES,
+                            )?)
+                            .map_err(|_| INVALID)?,
+                        )
+                    } else {
+                        None
+                    };
+                    let key = crypto::load_key(&cli.home)?;
+                    let public = publication::append(existing, &key, draft, true, util::now())?;
+                    util::atomic_write(&feed, &util::canonical(&public)?)?;
+                    print(&json!({"status":"published","count":public.posts.len(),
+                        "id":public.posts[0].signed.id,"public_key":crypto::public(&key)}));
+                }
+                PublicCommand::Verify {
+                    feed,
+                    trust_publisher,
+                } => {
+                    let key = serde_json::from_slice::<String>(&util::read_bounded(
+                        &trust_publisher,
+                        1024,
+                    )?)
+                    .map_err(|_| INVALID)?;
+                    let public = serde_json::from_slice::<publication::Feed>(&util::read_bounded(
+                        &feed,
+                        publication::MAX_FEED_BYTES,
+                    )?)
+                    .map_err(|_| INVALID)?;
+                    publication::verify(&public, &key, util::now())?;
+                    print(&json!({"status":"verified","count":public.posts.len(),
+                        "updated_at":public.updated_at}));
+                }
+            }
             return Ok(0);
         }
         Command::Room { command } => {

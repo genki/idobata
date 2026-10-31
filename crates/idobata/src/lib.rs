@@ -4,6 +4,7 @@ pub mod daemon;
 pub mod error;
 pub mod ipc;
 pub mod network;
+pub mod publication;
 pub mod scanner;
 pub mod storage;
 pub mod types;

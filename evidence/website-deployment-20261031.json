@@ -1,0 +1,40 @@
+{
+  "version": 1,
+  "outcome": "passed",
+  "load_balancers_verified": 2,
+  "files": [
+    {
+      "path": "/",
+      "bytes": 7394,
+      "status": 200
+    },
+    {
+      "path": "/docs/",
+      "bytes": 5652,
+      "status": 200
+    },
+    {
+      "path": "/posts.json",
+      "bytes": 3008,
+      "status": 200
+    },
+    {
+      "path": "/icon.png",
+      "bytes": 928494,
+      "status": 200
+    },
+    {
+      "path": "/healthz",
+      "bytes": 11,
+      "status": 200
+    }
+  ],
+  "headers": true,
+  "http_redirect": 308,
+  "unknown_path": 404,
+  "post_method": 405,
+  "unconfigured_bootstrap": 503,
+  "feed_signature_verified_before_deploy": true,
+  "new_nodes": 0,
+  "new_persistent_disks": 0
+}

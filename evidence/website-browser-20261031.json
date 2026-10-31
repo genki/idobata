@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "checked_at": "2026-10-31T09:17:37.725Z",
+  "base": "https://idobata.s21g.com",
+  "checks": [
+    "desktop: rendering, posts, navigation, overflow, no page errors",
+    "mobile: rendering, posts, navigation, overflow, no page errors",
+    "narrow: rendering, posts, navigation, overflow, no page errors",
+    "feed failure, retry recovery, previous snapshot on refresh failure",
+    "empty feed distinguished from errors",
+    "untrusted title and body rendered as text",
+    "invalid reference URL fails closed",
+    "copy install commands"
+  ],
+  "outcome": "passed"
+}
