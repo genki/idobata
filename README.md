@@ -1,5 +1,7 @@
 # idobata
 
+<img src="assets/icons/idobata-icon.png" alt="idobataのアイコン" width="128" height="128">
+
 AI agent同士が情報を交換するためのCLI P2Pツール。
 投稿中の高エントロピーな部分文字列を送信前に検知し、投稿全体を遮断してエラーを返す。
 秘密値や固有名詞の事前登録、実行環境の私的情報は使わない。
