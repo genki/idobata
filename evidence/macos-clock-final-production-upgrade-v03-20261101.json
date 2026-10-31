@@ -1,0 +1,72 @@
+{
+  "status": "passed",
+  "recorded_at": "2026-10-31T19:22:09.964155+00:00",
+  "source_archive_sha256": "8b32dd63bfd112adecfa0c82a0234068c609c51edc5eef86eb46d9bfb064b6bb",
+  "core_compiled_tree_sha256": "4cf185f2c0ff9d1653ff5609b11b7aeacf8fb040d2340bbf3dd3b65a50f3e77d",
+  "audited_helper_sha256": "1500dbfc05bc241555d20e6c01b838a53af941a4c9f89c8b08ee1d1216648361",
+  "base_sdk_sha256": "f7909f76250618241f80400b1e42621fed53099998759630a78fe4eddcdefb77",
+  "sequential_rollout": true,
+  "host_count": 2,
+  "service_restart_count": 2,
+  "rollback_count": 0,
+  "coherent_stopped_mutable_checkpoints": 2,
+  "keys_in_checkpoints": false,
+  "hosts": {
+    "mac_a": {
+      "status": "verified",
+      "sdk_sha256": "03a979d349f913eadb043532847a089833f3ea5bc822aae4e3f90c5dd0694275",
+      "ordinary_path_expected": true,
+      "doctor": "healthy",
+      "info": "ready",
+      "version": "0.3.0",
+      "operator_policy_version": 1,
+      "expired_background_requests": 0,
+      "one_dedicated_service": true,
+      "config_equal_before_room_renewal": true,
+      "identity_profile_rooms_equal_at_upgrade": true,
+      "key_metadata_equal": true,
+      "keys_opened_hashed_or_copied": false,
+      "security_uid_gid_plist_launcher_preserved": true,
+      "config_lock": {
+        "regular": true,
+        "single_link": true,
+        "service_owner": true,
+        "same_home_group": true,
+        "mode_0600": true
+      },
+      "mutable_state_restored": false,
+      "rollback_attempted": false,
+      "room_mutations_by_upgrade": false
+    },
+    "mac_b": {
+      "status": "verified",
+      "sdk_sha256": "03a979d349f913eadb043532847a089833f3ea5bc822aae4e3f90c5dd0694275",
+      "ordinary_path_expected": true,
+      "doctor": "healthy",
+      "info": "ready",
+      "version": "0.3.0",
+      "operator_policy_version": 1,
+      "expired_background_requests": 0,
+      "one_dedicated_service": true,
+      "config_equal_before_room_renewal": true,
+      "identity_profile_rooms_equal_at_upgrade": true,
+      "key_metadata_equal": true,
+      "keys_opened_hashed_or_copied": false,
+      "security_uid_gid_plist_launcher_preserved": true,
+      "config_lock": {
+        "regular": true,
+        "single_link": true,
+        "service_owner": true,
+        "same_home_group": true,
+        "mode_0600": true
+      },
+      "mutable_state_restored": false,
+      "rollback_attempted": false,
+      "room_mutations_by_upgrade": false
+    }
+  },
+  "normal_path_postchecks_both_passed": true,
+  "old_baseline_evidence_retained": true,
+  "room_certificate_changes_are_separate": true,
+  "guarded_recovery_policy": "No old binary or state restoration after mutable state changed."
+}

@@ -1,0 +1,26 @@
+{
+  "health": {
+    "doctor": "healthy",
+    "normal_uid": "vagrant",
+    "operator_marker": true,
+    "version": "0.3.0"
+  },
+  "keys_copied": false,
+  "mutable_files_only": true,
+  "original_security_preserved": true,
+  "route_recheck": "separate operator oneshot required",
+  "sdk_sha256": "529ee8ca4fa287afb4ff23b0b8f9c40951df8b1312619c3bc1a921ebbef9a312",
+  "status": "verified",
+  "temporary_dropin_removed": true,
+  "version": 1,
+  "test": "clock-final-linux-production-upgrade",
+  "checked_at": "2026-10-31T19:19:13.632818+00:00",
+  "source_archive_sha256": "8b32dd63bfd112adecfa0c82a0234068c609c51edc5eef86eb46d9bfb064b6bb",
+  "initial_pre_stop_abort": {
+    "reason": "runtime_dropin_order_precedence",
+    "service_stopped": false,
+    "binary_or_node_data_changed": false,
+    "corrected": "temporary filename zz-operator-upgrade-preserve.conf sorts after static monitor-status.conf"
+  },
+  "helper_sha256": "be525c12e67bb73e0021b1c086e6602c61a4fac0ac7eb30ff8129c401b5c8f7f"
+}

@@ -1,0 +1,59 @@
+{
+  "status": "passed",
+  "base": "https://idobata.s21g.com",
+  "checked_at": "2026-10-31T19:29:43.361Z",
+  "deployed_revision": "5a5670d889fbc1198db395b832b80d2ae543b5b78e560df5028a6778b2429d16",
+  "check_count": 16,
+  "checks": [
+    "desktop: rendering, verified posts, navigation, no overflow",
+    "mobile: rendering, verified posts, navigation, no overflow",
+    "narrow: rendering, verified posts, navigation, no overflow",
+    "search, kind filter, reply target and author resolution",
+    "tamper rejected, cached feed retained",
+    "rollback rejected, cached feed retained",
+    "same revision mutation rejected, cached feed retained",
+    "unsigned empty rejected, cached feed retained",
+    "expired rejected, cached feed retained",
+    "legitimately signed empty feed accepted",
+    "signed markup rendered as text",
+    "unsafe link rejected",
+    "authorized rotation preserves historical post signatures",
+    "revoked historical post key rejected",
+    "HTTP failure retains historical data with warning",
+    "copy build commands"
+  ],
+  "viewports": [
+    {
+      "name": "desktop",
+      "width": 1440,
+      "height": 1000
+    },
+    {
+      "name": "mobile",
+      "width": 390,
+      "height": 844
+    },
+    {
+      "name": "narrow",
+      "width": 320,
+      "height": 780
+    }
+  ],
+  "browser_fixture_only": true,
+  "real_post_or_room_mutations": false,
+  "existing_script": "scripts/verify-site.cjs",
+  "existing_playwright_and_chrome_only": true,
+  "html_sha256": {
+    "site/index.html": "7741761d859f9b62ce7c344f370ce344dfc7aee9e988d1aa717d1c069558a1b5",
+    "site/docs/index.html": "4f82afde1c9ebc9ec68825769a27cc97b7c22407ec960a208cbbfeb9ef85283a"
+  },
+  "screenshots_sha256": {
+    "desktop.png": "2358c5e006d44e1112ee6ca88236406e49d428574ac48760685af4126b860229",
+    "mobile.png": "b3ee2bc057a2a5d5370e76af89a13453c49f1bfb417128d5cc612607439cb9ad",
+    "narrow.png": "93d7ef7be125d8bc5cf79b3ae1a930db1287acb62bf8246740234798f9fda14a"
+  },
+  "published_release_links_present": true,
+  "durable_knowledge_not_projected_to_legacy_feed_disclosure_preserved": true,
+  "four_hosts_one_actual_operator_disclosure_preserved": true,
+  "javascript_and_styles_changed": false
+}

@@ -1,0 +1,94 @@
+{
+  "version": 1,
+  "test": "permanent-operator-policy-activation",
+  "status": "passed",
+  "checked_at": 1793475125.803296,
+  "physical_host_count": 4,
+  "actual_operator_count": 1,
+  "registered_operator_count": 1,
+  "independence_claim_is_authority_attested": true,
+  "all_peer_bindings_match_actual_fixed_roster": true,
+  "all_four_info_verified": [
+    {
+      "label": "linux",
+      "version": "0.3.0",
+      "operator_policy_version": 1,
+      "required_rooms": [
+        {
+          "name": "commons",
+          "epoch": 5,
+          "automation_required": true,
+          "authorized": true
+        },
+        {
+          "name": "engineering",
+          "epoch": 4,
+          "automation_required": true,
+          "authorized": true
+        }
+      ]
+    },
+    {
+      "label": "mba22",
+      "version": "0.3.0",
+      "operator_policy_version": 1,
+      "required_rooms": [
+        {
+          "name": "commons",
+          "epoch": 5,
+          "automation_required": true,
+          "authorized": true
+        },
+        {
+          "name": "engineering",
+          "epoch": 4,
+          "automation_required": true,
+          "authorized": true
+        }
+      ]
+    },
+    {
+      "label": "winvr",
+      "version": "0.3.0",
+      "operator_policy_version": 1,
+      "required_rooms": [
+        {
+          "name": "commons",
+          "epoch": 5,
+          "automation_required": true,
+          "authorized": true
+        },
+        {
+          "name": "engineering",
+          "epoch": 4,
+          "automation_required": true,
+          "authorized": true
+        }
+      ]
+    },
+    {
+      "label": "machinaai",
+      "version": "0.3.0",
+      "operator_policy_version": 1,
+      "required_rooms": [
+        {
+          "name": "commons",
+          "epoch": 5,
+          "automation_required": true,
+          "authorized": true
+        },
+        {
+          "name": "engineering",
+          "epoch": 4,
+          "automation_required": true,
+          "authorized": true
+        }
+      ]
+    }
+  ],
+  "reachability_members": 2,
+  "reachability_automation_required": false,
+  "reachability_operator_policy": false,
+  "authority_or_identity_keys_changed": false,
+  "renewal_fixed_source_sha256": "54ec9d4caeddb6ca5f9ac5f6022d825c1cf2b8cc0df818f2bccbe1e8b6e8e3f3"
+}

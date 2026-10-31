@@ -1,0 +1,169 @@
+{
+  "status": "passed",
+  "started_at": "2026-10-31T19:24:33.757601+00:00",
+  "interval_seconds": 30,
+  "intended_duration_seconds": 300,
+  "alert_baseline_bytes": 735082,
+  "samples": [
+    {
+      "index": 0,
+      "elapsed_seconds": 0.0,
+      "api_ok": true,
+      "entry_count": 11,
+      "status_counts": {
+        "up": 11
+      },
+      "group_status_counts": {
+        "up": 3
+      }
+    },
+    {
+      "index": 1,
+      "elapsed_seconds": 30.001,
+      "api_ok": true,
+      "entry_count": 11,
+      "status_counts": {
+        "up": 11
+      },
+      "group_status_counts": {
+        "up": 3
+      }
+    },
+    {
+      "index": 2,
+      "elapsed_seconds": 60.0,
+      "api_ok": true,
+      "entry_count": 11,
+      "status_counts": {
+        "up": 11
+      },
+      "group_status_counts": {
+        "up": 3
+      }
+    },
+    {
+      "index": 3,
+      "elapsed_seconds": 90.0,
+      "api_ok": true,
+      "entry_count": 11,
+      "status_counts": {
+        "up": 11
+      },
+      "group_status_counts": {
+        "up": 3
+      }
+    },
+    {
+      "index": 4,
+      "elapsed_seconds": 120.0,
+      "api_ok": true,
+      "entry_count": 11,
+      "status_counts": {
+        "up": 11
+      },
+      "group_status_counts": {
+        "up": 3
+      }
+    },
+    {
+      "index": 5,
+      "elapsed_seconds": 150.0,
+      "api_ok": true,
+      "entry_count": 11,
+      "status_counts": {
+        "up": 11
+      },
+      "group_status_counts": {
+        "up": 3
+      }
+    },
+    {
+      "index": 6,
+      "elapsed_seconds": 180.0,
+      "api_ok": true,
+      "entry_count": 11,
+      "status_counts": {
+        "up": 11
+      },
+      "group_status_counts": {
+        "up": 3
+      }
+    },
+    {
+      "index": 7,
+      "elapsed_seconds": 210.0,
+      "api_ok": true,
+      "entry_count": 11,
+      "status_counts": {
+        "up": 11
+      },
+      "group_status_counts": {
+        "up": 3
+      }
+    },
+    {
+      "index": 8,
+      "elapsed_seconds": 240.0,
+      "api_ok": true,
+      "entry_count": 11,
+      "status_counts": {
+        "up": 11
+      },
+      "group_status_counts": {
+        "up": 3
+      }
+    },
+    {
+      "index": 9,
+      "elapsed_seconds": 270.0,
+      "api_ok": true,
+      "entry_count": 11,
+      "status_counts": {
+        "up": 11
+      },
+      "group_status_counts": {
+        "up": 3
+      }
+    },
+    {
+      "index": 10,
+      "elapsed_seconds": 300.013,
+      "api_ok": true,
+      "entry_count": 11,
+      "status_counts": {
+        "up": 11
+      },
+      "group_status_counts": {
+        "up": 3
+      }
+    }
+  ],
+  "new_idobata_alert_log_events": {},
+  "new_ng_notice_successes": 0,
+  "alert_log_rotations": 0,
+  "production_mutations": false,
+  "service_details_or_identifiers_stored": false,
+  "finished_at": "2026-10-31T19:29:33.795772+00:00",
+  "duration_seconds": 300.038,
+  "entry_count_sequence": [
+    11,
+    11,
+    11,
+    11,
+    11,
+    11,
+    11,
+    11,
+    11,
+    11,
+    11
+  ],
+  "down_samples": 0,
+  "api_error_samples": 0,
+  "exact_alert_log_transition_recheck": {
+    "new_ng_notices": 0,
+    "new_log_bytes": 0,
+    "bodies_and_identifiers_saved": false
+  },
+  "followup_v03_transition_report": "moon-services-clock-final-v03-observation-20261101.json"
+}

@@ -1,0 +1,160 @@
+{
+  "status": "passed",
+  "started_at": "2026-10-31T19:30:38.392167+00:00",
+  "interval_seconds": 30,
+  "maximum_duration_seconds": 600,
+  "stop_after_four_consecutive_13_row_samples": true,
+  "alert_baseline_bytes": 735082,
+  "samples": [
+    {
+      "index": 0,
+      "elapsed_seconds": 0.0,
+      "api_ok": true,
+      "entry_count": 11,
+      "status_counts": {
+        "up": 11
+      },
+      "group_status_counts": {
+        "up": 3
+      }
+    },
+    {
+      "index": 1,
+      "elapsed_seconds": 30.0,
+      "api_ok": true,
+      "entry_count": 11,
+      "status_counts": {
+        "up": 11
+      },
+      "group_status_counts": {
+        "up": 3
+      }
+    },
+    {
+      "index": 2,
+      "elapsed_seconds": 60.0,
+      "api_ok": true,
+      "entry_count": 11,
+      "status_counts": {
+        "up": 11
+      },
+      "group_status_counts": {
+        "up": 3
+      }
+    },
+    {
+      "index": 3,
+      "elapsed_seconds": 90.0,
+      "api_ok": true,
+      "entry_count": 11,
+      "status_counts": {
+        "up": 11
+      },
+      "group_status_counts": {
+        "up": 3
+      }
+    },
+    {
+      "index": 4,
+      "elapsed_seconds": 120.0,
+      "api_ok": true,
+      "entry_count": 11,
+      "status_counts": {
+        "up": 11
+      },
+      "group_status_counts": {
+        "up": 3
+      }
+    },
+    {
+      "index": 5,
+      "elapsed_seconds": 150.0,
+      "api_ok": true,
+      "entry_count": 13,
+      "status_counts": {
+        "up": 13
+      },
+      "group_status_counts": {
+        "up": 3
+      }
+    },
+    {
+      "index": 6,
+      "elapsed_seconds": 180.0,
+      "api_ok": true,
+      "entry_count": 13,
+      "status_counts": {
+        "up": 13
+      },
+      "group_status_counts": {
+        "up": 3
+      }
+    },
+    {
+      "index": 7,
+      "elapsed_seconds": 210.0,
+      "api_ok": true,
+      "entry_count": 13,
+      "status_counts": {
+        "up": 13
+      },
+      "group_status_counts": {
+        "up": 3
+      }
+    },
+    {
+      "index": 8,
+      "elapsed_seconds": 240.0,
+      "api_ok": true,
+      "entry_count": 13,
+      "status_counts": {
+        "up": 13
+      },
+      "group_status_counts": {
+        "up": 3
+      }
+    }
+  ],
+  "new_idobata_alert_log_events": {},
+  "new_ng_notice_successes": 0,
+  "alert_log_rotations": 0,
+  "production_mutations": false,
+  "service_details_or_identifiers_stored": false,
+  "finished_at": "2026-10-31T19:34:38.413285+00:00",
+  "duration_seconds": 240.021,
+  "entry_count_sequence": [
+    11,
+    11,
+    11,
+    11,
+    11,
+    13,
+    13,
+    13,
+    13
+  ],
+  "down_samples": 0,
+  "api_error_samples": 0,
+  "exact_alert_log_transition_recheck": {
+    "new_ng_notices": 0,
+    "new_log_bytes": 0,
+    "bodies_and_identifiers_saved": false
+  },
+  "transition": {
+    "entry_count_increased_11_to_13": true,
+    "row_count_increase_treated_as_failure": false,
+    "final_four_samples_all_13_up": true
+  },
+  "fresh_canary_confirmation": {
+    "evidence": "watch-v03-handoff-20261101.json",
+    "source": "coordinator observed signed watch status; API ratio alone was not assumed fresh",
+    "series": "v03",
+    "switch_unix": 1793475161.8238487,
+    "canary_created_unix": 1793475163.8825917,
+    "created_after_switch": true,
+    "complete": true,
+    "verified_receipts": 3,
+    "expected_receipts": 3,
+    "last_complete_creation_matches_new_canary": true
+  }
+}

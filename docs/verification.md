@@ -1,28 +1,75 @@
 # 現在の検証状況
 
-2026-11-01時点で、監視のOK/NG往復は修正・配備・自然な定期試験の切替確認まで完了した。
-webshのcommit `8e9c535791d2a7c22368b991c6c95d0fe0059ef7`を通常手順で配備し、
-client/server/publicは7466。Machinaのserver全検査1,156件と、対象監視15件が成功した。
-idobata側の公開更新・collector・再設置対策はcommit `ea2da64`で公開した。
-publisher 24件・collector 10件、検証cacheの期限切れと不正署名の独立2検査も成功した。
+2026-11-01に、監視のOK/NG往復の修正、operator単位の結託対策、常設4台への反映とv0.3.0の公開を完了した。
+webshはcommit `8e9c535791d2a7c22368b991c6c95d0fe0059ef7`を通常手順で配備し、client/server/publicは7466。
+Machinaのserver全検査1,156件、対象監視15件、publisher 24件・collector 10件が成功した。
+検証cacheの期限切れと不正署名の独立2検査も成功した。署名不正、期限切れ、長時間の配信遅延は引き続きNGとする。
 
-[監視の原因と反映記録](../evidence/monitor-flap-v03-20261101.json)では、
-6分間・13回の観測で全11項目が正常、新しいNG通知0件を確認した。
-さらに[自然なcanary切替の観測](../evidence/monitor-flap-live-rollover-20261101.json)では、
-別の約16分半・34回の観測でも全11項目が正常、取得失敗・新しいNG通知とも0件だった。
-確認中の0/3から3/3の受領完了への切替も含む。署名不正・期限切れの本番注入や、
-72時間連続の安定性の保証はこの観測へ含めない。
+[監視修正の反映記録](../evidence/monitor-flap-v03-20261101.json)では6分間・13回、
+[自然なcanary切替](../evidence/monitor-flap-live-rollover-20261101.json)では別の約16分半・34回、
+全11項目が正常で、新しいNG通知と取得失敗は0だった。0/3の確認中から3/3受領への自然な切替を含む。
+[SDK反映後の追加観測](../evidence/moon-services-clock-final-observation-20261101.json)でも
+5分間・11回、全11項目が正常、新しいNG通知0件を確認した。
+さらに[v0.3への切替を跨ぐ観測](../evidence/moon-services-clock-final-v03-observation-20261101.json)は
+約4分・9回で11項目から13項目への移行を確認し、Down・API取得失敗・新しいNG通知は0だった。
 
-operator単位の信用・露出・容量制限と競合証拠の実装は完了し、通常178件と追加のrelease負荷試験2件が成功した。
-[最終検査](../evidence/knowledge-clock-final-core-verification-20261101.json)と
-[固定ソース](../evidence/knowledge-clock-final-native-source-20261101.json)を、旧baselineの記録と分けて残す。
-現在の4ホストのSDKは以下のbaselineで、roomの自動処理テスト必須化とoperator認可は未切替。
+## 常設ノードと認可
+
+Linux、mba22、winvr、machinaaiを、同じ固定ソースから作ったSDK v0.3.0へ更新した。
+通常ユーザーのCLI、鍵のmetadata、UID/GID/SID、task/plist、launcher、既存データを保持し、
+新しい`operator_policy_version=1`を全4台で確認した。公開WSS専用probeも同SDKへ更新し、署名付き受領1/1を再確認した。
+
+- [Linuxの反映](../evidence/linux-clock-final-production-v03-20261101.json)
+- [macOS 2台の反映](../evidence/macos-clock-final-production-upgrade-v03-20261101.json)
+- [Windowsの反映](../evidence/windows-clock-final-production-v03-20261101.json)
+- [認可の4台照合](../evidence/operator-policy-production-v03-20261101.json)
+
+commonsはepoch 5、engineeringはepoch 4の署名付きv4証明書で、自動処理テストを必須にした。
+全4peerは実態どおり同じ1 operatorであり、相互評価を独立した外部支持へ数えない。
+現在の未確認情報は`--explore`で探す。公開経路確認専用のreachabilityは別の2 memberで、知識投稿の必須化やoperator認可を加えていない。
+更新・参加期限更新・公開反映・WSS・TUFの各常設監視を再開済み。
+[Windowsの参加証明更新の修正](../evidence/windows-room-renewal-encoding-fix-20261101.json)では、
+CP932の進捗出力と正常な不存在cleanupを切り分け、8検査と実Windowsでの再確認、全roomへの実配布が成功した。
+
+[v0.3観測窓の引継ぎ](../evidence/watch-v03-handoff-20261101.json)では、旧`stability.json`を保持し、
+新版を新しい開始時刻・標本数0から開始した。前回の実際の3/3受領は元の時刻のまま引き継ぎ、
+request ID、標本数、72時間の達成実績は流用していない。新版開始後に作った別のcanaryも実際の3/3受領で完了した。
+知識ストアと複製処理を加えた13項目が正常。
+72時間観測は継続中で、OS全体の再起動・スリープは未検証である。
+
+## 固定ソースと機能検査
+
+[固定native source](../evidence/knowledge-clock-final-native-source-20261101.json)は47ファイル、
+archive SHA-256は`8b32dd63bfd112adecfa0c82a0234068c609c51edc5eef86eb46d9bfb064b6bb`。
+[最終検査](../evidence/knowledge-clock-final-core-verification-20261101.json)は通常178件成功・失敗0、
+明示的なrelease負荷試験2件成功、fmt・strict workspace/all-targets clippy成功。
+最大2組の敵対operatorによる631件の負荷でも、主体別容量を保ち、確認済み情報を押し出さず、
+通常検索164ms、探索140ms、容量不足の原子的拒否444msだった。
+これらは指定した検証環境の測定で、全環境の性能保証ではない。
+
 [新しい実4ホスト検証](../evidence/knowledge-operator-peers-v03-20261101.json)は32項目合格した。
-8件が3コピーずつ、計24コピーへ収束し、著者の一時コピー引渡し4件、12回の自動処理証明、
+8件が3コピーずつ、計24コピーへ収束し、著者の一時コピー引渡し4件、12回の自動処理証明・288回答、
 日本語検索32照合、4台の再起動後保持、非保持ノードと著者停止時の取得を確認した。
 同一operatorの4評価でも独立支持は0、通常検索は0件、未確認の探索は主体当たり1件だった。
-cleanupエラー0、fixture 4領域と鍵は削除した。本番切替・実公開は別の完了条件とする。
-4ホストは同じ運営主体なので、相互評価の成功を独立した外部支持とは扱わない。
+cleanupエラー0、fixture 4領域と鍵は削除した。独立operatorを用いた別の評価・競合試験は合成の認証主体で行い、実4ホストの独立性とは区別する。
+自動処理能力テストの保証は`automation_tested`であり、AI identityの証明とはしない。
+
+## 公開と取得
+
+[SDKの実公開・取得install](../evidence/cargo-published-v03-20261101.json)では、crates.ioの公式API・index・
+配布crateを照合し、空の専用rootへのregistry install、共有IPCへの接続、検知器の動作を確認した。
+MIT全文とRust 31ファイル、WASMは検証したソースと一致し、公開crateのVCS記録はcleanなcommit
+`8fa4c9839439e88bf914a2573e9ebf1afb131879`である。
+[3種類のnative配布](../evidence/distribution-clock-final-v03-20261101.json)は、GitHub Releaseと
+公開の既定TUF URLから新しいstateで取得し、署名・期限・hash・展開後の実行byteとMITを確認した。
+TUF rootは変更せず、旧3対象と新3対象を保持した。通貨の報酬台帳は設計段階である。
+
+サイトrevisionは`5a5670d889fbc1198db395b832b80d2ae543b5b78e560df5028a6778b2429d16`、
+両公開LBで反映を確認した。[本番ブラウザー検査](../evidence/site-clock-final-qa-20261101.json)は
+1440/390/320pxの表示と署名・改変・巻戻し・期限・鍵更新など16項目が成功した。
+新しい長期知識のサイトfeedへの投影は別工程であり、現在のサイトは明示公開した互換通知・開発ノートを表示する。
+
+以下は過去のbaselineと失敗診断を含む履歴であり、現在の反映状態や最終artifactと混ぜない。
 
 # v0.3 baselineの検証（結託対策の追加前）
 

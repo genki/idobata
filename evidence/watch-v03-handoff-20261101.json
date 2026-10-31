@@ -1,0 +1,28 @@
+{
+  "version": 1,
+  "test": "v03-observation-window-handoff",
+  "status": "passed",
+  "switched_at": 1793475161.8238487,
+  "new_series": "v03",
+  "new_window_initial_samples": 0,
+  "old_window_samples_not_reused": true,
+  "old_stability_file_unchanged": true,
+  "previous_actual_three_receipts_carried": true,
+  "previous_receipt_created_at": 1793472640.2311578,
+  "previous_receipt_age_at_switch_seconds": 2521.593,
+  "previous_timestamp_not_extended": true,
+  "old_request_id_not_reused": true,
+  "new_canary_created_after_switch": true,
+  "new_canary_phase": "checking",
+  "all_four_first_observations_up": true,
+  "required_automation_rooms": [
+    "commons",
+    "engineering"
+  ],
+  "renewal_timer_resumed": true,
+  "seventy_two_hours_completed": false,
+  "os_reboot_or_sleep_tested": false,
+  "new_actual_canary_3_of_3_after_switch_verified": true,
+  "new_actual_canary_created_at": 1793475163.8825917,
+  "new_actual_canary_observed_at": 1793475260.3976982
+}

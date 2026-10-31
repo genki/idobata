@@ -1,0 +1,78 @@
+{
+  "version": 1,
+  "test": "github-and-tuf-v03-publication",
+  "checked_at": "2026-10-31T19:26:26.930417+00:00",
+  "github_release_url": "https://github.com/genki/idobata/releases/tag/v0.3.0",
+  "source_commit": "8fa4c9839439e88bf914a2573e9ebf1afb131879",
+  "draft": false,
+  "prerelease": false,
+  "github_asset_digests_verified": true,
+  "new_targets": [
+    {
+      "target": "idobata-0.3.0-linux-x86_64.tar.gz",
+      "platform": "linux-x86_64",
+      "bytes": 4772267,
+      "sha256": "9a23a9093dd0692bee6194891ddbbe220bd300f3bcf6b6f117219b271d8a231e",
+      "binary_sha256": "529ee8ca4fa287afb4ff23b0b8f9c40951df8b1312619c3bc1a921ebbef9a312"
+    },
+    {
+      "target": "idobata-0.3.0-macos-arm64.tar.gz",
+      "platform": "macos-arm64",
+      "bytes": 4340670,
+      "sha256": "b75fdd4344b09c530d8c34968548e7c2456dd53e2fff8af7a91ccf4764c30da5",
+      "binary_sha256": "03a979d349f913eadb043532847a089833f3ea5bc822aae4e3f90c5dd0694275"
+    },
+    {
+      "target": "idobata-0.3.0-windows-x86_64.zip",
+      "platform": "windows-x86_64",
+      "bytes": 4066424,
+      "sha256": "101bd9113f0b98b48be5b6c54cefc371d815da37e81c3809ab35e3a883cf842b",
+      "binary_sha256": "77d0b8a3d8099f176137eb98c7e36a5cc2a3c7ad95354f96dbe7a474221fd187"
+    }
+  ],
+  "tuf_root_sha256": "e62718a4d4b3095906ce8015d40466c586eebd3161ea6117f86915bf15c4494f",
+  "tuf_root_unchanged": true,
+  "tuf_targets_version": 200,
+  "tuf_snapshot_version": 201,
+  "tuf_timestamp_version": 201,
+  "tuf_target_count": 6,
+  "previous_three_v02_targets_preserved": true,
+  "only_snapshot_timestamp_online": true,
+  "public_default_tuf_download_checked": true,
+  "public_downloads": [
+    {
+      "platform": "linux-x86_64",
+      "target": "idobata-0.3.0-linux-x86_64.tar.gz",
+      "public_default_metadata_and_targets_urls": true,
+      "fresh_private_tuf_state": true,
+      "archive_sha256": "9a23a9093dd0692bee6194891ddbbe220bd300f3bcf6b6f117219b271d8a231e",
+      "bytes": 4772267,
+      "binary_sha256": "529ee8ca4fa287afb4ff23b0b8f9c40951df8b1312619c3bc1a921ebbef9a312",
+      "full_mit_license": true,
+      "only_expected_three_members": true
+    },
+    {
+      "platform": "macos-arm64",
+      "target": "idobata-0.3.0-macos-arm64.tar.gz",
+      "public_default_metadata_and_targets_urls": true,
+      "fresh_private_tuf_state": true,
+      "archive_sha256": "b75fdd4344b09c530d8c34968548e7c2456dd53e2fff8af7a91ccf4764c30da5",
+      "bytes": 4340670,
+      "binary_sha256": "03a979d349f913eadb043532847a089833f3ea5bc822aae4e3f90c5dd0694275",
+      "full_mit_license": true,
+      "only_expected_three_members": true
+    },
+    {
+      "platform": "windows-x86_64",
+      "target": "idobata-0.3.0-windows-x86_64.zip",
+      "public_default_metadata_and_targets_urls": true,
+      "fresh_private_tuf_state": true,
+      "archive_sha256": "101bd9113f0b98b48be5b6c54cefc371d815da37e81c3809ab35e3a883cf842b",
+      "bytes": 4066424,
+      "binary_sha256": "77d0b8a3d8099f176137eb98c7e36a5cc2a3c7ad95354f96dbe7a474221fd187",
+      "full_mit_license": true,
+      "only_expected_three_members": true
+    }
+  ],
+  "public_download_completed_at": "2026-10-31T19:29:08.077826+00:00"
+}

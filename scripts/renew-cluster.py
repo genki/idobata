@@ -11,10 +11,31 @@ import tempfile
 import time
 
 
+class RenewalCommandError(RuntimeError):
+    """Keep diagnostic streams privately, without embedding commands/certificates."""
+    def __init__(self,tool,returncode,stdout,stderr):
+        super().__init__('参加許可の更新に失敗: '+tool+' (exit '+str(returncode)+')')
+        self.returncode=returncode
+        self.stdout_bytes=stdout
+        self.stderr_bytes=stderr
+        for encoding in ('utf-8','cp932'):
+            try:
+                self.stderr=stderr.decode(encoding)
+                break
+            except UnicodeDecodeError:
+                pass
+        else:
+            self.stderr=stderr.decode('utf-8',errors='replace')
+
+
 def run(args,data=None,timeout=90):
-    p=subprocess.run(args,input=data,text=True,capture_output=True,timeout=timeout)
-    if p.returncode:raise RuntimeError('参加許可の更新に失敗: '+args[0]+' (exit '+str(p.returncode)+')')
-    return p.stdout
+    # Windows PowerShell can emit CP932 CLIXML progress on stderr even at exit 0.
+    # Decode the UTF-8 stdout protocol only; harmless stderr cannot fail success.
+    payload=data.encode('utf-8') if isinstance(data,str) else data
+    p=subprocess.run(args,input=payload,capture_output=True,timeout=timeout)
+    if p.returncode:
+        raise RenewalCommandError(args[0],p.returncode,p.stdout,p.stderr)
+    return p.stdout.decode('utf-8')
 
 
 def windows_join(node,room,certificate,authority):
@@ -35,9 +56,10 @@ def windows_join(node,room,certificate,authority):
     arguments=subprocess.list2cmdline(['--home',home,'room','join','--room',room,
                                       '--invite-file',invite,'--trust-authority',authority])
     script=r'''
-$ErrorActionPreference='Stop';$ProgressPreference='SilentlyContinue';[Console]::OutputEncoding=[Text.UTF8Encoding]::new()
+$ErrorActionPreference='Stop';$ProgressPreference='SilentlyContinue';$OutputEncoding=[Console]::OutputEncoding=[Text.UTF8Encoding]::new($false)
 $invite=INVITE
 $task=TASK
+$primary=$null
 try {
 $acl=[System.Security.AccessControl.FileSecurity]::new()
 $acl.SetAccessRuleProtection($true,$false)
@@ -59,14 +81,25 @@ $state=(Get-ScheduledTask -TaskName $task).State
 if ($state -eq 'Running') { throw 'room join timeout' }
 $result=(Get-ScheduledTaskInfo -TaskName $task).LastTaskResult
 if($result -ne 0){throw ('room join exit '+$result)}
+} catch {
+ $primary=$_
+ throw
 } finally {
+ try {
  $existing=Get-ScheduledTask -TaskName $task -ErrorAction SilentlyContinue
  if ($existing) {
   if ($existing.State -eq 'Running') { Stop-ScheduledTask -TaskName $task }
   Unregister-ScheduledTask -TaskName $task -Confirm:$false
  }
  if (Test-Path -LiteralPath $invite) { Remove-Item -LiteralPath $invite -Force }
+ } catch {
+  if($null -eq $primary){throw}
+  [Console]::Error.WriteLine('cleanup_failed_after_primary')
+ }
 }
+# A missing task is normal during idempotent cleanup. PowerShell may otherwise
+# propagate its suppressed Get-ScheduledTask failure via $? at script EOF.
+exit 0
 '''
     for placeholder,value in [('INVITE',invite),('TASK',task),('BINARY',binary),('ARGUMENTS',arguments)]:
         script=script.replace(placeholder,quote(value))
@@ -75,17 +108,30 @@ if($result -ne 0){throw ('room join exit '+$result)}
         local=Path(directory)/'invite.json'
         local.write_text(json.dumps(certificate,ensure_ascii=False),encoding='utf-8')
         local.chmod(0o600)
+        primary=None
         try:
             run(['scp','-q','-o','BatchMode=yes','-o','ConnectTimeout=12',str(local),node['ssh']+':'+invite])
             run(['ssh','-o','BatchMode=yes',node['ssh'],'powershell.exe -NoProfile -NonInteractive -EncodedCommand '+encoded])
+        except BaseException as error:
+            primary=error
+            raise
         finally:
-            cleanup=("$ErrorActionPreference='Stop';$task="+quote(task)+
+            cleanup=("$ErrorActionPreference='Stop';$ProgressPreference='SilentlyContinue';"
+                     "$OutputEncoding=[Console]::OutputEncoding=[Text.UTF8Encoding]::new($false);$task="+quote(task)+
                      ";$existing=Get-ScheduledTask -TaskName $task -ErrorAction SilentlyContinue;"
                      "if($existing){if($existing.State -eq 'Running'){Stop-ScheduledTask -TaskName $task};"
                      "Unregister-ScheduledTask -TaskName $task -Confirm:$false};"
-                     "if(Test-Path -LiteralPath "+quote(invite)+"){Remove-Item -LiteralPath "+quote(invite)+" -Force}")
+                     "if(Test-Path -LiteralPath "+quote(invite)+"){Remove-Item -LiteralPath "+quote(invite)+" -Force};exit 0")
             cleanup=base64.b64encode(cleanup.encode('utf-16le')).decode()
-            run(['ssh','-o','BatchMode=yes',node['ssh'],'powershell.exe -NoProfile -NonInteractive -EncodedCommand '+cleanup])
+            try:
+                run(['ssh','-o','BatchMode=yes',node['ssh'],'powershell.exe -NoProfile -NonInteractive -EncodedCommand '+cleanup])
+            except BaseException as error:
+                if primary is None:
+                    raise
+                # The failed operation is the cause; cleanup must not replace it.
+                primary.cleanup_error=error
+                if hasattr(primary,'add_note'):
+                    primary.add_note('Windows renewal cleanup also failed; inspect cleanup_error')
 
 
 def main():

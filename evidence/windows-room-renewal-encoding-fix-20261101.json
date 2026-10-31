@@ -1,0 +1,84 @@
+{
+  "version": 1,
+  "status": "verified",
+  "scope": "Windows renewal output handling and idempotent cleanup; no Rust or SDK changes",
+  "source_sha256": {
+    "scripts/renew-cluster.py": "54ec9d4caeddb6ca5f9ac5f6022d825c1cf2b8cc0df818f2bccbe1e8b6e8e3f3",
+    "scripts/test-renew-cluster.py": "655c1322d5941e93039fcedb671068e07006593866bf09bf6b0d5c9b0246fe6c"
+  },
+  "cause": {
+    "stderr_encoding": "CP932 PowerShell CLIXML module progress",
+    "utf8_error_byte": 131,
+    "utf8_error_position": 256,
+    "missing_task_query_can_leave_exit_1": true,
+    "cleanup_exception_could_mask_primary_result": true,
+    "commons_join_observed_committed_before_fix": true,
+    "initial_limited_inspection_remaining_tasks": 0,
+    "initial_limited_inspection_remaining_invites": 0
+  },
+  "fix": {
+    "capture_subprocess_bytes": true,
+    "stdout_protocol_stays_strict_utf8": true,
+    "stderr_decoding_cannot_fail_exit_0": true,
+    "nonzero_exit_and_private_stderr_retained": true,
+    "powershell_progress_suppressed_and_utf8_explicit": true,
+    "normal_main_and_cleanup_exit_0_explicit": true,
+    "primary_exception_preserved_if_cleanup_also_fails": true,
+    "certificate_transfer_remains_private_sftp": true,
+    "certificate_not_embedded_in_command": true,
+    "service_identity_and_invite_acl_policy_unchanged": true
+  },
+  "validation": {
+    "mocked_regressions_passed": 8,
+    "python_compile_passed": true,
+    "diff_check_passed": true,
+    "read_only_windows_cleanup_recheck": {
+      "fixed_remote_exit": 0,
+      "stderr_bytes": 0,
+      "stdout_bytes": 0,
+      "operation": "read-only idempotent absent task/invite cleanup logic with explicit success",
+      "no_task_or_invite_mutation": true
+    },
+    "read_only_windows_primary_error_rechecks": {
+      "primary_and_cleanup": {
+        "exit": 1,
+        "primary_preserved": true,
+        "explicit_success_did_not_swallow_error": true
+      },
+      "cleanup_only": {
+        "exit": 1,
+        "primary_preserved": true,
+        "explicit_success_did_not_swallow_error": true
+      }
+    },
+    "production_mutation_during_diagnostics": false
+  },
+  "authorized_real_force_renewal": {
+    "completed": true,
+    "results": [
+      {
+        "room": "commons",
+        "epoch": 5,
+        "members": 4
+      },
+      {
+        "room": "engineering",
+        "epoch": 4,
+        "members": 4
+      },
+      {
+        "room": "reachability",
+        "members": 2,
+        "status": "renewed"
+      }
+    ],
+    "manager_verified_host_count": 4,
+    "manager_verified_required_room_count_per_host": 2,
+    "manager_verified_authorized_required_flags_and_operator_marker": true,
+    "manager_verified_bindings": 4,
+    "actual_registered_operator_count": 1,
+    "reachability_remains_separate_and_not_required": true,
+    "renew_timer_resumed_by_manager": true
+  },
+  "real_renewal_log_sha256": "741052126e0f450570fc2ea0c9f41547bb47f728e569693bef3e129690892871"
+}

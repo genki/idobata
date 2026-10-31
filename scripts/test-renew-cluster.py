@@ -4,6 +4,7 @@ import base64
 import importlib.util
 import json
 from pathlib import Path
+import subprocess
 import unittest
 from unittest.mock import patch
 
@@ -73,6 +74,65 @@ class WindowsRenewTests(unittest.TestCase):
             self.assertIn('Stop-ScheduledTask', cleanup)
             self.assertIn('Unregister-ScheduledTask', cleanup)
             self.assertIn('Remove-Item', cleanup)
+
+    def test_cp932_progress_on_success_does_not_mask_committed_join(self):
+        progress='モジュールを初めて使用するための準備しています。'.encode('cp932')
+        result=subprocess.CompletedProcess(['ssh'],0,b'{"status":"joined"}',progress)
+        with patch.object(RENEW.subprocess,'run',return_value=result) as invoke:
+            self.assertEqual(RENEW.run(['ssh'],'非公開の証明書'),'{"status":"joined"}')
+        self.assertEqual(invoke.call_args.kwargs['input'],'非公開の証明書'.encode('utf-8'))
+        self.assertNotIn('text',invoke.call_args.kwargs)
+
+    def test_cp932_failure_keeps_exit_and_private_stderr(self):
+        message='アクセスが拒否されました。'
+        result=subprocess.CompletedProcess(['ssh'],5,b'',message.encode('cp932'))
+        with patch.object(RENEW.subprocess,'run',return_value=result):
+            with self.assertRaises(RENEW.RenewalCommandError) as caught:
+                RENEW.run(['ssh'])
+        self.assertEqual(caught.exception.returncode,5)
+        self.assertEqual(caught.exception.stderr,message)
+        self.assertNotIn(message,str(caught.exception))
+
+    def test_cleanup_failure_does_not_replace_primary_failure(self):
+        primary=RuntimeError('primary_join_failure')
+        cleanup=RuntimeError('cleanup_failure')
+        calls=[]
+
+        def run(args,*_data,**_options):
+            calls.append(args)
+            if len(calls)==2:raise primary
+            if len(calls)==3:raise cleanup
+            return ''
+
+        with patch.object(RENEW,'run',side_effect=run):
+            with self.assertRaises(RuntimeError) as caught:
+                RENEW.windows_join(self.node,'commons',{'signed':{}},'1'*52)
+        self.assertIs(caught.exception,primary)
+        self.assertIs(primary.cleanup_error,cleanup)
+
+    def test_standalone_cleanup_failure_is_reported_and_all_scripts_are_quiet_utf8(self):
+        calls=[]
+
+        def run(args,*_data,**_options):
+            calls.append(args)
+            if len(calls)==3:raise RuntimeError('cleanup_failure')
+            return ''
+
+        with patch.object(RENEW,'run',side_effect=run):
+            with self.assertRaisesRegex(RuntimeError,'cleanup_failure'):
+                RENEW.windows_join(self.node,'commons',{'signed':{}},'1'*52)
+        for call in calls[1:]:
+            script=base64.b64decode(call[-1].split()[-1]).decode('utf-16le')
+            self.assertIn("$ProgressPreference='SilentlyContinue'",script)
+            self.assertIn('$OutputEncoding=[Console]::OutputEncoding=',script)
+            self.assertTrue(script.rstrip().endswith('exit 0'))
+            self.assertLess(len(call[-1]),8191)
+
+    def test_stdout_protocol_remains_strict_utf8(self):
+        result=subprocess.CompletedProcess(['ssh'],0,b'\x83\x82',b'')
+        with patch.object(RENEW.subprocess,'run',return_value=result):
+            with self.assertRaises(UnicodeDecodeError):
+                RENEW.run(['ssh'])
 
     def test_alias_and_windows_path_traversal_are_rejected_before_commands(self):
         for room, home, binary in [
