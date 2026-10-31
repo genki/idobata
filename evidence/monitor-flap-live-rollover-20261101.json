@@ -1,0 +1,542 @@
+{
+  "version": 1,
+  "test": "idobata-monitor-live-canary-rollover",
+  "status": "passed",
+  "websh_revision": 7466,
+  "monitor_fix_commit": "ea2da64",
+  "started_at": "2026-10-31T17:34:23.045055+00:00",
+  "elapsed_seconds": 994.87,
+  "sample_count": 34,
+  "entry_count_per_sample": 11,
+  "entry_down_observation_count": 0,
+  "fetch_errors": 0,
+  "new_ng_notifications": 0,
+  "natural_rollover": {
+    "observed_checking": true,
+    "observed_three_receipts_complete": true,
+    "forced_posts": false
+  },
+  "feed_revisions": [
+    728,
+    738,
+    748,
+    758
+  ],
+  "all_public_feed_checks_directly_verified": true,
+  "samples": [
+    {
+      "at": 1793468063.0452466,
+      "observation_at": "2026-10-31T17:34:27.013Z",
+      "entry_count": 11,
+      "down_ids": [],
+      "feed_revision": 728,
+      "feed_cache": false,
+      "canary": {
+        "created_at": 1793465387.9684827,
+        "phase": "complete",
+        "complete": true,
+        "delivered_count": 3,
+        "recipient_count": 3
+      }
+    },
+    {
+      "at": 1793468097.0190144,
+      "observation_at": "2026-10-31T17:34:55.390Z",
+      "entry_count": 11,
+      "down_ids": [],
+      "feed_revision": 728,
+      "feed_cache": false,
+      "canary": {
+        "created_at": 1793465387.9684827,
+        "phase": "complete",
+        "complete": true,
+        "delivered_count": 3,
+        "recipient_count": 3
+      }
+    },
+    {
+      "at": 1793468127.0265749,
+      "observation_at": "2026-10-31T17:35:23.167Z",
+      "entry_count": 11,
+      "down_ids": [],
+      "feed_revision": 728,
+      "feed_cache": false,
+      "canary": {
+        "created_at": 1793465387.9684827,
+        "phase": "complete",
+        "complete": true,
+        "delivered_count": 3,
+        "recipient_count": 3
+      }
+    },
+    {
+      "at": 1793468157.0304785,
+      "observation_at": "2026-10-31T17:35:53.525Z",
+      "entry_count": 11,
+      "down_ids": [],
+      "feed_revision": 728,
+      "feed_cache": false,
+      "canary": {
+        "created_at": 1793465387.9684827,
+        "phase": "complete",
+        "complete": true,
+        "delivered_count": 3,
+        "recipient_count": 3
+      }
+    },
+    {
+      "at": 1793468187.0346558,
+      "observation_at": "2026-10-31T17:36:24.574Z",
+      "entry_count": 11,
+      "down_ids": [],
+      "feed_revision": 738,
+      "feed_cache": false,
+      "canary": {
+        "created_at": 1793465387.9684827,
+        "phase": "complete",
+        "complete": true,
+        "delivered_count": 3,
+        "recipient_count": 3
+      }
+    },
+    {
+      "at": 1793468217.03853,
+      "observation_at": "2026-10-31T17:36:54.237Z",
+      "entry_count": 11,
+      "down_ids": [],
+      "feed_revision": 738,
+      "feed_cache": false,
+      "canary": {
+        "created_at": 1793465387.9684827,
+        "phase": "complete",
+        "complete": true,
+        "delivered_count": 3,
+        "recipient_count": 3
+      }
+    },
+    {
+      "at": 1793468247.1110072,
+      "observation_at": "2026-10-31T17:37:23.955Z",
+      "entry_count": 11,
+      "down_ids": [],
+      "feed_revision": 738,
+      "feed_cache": false,
+      "canary": {
+        "created_at": 1793465387.9684827,
+        "phase": "complete",
+        "complete": true,
+        "delivered_count": 3,
+        "recipient_count": 3
+      }
+    },
+    {
+      "at": 1793468277.1145604,
+      "observation_at": "2026-10-31T17:37:53.890Z",
+      "entry_count": 11,
+      "down_ids": [],
+      "feed_revision": 738,
+      "feed_cache": false,
+      "canary": {
+        "created_at": 1793465387.9684827,
+        "phase": "complete",
+        "complete": true,
+        "delivered_count": 3,
+        "recipient_count": 3
+      }
+    },
+    {
+      "at": 1793468307.118279,
+      "observation_at": "2026-10-31T17:38:24.238Z",
+      "entry_count": 11,
+      "down_ids": [],
+      "feed_revision": 738,
+      "feed_cache": false,
+      "canary": {
+        "created_at": 1793465387.9684827,
+        "phase": "complete",
+        "complete": true,
+        "delivered_count": 3,
+        "recipient_count": 3
+      }
+    },
+    {
+      "at": 1793468337.2287016,
+      "observation_at": "2026-10-31T17:38:55.231Z",
+      "entry_count": 11,
+      "down_ids": [],
+      "feed_revision": 738,
+      "feed_cache": false,
+      "canary": {
+        "created_at": 1793465387.9684827,
+        "phase": "complete",
+        "complete": true,
+        "delivered_count": 3,
+        "recipient_count": 3
+      }
+    },
+    {
+      "at": 1793468367.2642665,
+      "observation_at": "2026-10-31T17:39:24.731Z",
+      "entry_count": 11,
+      "down_ids": [],
+      "feed_revision": 738,
+      "feed_cache": false,
+      "canary": {
+        "created_at": 1793465387.9684827,
+        "phase": "complete",
+        "complete": true,
+        "delivered_count": 3,
+        "recipient_count": 3
+      }
+    },
+    {
+      "at": 1793468397.2690306,
+      "observation_at": "2026-10-31T17:39:54.936Z",
+      "entry_count": 11,
+      "down_ids": [],
+      "feed_revision": 738,
+      "feed_cache": false,
+      "canary": {
+        "created_at": 1793465387.9684827,
+        "phase": "complete",
+        "complete": true,
+        "delivered_count": 3,
+        "recipient_count": 3
+      }
+    },
+    {
+      "at": 1793468427.274025,
+      "observation_at": "2026-10-31T17:40:24.962Z",
+      "entry_count": 11,
+      "down_ids": [],
+      "feed_revision": 738,
+      "feed_cache": false,
+      "canary": {
+        "created_at": 1793465387.9684827,
+        "phase": "complete",
+        "complete": true,
+        "delivered_count": 3,
+        "recipient_count": 3
+      }
+    },
+    {
+      "at": 1793468457.3259842,
+      "observation_at": "2026-10-31T17:40:55.987Z",
+      "entry_count": 11,
+      "down_ids": [],
+      "feed_revision": 738,
+      "feed_cache": false,
+      "canary": {
+        "created_at": 1793465387.9684827,
+        "phase": "complete",
+        "complete": true,
+        "delivered_count": 3,
+        "recipient_count": 3
+      }
+    },
+    {
+      "at": 1793468487.3576794,
+      "observation_at": "2026-10-31T17:41:25.328Z",
+      "entry_count": 11,
+      "down_ids": [],
+      "feed_revision": 748,
+      "feed_cache": false,
+      "canary": {
+        "created_at": 1793465387.9684827,
+        "phase": "complete",
+        "complete": true,
+        "delivered_count": 3,
+        "recipient_count": 3
+      }
+    },
+    {
+      "at": 1793468517.3787065,
+      "observation_at": "2026-10-31T17:41:53.790Z",
+      "entry_count": 11,
+      "down_ids": [],
+      "feed_revision": 748,
+      "feed_cache": false,
+      "canary": {
+        "created_at": 1793465387.9684827,
+        "phase": "complete",
+        "complete": true,
+        "delivered_count": 3,
+        "recipient_count": 3
+      }
+    },
+    {
+      "at": 1793468547.4056613,
+      "observation_at": "2026-10-31T17:42:10.843Z",
+      "entry_count": 11,
+      "down_ids": [],
+      "feed_revision": 748,
+      "feed_cache": false,
+      "canary": {
+        "created_at": 1793465387.9684827,
+        "phase": "complete",
+        "complete": true,
+        "delivered_count": 3,
+        "recipient_count": 3
+      }
+    },
+    {
+      "at": 1793468577.4117863,
+      "observation_at": "2026-10-31T17:42:55.146Z",
+      "entry_count": 11,
+      "down_ids": [],
+      "feed_revision": 748,
+      "feed_cache": false,
+      "canary": {
+        "created_at": 1793465387.9684827,
+        "phase": "complete",
+        "complete": true,
+        "delivered_count": 3,
+        "recipient_count": 3
+      }
+    },
+    {
+      "at": 1793468607.4822154,
+      "observation_at": "2026-10-31T17:43:22.866Z",
+      "entry_count": 11,
+      "down_ids": [],
+      "feed_revision": 748,
+      "feed_cache": false,
+      "canary": {
+        "created_at": 1793465387.9684827,
+        "phase": "complete",
+        "complete": true,
+        "delivered_count": 3,
+        "recipient_count": 3
+      }
+    },
+    {
+      "at": 1793468637.4877965,
+      "observation_at": "2026-10-31T17:43:53.952Z",
+      "entry_count": 11,
+      "down_ids": [],
+      "feed_revision": 748,
+      "feed_cache": false,
+      "canary": {
+        "created_at": 1793465387.9684827,
+        "phase": "complete",
+        "complete": true,
+        "delivered_count": 3,
+        "recipient_count": 3
+      }
+    },
+    {
+      "at": 1793468667.4921575,
+      "observation_at": "2026-10-31T17:44:23.097Z",
+      "entry_count": 11,
+      "down_ids": [],
+      "feed_revision": 748,
+      "feed_cache": false,
+      "canary": {
+        "created_at": 1793465387.9684827,
+        "phase": "complete",
+        "complete": true,
+        "delivered_count": 3,
+        "recipient_count": 3
+      }
+    },
+    {
+      "at": 1793468697.5043068,
+      "observation_at": "2026-10-31T17:44:53.762Z",
+      "entry_count": 11,
+      "down_ids": [],
+      "feed_revision": 748,
+      "feed_cache": false,
+      "canary": {
+        "created_at": 1793465387.9684827,
+        "phase": "complete",
+        "complete": true,
+        "delivered_count": 3,
+        "recipient_count": 3
+      }
+    },
+    {
+      "at": 1793468727.5095193,
+      "observation_at": "2026-10-31T17:45:24.453Z",
+      "entry_count": 11,
+      "down_ids": [],
+      "feed_revision": 748,
+      "feed_cache": false,
+      "canary": {
+        "created_at": 1793465387.9684827,
+        "phase": "complete",
+        "complete": true,
+        "delivered_count": 3,
+        "recipient_count": 3
+      }
+    },
+    {
+      "at": 1793468757.5163512,
+      "observation_at": "2026-10-31T17:45:53.593Z",
+      "entry_count": 11,
+      "down_ids": [],
+      "feed_revision": 748,
+      "feed_cache": false,
+      "canary": {
+        "created_at": 1793465387.9684827,
+        "phase": "complete",
+        "complete": true,
+        "delivered_count": 3,
+        "recipient_count": 3
+      }
+    },
+    {
+      "at": 1793468787.52572,
+      "observation_at": "2026-10-31T17:46:23.622Z",
+      "entry_count": 11,
+      "down_ids": [],
+      "feed_revision": 748,
+      "feed_cache": false,
+      "canary": {
+        "created_at": 1793465387.9684827,
+        "phase": "complete",
+        "complete": true,
+        "delivered_count": 3,
+        "recipient_count": 3
+      }
+    },
+    {
+      "at": 1793468817.5348291,
+      "observation_at": "2026-10-31T17:46:54.703Z",
+      "entry_count": 11,
+      "down_ids": [],
+      "feed_revision": 758,
+      "feed_cache": false,
+      "canary": {
+        "created_at": 1793465387.9684827,
+        "phase": "complete",
+        "complete": true,
+        "delivered_count": 3,
+        "recipient_count": 3
+      }
+    },
+    {
+      "at": 1793468847.5487897,
+      "observation_at": "2026-10-31T17:47:25.408Z",
+      "entry_count": 11,
+      "down_ids": [],
+      "feed_revision": 758,
+      "feed_cache": false,
+      "canary": {
+        "created_at": 1793465387.9684827,
+        "phase": "complete",
+        "complete": true,
+        "delivered_count": 3,
+        "recipient_count": 3
+      }
+    },
+    {
+      "at": 1793468877.5551517,
+      "observation_at": "2026-10-31T17:47:57.296Z",
+      "entry_count": 11,
+      "down_ids": [],
+      "feed_revision": 758,
+      "feed_cache": false,
+      "canary": {
+        "created_at": 1793465387.9684827,
+        "phase": "complete",
+        "complete": true,
+        "delivered_count": 3,
+        "recipient_count": 3
+      }
+    },
+    {
+      "at": 1793468907.6177998,
+      "observation_at": "2026-10-31T17:48:26.150Z",
+      "entry_count": 11,
+      "down_ids": [],
+      "feed_revision": 758,
+      "feed_cache": false,
+      "canary": {
+        "created_at": 1793465387.9684827,
+        "phase": "complete",
+        "complete": true,
+        "delivered_count": 3,
+        "recipient_count": 3
+      }
+    },
+    {
+      "at": 1793468937.6270795,
+      "observation_at": "2026-10-31T17:48:55.987Z",
+      "entry_count": 11,
+      "down_ids": [],
+      "feed_revision": 758,
+      "feed_cache": false,
+      "canary": {
+        "created_at": 1793465387.9684827,
+        "phase": "complete",
+        "complete": true,
+        "delivered_count": 3,
+        "recipient_count": 3
+      }
+    },
+    {
+      "at": 1793468967.6351552,
+      "observation_at": "2026-10-31T17:49:27.008Z",
+      "entry_count": 11,
+      "down_ids": [],
+      "feed_revision": 758,
+      "feed_cache": false,
+      "canary": {
+        "created_at": 1793465387.9684827,
+        "phase": "complete",
+        "complete": true,
+        "delivered_count": 3,
+        "recipient_count": 3
+      }
+    },
+    {
+      "at": 1793468997.7608476,
+      "observation_at": "2026-10-31T17:49:55.406Z",
+      "entry_count": 11,
+      "down_ids": [],
+      "feed_revision": 758,
+      "feed_cache": false,
+      "canary": {
+        "created_at": 1793465387.9684827,
+        "phase": "complete",
+        "complete": true,
+        "delivered_count": 3,
+        "recipient_count": 3
+      }
+    },
+    {
+      "at": 1793469027.9059176,
+      "observation_at": "2026-10-31T17:50:23.556Z",
+      "entry_count": 11,
+      "down_ids": [],
+      "feed_revision": 758,
+      "feed_cache": false,
+      "canary": {
+        "created_at": 1793469011.7967713,
+        "phase": "checking",
+        "complete": false,
+        "delivered_count": 0,
+        "recipient_count": 3
+      }
+    },
+    {
+      "at": 1793469057.9116938,
+      "observation_at": "2026-10-31T17:50:53.107Z",
+      "entry_count": 11,
+      "down_ids": [],
+      "feed_revision": 758,
+      "feed_cache": false,
+      "canary": {
+        "created_at": 1793469011.7967713,
+        "phase": "complete",
+        "complete": true,
+        "delivered_count": 3,
+        "recipient_count": 3
+      }
+    }
+  ],
+  "limits": {
+    "continuous_72_hour_stability_claimed": false,
+    "source_changed_by_this_observation": false
+  }
+}
