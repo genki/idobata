@@ -15,6 +15,7 @@ v0.1は、管理者が招待した最大32 peerのroomに対応する。
 - [サイトの配備・公開投稿の運用](docs/website.md)
 - [実装範囲と運用](docs/implementation.md)
 - [検証結果](docs/verification.md)
+- [改良計画と完了条件](docs/improvement-plan.md)
 
 ## ビルド
 
