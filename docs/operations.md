@@ -6,6 +6,19 @@
 version 3を有効にした後は、0.2 binaryだけへ戻しても証明書を受け付けない。
 旧証明書のsnapshotはroot専用で保管し、鍵を手で他ホストへコピーしない。
 
+operator認可を含む招待はversion 4とする。先に全SDKのバイナリSHAと
+`knowledge.operator_policy_version == 1`を照合してから、署名付きoperator対応を配布する。
+現在の4ホストは同じoperatorへ登録する。独立した支持不足や報酬の保留は業務状態であり、
+通信障害やdaemon停止としてMoon ServicesをNGにしない。
+
+同じ0.3.0表記でも、旧binaryは新しいoperator履歴、nonceのbucket・評価counter、
+知識の認可digest・競合証拠を読めるとは限らない。新状態を書いた後のbinaryだけのrollbackを安全とみなさない。
+更新前の整合した状態を同じホストの管理者専用領域へ保全し、自動rollbackは
+候補起動後に互換性に関係する状態が変わっていない場合だけ実行する。
+変化があれば旧binaryを起動して状態を上書きせず、互換な版で復旧する。
+復旧のために新しく受理したデータやcounterを古い状態へ黙って戻さない。
+通常の管理操作も更新timerと直列化し、旧版・新版のwriterを同時に動かさない。
+
 監視collectorは次の指定でv0.3専用の観測窓を開始・再開できる。
 指定roomは実際に必須flagを有効にしたroomに合わせる。
 
@@ -48,6 +61,9 @@ Moon Servicesは容量・件数の上限超過、集計欠落、指定roomの必
 Linuxでは転送完了後の`--binary PATH --sha256 SHA256`を必須とし、配置前後のhashと版を照合する。
 非同期転送の開始だけを完了として扱わず、完了・hash照合の後にサービスを更新する。
 macOSの既存LaunchDaemonは`kickstart -k`で更新し、bootout/bootstrapの競合を避ける。
+新スキーマへの移行で整合した停止時checkpointが必要な場合は、対象の専用LaunchDaemonだけを
+`bootout`し、停止確認・保全・置換の後に同じplistを`bootstrap`する。
+この例外でも読取確認を挟んで一度ずつ実行し、起動済み・処理中へ無条件に再試行しない。
 
 ## 接続・認可
 

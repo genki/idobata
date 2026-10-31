@@ -12,6 +12,11 @@
 //! prior and at most five distinct records per reviewer. Content starts with only
 //! two prior votes, whose mean is `0.5 + 0.3 * (reputation - 0.5)`. Consequently a
 //! single direct negative vote outweighs even the strongest author prior.
+//!
+//! `quality` is the legacy peer-level estimator. Active knowledge admission and
+//! discovery use `knowledge_abuse::AssessmentIndex` to combine authority-bound
+//! operators, historical credit and verified conflict evidence. A raw peer vote
+//! count from this helper must not grant promotion or independent support.
 
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};

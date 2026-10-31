@@ -909,6 +909,7 @@ mod authorization_display_tests {
                 .collect(),
             public: false,
             knowledge_automation_required: false,
+            knowledge_operators: None,
         };
         let mut room = TrustedRoom {
             authority_peer_id: own.clone(),

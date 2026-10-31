@@ -5,6 +5,8 @@ Uses the inventory format and Node fixture helper from verify-peers.py. Binary
 paths must already select the new SDK; this script never installs a binary or
 changes production services. Inventory ports are deliberately replaced with
 39130..39133. Only the fixture's daemons, tunnels and data are removed.
+Acceptance requires every node's public native binary_sha256. The required
+source digest is a manager-provided build label, not a CLI provenance proof.
 
 The report contains counts and outcomes, never record bodies, queries, peer IDs,
 addresses, certificates, synthetic token values or private exception messages.
@@ -72,7 +74,9 @@ def fixture_node_config(config, index, port):
     root = config.get('root')
     binary = config.get('binary')
     check(platform in ['linux', 'macos', 'windows'] and isinstance(root, str)
-          and isinstance(binary, str) and binary, 'invalid_fixture_inventory_fields')
+          and isinstance(binary, str) and binary
+          and not any(ord(character) < 32 for character in binary),
+          'invalid_fixture_inventory_fields')
     root = root.replace('\\', '/').rstrip('/')
     check(not any(part in ['.', '..'] for part in root.split('/'))
           and not any(ord(character) < 32 for character in root),
@@ -87,8 +91,15 @@ def fixture_node_config(config, index, port):
     value = {'platform': platform, 'binary': binary, 'root': root,
              'name': 'node-' + str(index + 1), 'port': port}
     if config.get('ssh'):
-        check(isinstance(config['ssh'], str), 'invalid_fixture_ssh_alias')
+        check(isinstance(config['ssh'], str)
+              and re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9_.@-]{0,127}', config['ssh']),
+              'invalid_fixture_ssh_alias')
         value['ssh'] = config['ssh']
+    expected = config.get('binary_sha256')
+    if expected is not None:
+        check(isinstance(expected, str) and ID_PATTERN.fullmatch(expected),
+              'invalid_expected_native_binary_hash')
+        value['binary_sha256'] = expected
     return value
 
 
@@ -354,7 +365,8 @@ def solver_self_test():
             'rejected_unsafe_fixture_root_count': 4,
             'rejected_unsafe_upload_path_count': 6,
             'mock_private_sftp_upload_count': 1,
-            'replication_diagnostic_cases': replication_summary_self_test()}
+            'replication_diagnostic_cases': replication_summary_self_test(),
+            'case_a_guard_checks': case_a_self_test()}
 
 
 class FixtureNode(HELPERS.Node):
@@ -368,6 +380,36 @@ class FixtureNode(HELPERS.Node):
         self.phase = 'cli'
         self.last_mutation = 0.0
         self.automation_counts = {'publish': 0, 'evaluate': 0}
+
+    def binary_sha256(self):
+        """Read only the public native executable, never identity/storage keys."""
+        if self.win:
+            result = self.powershell(
+                '(Get-FileHash -LiteralPath ' + HELPERS.ps_quote(self.binary)
+                + ' -Algorithm SHA256).Hash.ToLowerInvariant()', timeout=45)
+        elif self.host:
+            result = self.shell("python3 - <<'HASH'\nimport hashlib\n"
+                                + 'digest=hashlib.sha256()\n'
+                                + f'with open({self.binary!r},"rb") as source:\n'
+                                + ' for chunk in iter(lambda:source.read(1048576),b""):\n'
+                                + '  digest.update(chunk)\nprint(digest.hexdigest())\nHASH',
+                                timeout=45)
+        else:
+            digest = hashlib.sha256()
+            with open(self.binary, 'rb') as source:
+                for chunk in iter(lambda: source.read(1048576), b''):
+                    digest.update(chunk)
+            return digest.hexdigest()
+        if result.returncode != 0:
+            self.private_diagnostic(result)
+            raise VerificationFailure('native_binary_hash_failed', node_index=self.fixture_index)
+        try:
+            value = result.stdout.decode('utf-8-sig').strip()
+        except UnicodeError:
+            raise VerificationFailure('invalid_native_binary_hash',
+                                      node_index=self.fixture_index) from None
+        check(ID_PATTERN.fullmatch(value), 'invalid_native_binary_hash')
+        return value
 
     def private_diagnostic(self, result):
         # stdout/stderr may contain a rejected body. Never include them in JSON.
@@ -383,6 +425,10 @@ class FixtureNode(HELPERS.Node):
     def run(self, args, data=None, codes=(0,), timeout=35):
         if isinstance(data, str):
             data = data.encode()
+        if len(args) >= 2 and args[0] == 'knowledge':
+            if not hasattr(self, 'knowledge_cli_counts'):
+                self.knowledge_cli_counts = {}
+            self.knowledge_cli_counts[args[1]] = self.knowledge_cli_counts.get(args[1], 0) + 1
         result = subprocess.run(self.argv(args), input=data, capture_output=True,
                                 timeout=timeout)
         if result.returncode not in codes:
@@ -486,6 +532,7 @@ class FixtureNode(HELPERS.Node):
         return result
 
     def remove_fixture_file(self, path):
+        path = fixture_file_path(self.home, path, windows=self.win)
         if self.win:
             quoted = HELPERS.ps_quote(path)
             result = self.powershell(f'Remove-Item -LiteralPath {quoted} -Force')
@@ -586,8 +633,8 @@ def status(node):
     value = node.run(['knowledge', 'status', '--room', ROOM])
     check(value.get('replication_factor') == 3, 'wrong_replication_factor')
     check(isinstance(value.get('records'), list), 'missing_local_record_inventory')
-    check(isinstance(value.get('bytes'), int)
-          and isinstance(value.get('quota_bytes'), int)
+    check(type(value.get('bytes')) is int
+          and type(value.get('quota_bytes')) is int
           and 0 <= value['bytes'] <= value['quota_bytes'] <= 64 * 1024 * 1024,
           'invalid_quota_accounting')
     check(value.get('objects') == len(value['records']), 'wrong_object_count')
@@ -626,6 +673,14 @@ def record_inventory(snapshots):
             local_ids.add(record_id)
             result.setdefault(record_id, []).append((index, record))
     return result
+
+
+def require_nonkeeper_authors(fixtures, copies):
+    selected = [fixture for fixture in fixtures
+                if fixture['author_index'] not in {
+                    index for index, _ in copies[fixture['id']]}]
+    check(selected, 'fixture_placement_insufficient')
+    return selected
 
 
 def replica_complete(snapshots, fixtures, peer_ids):
@@ -783,9 +838,11 @@ def wait_replicas(nodes, fixtures, peer_ids):
         time.sleep(1)
 
 
-def search(node, query=QUERY):
-    value = node.run(['knowledge', 'search', '--room', ROOM,
-                      '--query', query, '--limit', '10'])
+def search(node, query=QUERY, *, explore=True):
+    args = ['knowledge', 'search', '--room', ROOM, '--query', query, '--limit', '10']
+    if explore:
+        args.append('--explore')
+    value = node.run(args)
     check(isinstance(value.get('hits'), list), 'missing_search_hits')
     return value
 
@@ -810,17 +867,91 @@ def verified_get(node, fixture):
 
 def useful_votes(value):
     quality = value.get('quality')
-    if isinstance(quality, dict) and isinstance(quality.get('useful_votes'), int):
-        return quality['useful_votes']
-    reviews = value.get('reviews')
-    check(isinstance(reviews, list), 'missing_review_summary')
-    latest = {}
-    for review in reviews:
-        reviewer = review.get('reviewer_peer_id')
-        check(isinstance(reviewer, str), 'missing_review_author')
-        check(reviewer not in latest, 'duplicate_reviewer_counted')
-        latest[reviewer] = review.get('verdict')
-    return sum(verdict == 'useful' for verdict in latest.values())
+    check(isinstance(quality, dict) and type(quality.get('useful_votes')) is int
+          and quality['useful_votes'] >= 0, 'missing_independent_useful_vote_count')
+    return quality['useful_votes']
+
+
+def case_a_self_test():
+    """Exercise new acceptance guards using synthetic values and mocked I/O."""
+    from unittest import mock
+    config = {'platform': 'linux', 'root': '/tmp/idobata-knowledge-fixtures',
+              'binary': '/tmp/candidate-idobata'}
+    rejected = 0
+    for alias in ['-oProxyCommand=unexpected', 'host name', 'host\nname']:
+        try:
+            fixture_node_config({**config, 'ssh': alias}, 0, 39130)
+        except VerificationFailure:
+            rejected += 1
+        else:
+            raise VerificationFailure('unsafe_ssh_alias_was_accepted')
+    for value in [True, 'a' * 63, 'A' * 64]:
+        try:
+            fixture_node_config({**config, 'binary_sha256': value}, 0, 39130)
+        except VerificationFailure:
+            rejected += 1
+        else:
+            raise VerificationFailure('invalid_native_hash_was_accepted')
+    selected = fixture_node_config({**config, 'binary_sha256': 'a' * 64}, 0, 39130)
+    check(selected['binary_sha256'] == 'a' * 64, 'expected_native_hash_was_discarded')
+    copies = {'a' * 64: [(0, {}), (1, {}), (2, {})]}
+    check(len(require_nonkeeper_authors([{'id': 'a' * 64, 'author_index': 3}], copies)) == 1,
+          'nonkeeper_author_fixture_not_selected')
+    try:
+        require_nonkeeper_authors([{'id': 'a' * 64, 'author_index': 0}], copies)
+    except VerificationFailure as error:
+        check(str(error) == 'fixture_placement_insufficient', 'wrong_placement_failure_class')
+    else:
+        raise VerificationFailure('keeper_author_fallback_was_accepted')
+    check(useful_votes({'quality': {'useful_votes': 0},
+                        'reviews': [{'verdict': 'useful'}]}) == 0,
+          'physical_review_was_counted_as_operator_support')
+    for value in [{'reviews': [{'verdict': 'useful'}]},
+                  {'quality': {'useful_votes': False}}]:
+        try:
+            useful_votes(value)
+        except VerificationFailure:
+            rejected += 1
+        else:
+            raise VerificationFailure('missing_operator_vote_count_was_reconstructed')
+    calls = []
+    node = SimpleNamespace(argv=lambda args: ['unused-cli'] + args,
+                           fixture_index=1, phase='self-test')
+    result = SimpleNamespace(returncode=0, stdout=b'{"hits":[]}', stderr=b'')
+    with mock.patch.object(subprocess, 'run', side_effect=lambda argv, **_: calls.append(argv) or result):
+        for args in [['knowledge', 'search'], ['knowledge', 'search'],
+                     ['knowledge', 'status'], ['info']]:
+            FixtureNode.run(node, args)
+    check(len(calls) == 4 and node.knowledge_cli_counts == {'search': 2, 'status': 1},
+          'actual_knowledge_cli_counter_incorrect')
+    with tempfile.TemporaryDirectory(prefix='idobata-public-binary-self-test-') as directory:
+        binary = Path(directory) / 'candidate-idobata'
+        binary.write_bytes(b'public native artifact fixture')
+        local = SimpleNamespace(win=False, host=None, binary=str(binary))
+        check(FixtureNode.binary_sha256(local) == hashlib.sha256(binary.read_bytes()).hexdigest(),
+              'native_binary_digest_not_exact')
+    upload_home = 'C:/Users/fixture/AppData/Local/Temp/idobata-fixture/node-test'
+    uploaded = []
+    upload = SimpleNamespace(win=True, host='fixture-host', home=upload_home,
+                             fixture_index=1, phase='put', private_diagnostic=lambda _: None)
+    for failure in ['exit', 'timeout']:
+        def failed_upload(argv, **_):
+            uploaded.append(Path(argv[-2]))
+            if failure == 'timeout':
+                raise subprocess.TimeoutExpired('fixture-sftp', 1)
+            return SimpleNamespace(returncode=1, stdout=b'', stderr=b'')
+        with mock.patch.object(subprocess, 'run', side_effect=failed_upload):
+            try:
+                FixtureNode.put(upload, upload_home + '/answer.json', b'fixture')
+            except (VerificationFailure, subprocess.TimeoutExpired):
+                pass
+            else:
+                raise VerificationFailure('failed_sftp_upload_was_accepted')
+    check(len(uploaded) == 2 and all(not path.exists() for path in uploaded),
+          'failed_sftp_upload_left_local_file')
+    return {'rejected_inventory_or_vote_shapes': rejected,
+            'placement_guard_cases': 2, 'cli_counter_cases': len(calls),
+            'public_native_hash_cases': 1, 'sftp_failure_cleanup_cases': len(uploaded)}
 
 
 def atomic_report(output, report):
@@ -842,6 +973,8 @@ def main():
     parser.add_argument('--inventory',
                         help='Same private JSON inventory as verify-peers.py; exactly four hosts')
     parser.add_argument('--output', help='Body-free JSON evidence output')
+    parser.add_argument('--source-sha256',
+                        help='Manager-verified source archive digest; not a CLI provenance proof')
     parser.add_argument('--self-test', action='store_true',
                         help='Run only independent solver vectors and malformed-input checks')
     args = parser.parse_args()
@@ -849,25 +982,32 @@ def main():
         print(json.dumps({'status': 'passed', 'test': 'automation-solver',
                           **solver_self_test()}), flush=True)
         return 0
-    if not args.inventory or not args.output:
-        parser.error('--inventory and --output are required for real-host verification')
+    if not args.inventory or not args.output or not args.source_sha256:
+        parser.error('--inventory, --output and --source-sha256 are required for real-host verification')
+    if not ID_PATTERN.fullmatch(args.source_sha256):
+        parser.error('--source-sha256 must contain exactly 64 lowercase hexadecimal characters')
     output = Path(args.output).resolve()
+    if output.exists():
+        parser.error('--output must be a new file; existing evidence is preserved')
     output.parent.mkdir(parents=True, exist_ok=True)
     run_id = str(time.time_ns())
     logs = output.parent / ('private-knowledge-logs-' + run_id)
     logs.mkdir(mode=0o700)
     report = {
-        'version': 2,
-        'test': 'real-host-knowledge-e2e',
+        'version': 3,
+        'test': 'real-host-one-operator-knowledge-e2e',
         'started_at': time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime()),
         'status': 'running',
         'checks': {},
         'retention_time_travel_tested': False,
         'production_services_changed': False,
         'automation_assurance_is_ai_identity': False,
+        'source_archive_sha256': args.source_sha256,
+        'source_provenance': 'manager_build_evidence_label_not_cli_attestation',
     }
     nodes = []
     tunnels = []
+    binaries_verified = False
     stage = 'inventory'
 
     def record(name, result):
@@ -885,7 +1025,22 @@ def main():
         check(sum(not node.host for node in nodes) == 1, 'expected_one_local_coordinator')
         first = next(node for node in nodes if not node.host)
         check(not first.win, 'local_coordinator_must_be_unix')
+        hosts = [node.host for node in nodes if node.host]
+        check(len(set(hosts)) == len(hosts), 'duplicate_fixture_ssh_alias')
         record('isolated_fixture_host_count', len(nodes))
+
+        stage = 'native_artifact_hashes'
+        supplied = sum(node.c.get('binary_sha256') is not None for node in nodes)
+        record('expected_native_binary_hash_count', supplied)
+        check(supplied == len(nodes), 'expected_native_binary_hashes_required')
+        artifacts = []
+        for index, node in enumerate(nodes):
+            actual = node.binary_sha256()
+            check(actual == node.c['binary_sha256'], 'native_binary_hash_mismatch')
+            artifacts.append({'node_index': index + 1, 'platform': node.c['platform'],
+                              'sha256': actual})
+        binaries_verified = True
+        record('verified_native_artifacts', artifacts)
 
         stage = 'sdk_versions'
         versions = []
@@ -919,13 +1074,20 @@ def main():
         members_path = first.home + '/members.json'
         invite_path = first.home + '/invite.json'
         first.put(members_path, json.dumps(identities))
+        operators_path = first.home + '/operators.json'
+        first.put(operators_path, json.dumps({
+            'bindings': {peer: 'fixture-shared-operator' for peer in peer_ids},
+            'credits': {'fixture-shared-operator': 1000}}))
         created = first.run(['room', 'create', '--room', ROOM, '--members-file',
-                             members_path, '--output', invite_path, '--require-automation'])
+                             members_path, '--output', invite_path, '--require-automation',
+                             '--operators-file', operators_path])
         authority = created['authority_peer_id']
         invite = Path(invite_path).read_bytes()
         certificate = json.loads(invite)
         check(certificate['signed'].get('knowledge_automation_required') is True
-              and certificate['signed'].get('version') == 3,
+              and certificate['signed'].get('version') == 4
+              and certificate['signed'].get('knowledge_operators', {}).get('bindings')
+              == {peer: 'fixture-shared-operator' for peer in peer_ids},
               'room_did_not_require_automation')
         for node in nodes:
             node.room_id = certificate['signed']['room_id']
@@ -936,6 +1098,10 @@ def main():
             node.run(['room', 'join', '--room', ROOM, '--invite-file',
                       node.home + '/invite.json', '--trust-authority', authority])
         record('fixed_authorized_roster_size', len(nodes))
+        record('operator_trust_assumption', {'physical_host_count': len(nodes),
+               'actual_operator_count': 1, 'registered_operator_count': 1,
+               'independence_is_authority_attested': True,
+               'synthetic_independent_operators_on_real_hosts': False})
 
         stage = 'fixture_transport'
         for node in nodes:
@@ -964,6 +1130,9 @@ def main():
             expirations = information.get('knowledge', {}).get('expired_background_requests')
             check(type(expirations) is int and expirations >= 0,
                   'candidate_missing_background_timeout_capability')
+            marker = information.get('knowledge', {}).get('operator_policy_version')
+            check(type(marker) is int and marker == 1,
+                  'candidate_missing_operator_policy_capability')
             rooms = information.get('rooms', [])
             check(any(room.get('name') == ROOM
                       and room.get('authorized') is True
@@ -971,6 +1140,7 @@ def main():
                   'daemon_room_did_not_require_automation')
         record('automation_required_room_host_count', len(nodes))
         record('background_timeout_capability_host_count', len(nodes))
+        record('operator_policy_capability_host_count', len(nodes))
 
         stage = 'blocked_inputs'
         for node in nodes:
@@ -1000,7 +1170,7 @@ def main():
             inputs = []
             for index, node in enumerate(nodes):
                 body = {
-                    'problem': f'知識検証 {labels[index]}のノード {round_index + 1}件目 同じ依頼が重複して実行される',
+                    'problem': f'知識検証 {labels[index]}のノード {round_index + 1}件目 固有事例{index + 1}番{round_index + 1}回 同じ依頼が重複して実行される',
                     'solution': '依頼の番号と処理結果を保存し、同じ番号では保存した結果を返す。',
                     'context': '処理結果と依頼の番号を同時に保存できる場合に使う。',
                     'references': [],
@@ -1016,7 +1186,8 @@ def main():
                 check(value.get('stored') is True, 'publish_not_stored')
                 check(value.get('replication_factor') == 3, 'publish_wrong_replication_factor')
                 return {'id': record_id, 'author': peer_ids[index],
-                        'author_index': index, 'input': body}
+                        'author_index': index, 'input': body,
+                        'unique_query': f'固有事例{index + 1}番{round_index + 1}回'}
 
             fixtures.extend(parallel(publish, inputs))
         check(len({fixture['id'] for fixture in fixtures}) == 8, 'publish_duplicate_id')
@@ -1027,6 +1198,7 @@ def main():
         began = time.monotonic()
         snapshots = wait_replicas(nodes, fixtures, peer_ids)
         copies = record_inventory(snapshots)
+        handoffs = require_nonkeeper_authors(fixtures, copies)
         record('converged_replication', {
             'record_count': len(fixtures),
             'persistent_copy_count': sum(len(items) for items in copies.values()),
@@ -1034,27 +1206,54 @@ def main():
             'maximum_copies_per_record': max(map(len, copies.values())),
             'staging_record_count': sum(record['staging'] for value in snapshots
                                         for record in value['records']),
+            'nonkeeper_author_handoff_count': len(handoffs),
             'wait_seconds': round(time.monotonic() - began, 3),
         })
 
-        stage = 'all_host_search'
+        stage = 'normal_and_explicit_exploration'
         wait_peer_readiness(nodes)
-        deadline = time.monotonic() + WAIT_SECONDS
-        expected_ids = {fixture['id'] for fixture in fixtures}
-        while True:
-            searches = parallel(search, nodes)
-            if all({hit['id'] for hit in value['hits']} == expected_ids
-                   and value.get('partial') is False
-                   and type(value.get('responded_peers')) is int
-                   and value['responded_peers'] >= 1 for value in searches):
-                break
-            check(time.monotonic() < deadline, 'all_host_search_deadline')
-            time.sleep(1)
-        for value in searches:
-            for hit in value['hits']:
-                check(value.get('untrusted') is True or hit.get('untrusted') is True,
+        normal = parallel(lambda node: search(node, explore=False), nodes)
+        check(all(value['hits'] == [] and value.get('partial') is False
+                  and value.get('reason') == 'insufficient_independent_operators'
+                  and value.get('exploration_available') is True
+                  and type(value.get('responded_peers')) is int
+                  and value['responded_peers'] >= 1 for value in normal),
+              'one_operator_normal_exposed_unconfirmed')
+        explored = parallel(search, nodes)
+        check(all(len(value['hits']) == 1 and value.get('partial') is False
+                  and value.get('search_mode') == 'explore'
+                  and value['hits'][0].get('confirmation') == 'unconfirmed'
+                  and value['hits'][0].get('author_peer_id') in peer_ids
+                  and value['hits'][0].get('untrusted') is True
+                  and type(value.get('responded_peers')) is int
+                  and value['responded_peers'] >= 1
+                  for value in explored), 'one_operator_explore_limit_failed')
+        record('normal_unconfirmed_result_count', sum(len(value['hits']) for value in normal))
+        record('generic_explore_maximum_hits_per_host', max(len(value['hits']) for value in explored))
+        individual_queries = 0
+        for fixture in fixtures:
+            deadline = time.monotonic() + WAIT_SECONDS
+            while True:
+                searches = parallel(lambda node: search(node, fixture['unique_query']), nodes)
+                individual_queries += len(searches)
+                if all(len(value['hits']) == 1
+                       and value['hits'][0]['id'] == fixture['id']
+                       and value['hits'][0].get('author_peer_id') == fixture['author']
+                       and value.get('partial') is False
+                       and type(value.get('responded_peers')) is int
+                       and value['responded_peers'] >= 1 for value in searches):
+                    break
+                check(time.monotonic() < deadline, 'individual_exploration_deadline')
+                time.sleep(1)
+            for value in searches:
+                check(all(hit.get('untrusted') is True for hit in value['hits']),
                       'missing_untrusted_search_marker')
-        record('all_host_search_hit_count', sum(len(value['hits']) for value in searches))
+            # Four simultaneous searches send three requests to each peer.
+            # Leave room under the shared operator rate for replication work.
+            time.sleep(1)
+        record('individual_japanese_exploration', {'record_count': len(fixtures),
+               'host_record_matches': len(fixtures) * len(nodes),
+               'actual_query_invocations': individual_queries})
 
         stage = 'nonholder_network_get'
         for fixture in fixtures:
@@ -1080,7 +1279,12 @@ def main():
         deadline = time.monotonic() + WAIT_SECONDS
         while True:
             values = [verified_get(nodes[3], target) for target in targets]
-            if all(value is not None and useful_votes(value) == 2 for value in values):
+            if all(value is not None and useful_votes(value) == 0
+                   and len(value.get('reviews', [])) == 2
+                   and {review.get('reviewer_peer_id') for review in value['reviews']}
+                   == set(peer_ids[1:3])
+                   and value.get('quality', {}).get('author_reputation') == 0.5
+                   and value.get('confirmation') == 'unconfirmed' for value in values):
                 break
             check(time.monotonic() < deadline, 'useful_feedback_deadline')
             time.sleep(1)
@@ -1094,12 +1298,38 @@ def main():
             'assurance': 'automation_tested',
         })
         peers = nodes[3].run(['knowledge', 'peers', '--room', ROOM,
-                              '--query', QUERY, '--limit', '10'])
+                              '--query', QUERY, '--limit', '10', '--explore'])
         peer_results = peers.get('peers')
-        check(isinstance(peer_results, list) and peer_results, 'missing_peer_discovery')
-        top_peer = peer_results[0].get('peer_id', peer_results[0].get('author_peer_id'))
-        check(top_peer == peer_ids[0], 'useful_author_not_ranked_first')
-        record('useful_author_rank', 1)
+        check(isinstance(peer_results, list) and len(peer_results) == 1
+              and peers.get('partial') is False
+              and peers.get('search_mode') == 'explore'
+              and type(peers.get('responded_peers')) is int and peers['responded_peers'] >= 1
+              and peer_results[0].get('peer_id') in peer_ids
+              and peer_results[0].get('untrusted') is True,
+              'same_operator_peer_exposure_exceeded')
+        target = targets[0]
+        individual_peers = nodes[3].run(['knowledge', 'peers', '--room', ROOM,
+                                       '--query', target['unique_query'], '--limit', '10', '--explore'])
+        discovered = individual_peers.get('peers')
+        check(isinstance(discovered, list) and len(discovered) == 1
+              and discovered[0].get('peer_id') == target['author']
+              and discovered[0].get('record_ids') == [target['id']]
+              and discovered[0].get('matching_records') == 1
+              and discovered[0].get('untrusted') is True
+              and individual_peers.get('partial') is False
+              and type(individual_peers.get('responded_peers')) is int
+              and individual_peers['responded_peers'] >= 1,
+              'individual_exploration_did_not_discover_author')
+        normal_after = parallel(lambda node: search(node, explore=False), nodes)
+        check(all(value['hits'] == [] and value.get('partial') is False
+                  and type(value.get('responded_peers')) is int
+                  and value['responded_peers'] >= 1 for value in normal_after),
+              'same_operator_votes_promoted_record')
+        record('same_operator_endorsements', {'physical_review_packets': len(targets) * 2,
+               'independent_useful_votes': 0, 'author_prior': 0.5,
+               'normal_results_after_endorsement': 0,
+               'maximum_explored_peer_count': len(peer_results)})
+        record('individual_query_discovered_expected_author', True)
 
         stage = 'restart_persistence'
         snapshots = wait_replicas(nodes, fixtures, peer_ids)
@@ -1123,16 +1353,14 @@ def main():
 
         stage = 'author_offline_retrieval'
         copies = record_inventory(snapshots)
-        selected = next((fixture for fixture in fixtures
-                         if fixture['author_index'] not in {
-                             index for index, _ in copies[fixture['id']]}), fixtures[0])
+        selected = require_nonkeeper_authors(fixtures, copies)[0]
         author_index = selected['author_index']
         nodes[author_index].stop()
         remaining = [node for index, node in enumerate(nodes) if index != author_index]
         wait_peer_readiness(remaining)
         results = parallel(lambda node: verified_get(node, selected), remaining)
         check(all(value is not None for value in results), 'author_offline_get_failed')
-        offline_searches = parallel(search, remaining)
+        offline_searches = parallel(lambda node: search(node, selected['unique_query']), remaining)
         check(all(value.get('partial') is True for value in offline_searches),
               'offline_search_not_marked_partial')
         check(all(type(value.get('responded_peers')) is int
@@ -1141,6 +1369,7 @@ def main():
         check(all(any(hit['id'] == selected['id'] for hit in value['hits'])
                   for value in offline_searches), 'author_offline_search_lost_record')
         live_holders = sum(index != author_index for index, _ in copies[selected['id']])
+        check(live_holders == 3, 'author_offline_requires_three_live_keepers')
         record('author_offline_retrieval', {
             'responding_host_count': len(results),
             'live_keeper_count': live_holders,
@@ -1156,6 +1385,8 @@ def main():
         report['failure_type'] = type(error).__name__
         if isinstance(error, VerificationFailure):
             report['failure_code'] = str(error)
+            if str(error) == 'fixture_placement_insufficient':
+                report['failure_class'] = 'fixture_placement_not_product_replication_failure'
             if hasattr(error, 'replication_diagnostics'):
                 report['replication_diagnostics'] = error.replication_diagnostics
             if error.node_index is not None:
@@ -1165,6 +1396,22 @@ def main():
         print(json.dumps({'status': 'failed', 'stage': stage,
                           'failure_type': type(error).__name__}), flush=True)
     finally:
+        if binaries_verified:
+            verified_after = 0
+            failures = []
+            for index, node in enumerate(nodes):
+                try:
+                    check(node.binary_sha256() == node.c['binary_sha256'],
+                          'native_binary_changed_during_fixture')
+                    verified_after += 1
+                except Exception:
+                    failures.append({'node_index': index + 1,
+                                     'operation': 'verify_native_binary_unchanged'})
+            report['checks']['native_binary_unchanged_after_fixture'] = {
+                'verified_host_count': verified_after, 'expected_host_count': len(nodes)}
+            report['native_artifact_postcheck_errors'] = failures
+            if failures:
+                report['status'] = 'failed'
         cleanup_errors = []
         stopped = []
         for index, node in reversed(list(enumerate(nodes))):
@@ -1194,6 +1441,9 @@ def main():
                                        'operation': 'remove_fixture_data'})
         for node in nodes:
             node.log.close()
+        report['actual_knowledge_cli_invocations'] = {
+            purpose: sum(getattr(node, 'knowledge_cli_counts', {}).get(purpose, 0) for node in nodes)
+            for purpose in ('publish', 'evaluate', 'search', 'get', 'peers', 'status')}
         report['cleanup_error_count'] = len(cleanup_errors)
         report['cleanup_errors'] = cleanup_errors
         report['private_fixture_keys_removed'] = not cleanup_errors

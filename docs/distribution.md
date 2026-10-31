@@ -8,17 +8,32 @@ GitHub Actionsを使用しない。
 ## crates.ioからCLIを導入する（公開待ち）
 
 Rustの公式レジストリは[crates.io](https://crates.io/)を使う。
-v0.3.0の`idobata`と`idobata-scanner`は公開準備中であり、現時点で公開済みとはしない。
-2026-11-01の公式API確認では両名とも404だった。これは名前の予約や今後の取得を保証しない。
+v0.3.0のCLI `idobata`は公開準備中。
+依存ライブラリーの[`idobata-scanner 0.3.0`](https://crates.io/crates/idobata-scanner/0.3.0)は
+2026-11-01に公開し、公式API・index・配布crateのchecksumを照合した。
+所有者は`genki`、licenseはMIT、同梱されたソース記録はcommit
+`1fd8bd698ab408ce4d201934d3a348b9e56a9ab1`で、MIT全文もroot正本と一致する。
 確認対象4ホストでCargoの読取操作`cargo owner --list --registry crates-io idobata`を実行し、
 通常のCargo設定ではtokenが見つからなかった。その後、保護された既存資格情報を公開用の子Cargoへ
-限定して渡し、既存crateの所有者一覧取得に成功した。実公開で必要な権限は公開時の結果で確認する。
+限定して渡し、既存crateの所有者一覧取得とscannerの実公開に成功した。
 tokenの新規発行や`cargo login`による永続保存は行っていない。
 2026-11-01にCargo 1.96で`cargo package --workspace --locked --allow-dirty`と
 `cargo publish --dry-run --workspace --locked --allow-dirty --registry crates-io`が成功した。
 追加された自動処理テストを含む固定ソースでも、両packageの展開後buildと公開dry-runが成功した。
 [最終package検査の記録](../evidence/cargo-package-v03-20261101.json)に、file数・SHA・ログのhash・
 同梱物の確認を残した。実公開・crates.ioからのinstallは別に確認する。
+scanner公開後はSDK単体の`cargo package -p idobata`と
+`cargo publish --dry-run -p idobata --registry crates-io`も成功した。
+その展開packageは一時レジストリではなく、実際に公開されたscannerのchecksumを使う。
+[実レジストリの検査記録](../evidence/cargo-registry-v03-20261101.json)に、公開元・ソースcommit・
+SDKのSHAと同梱物を記録した。CLIの実公開とinstallはまだ検証済みとしない。
+これらは接続受理順・background処理期限の修正前のSDKに対する履歴であり、旧SDK artifactを
+公開へ採用しない。修正後はcommit `c7313621391cda21fe5cb419ef6b43a9508f0f96`のRustと
+時点に依存しないREADMEで、SDK単体のpackageとdry-runが成功した。
+[修正後のpackage検査](../evidence/cargo-final-admission-v03-20261101.json)に、実scanner依存、
+READMEのSHA、MIT、WASM、ソース一致を記録した。READMEが未commitのためdirtyを明示した検査であり、
+native build対象43ファイルは変更していない。実4ホスト試験・実公開・
+crates.ioからのinstallは、それぞれ別の完了条件として記録する。
 
 公開後はRust 1.88以降とネイティブのビルド環境を用意し、次を実行する。
 

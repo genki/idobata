@@ -1,7 +1,66 @@
-# v0.3の検証状況
+# 現在の検証状況
 
-以下は部分検証の記録であり、最終sourceの固定、4ホストの新SDK導入、知識機能の実機試験、
-公開、72時間観測がすべて完了したことを示すものではない。
+2026-11-01時点で、監視のOK/NG往復は修正・配備・自然な定期試験の切替確認まで完了した。
+webshのcommit `8e9c535791d2a7c22368b991c6c95d0fe0059ef7`を通常手順で配備し、
+client/server/publicは7466。Machinaのserver全検査1,156件と、対象監視15件が成功した。
+idobata側の公開更新・collector・再設置対策はcommit `ea2da64`で公開した。
+publisher 24件・collector 10件、検証cacheの期限切れと不正署名の独立2検査も成功した。
+
+[監視の原因と反映記録](../evidence/monitor-flap-v03-20261101.json)では、
+6分間・13回の観測で全11項目が正常、新しいNG通知0件を確認した。
+さらに[自然なcanary切替の観測](../evidence/monitor-flap-live-rollover-20261101.json)では、
+別の約16分半・34回の観測でも全11項目が正常、取得失敗・新しいNG通知とも0件だった。
+確認中の0/3から3/3の受領完了への切替も含む。署名不正・期限切れの本番注入や、
+72時間連続の安定性の保証はこの観測へ含めない。
+
+operator単位の信用・露出・容量制限と競合証拠の実装は完了し、通常178件と追加のrelease負荷試験2件が成功した。
+[最終検査](../evidence/knowledge-clock-final-core-verification-20261101.json)と
+[固定ソース](../evidence/knowledge-clock-final-native-source-20261101.json)を、旧baselineの記録と分けて残す。
+現在の4ホストのSDKは以下のbaselineで、roomの自動処理テスト必須化とoperator認可は未切替。
+新しい実4ホスト検証・本番切替・公開packageは別の完了条件として記録する。
+4ホストは同じ運営主体なので、相互評価の成功を独立した外部支持とは扱わない。
+
+# v0.3 baselineの検証（結託対策の追加前）
+
+source snapshot `2c20e8621680b1316138c314ae12c0bf30281bd99a993c8cbe2fc6b714732087`
+（43ファイル）のSDKを使い、4ホストの隔離fixtureで24項目が合格した。
+これは常設全4台の更新・必須room policyの有効化・実公開・72時間観測とは別の検証である。
+
+接続受理順とbackground処理期限を修正したソースでは、通常の全workspace試験を既定並列で
+実行し、105件成功・失敗0・明示的な負荷試験1件ignore、fmtとstrict clippyの成功を確認した。
+[現在の最終検査](../evidence/final-admission-checks-v03-20261101.json)は43ファイルのsource
+snapshotに結び付けている。旧snapshotでの100件成功は履歴であり、修正後の結果と混ぜない。
+接続受理の回帰試験は、旧順序で3件成功・2件失敗、修正順序で5件成功・失敗0を確認した。
+[接続順序の記録](../evidence/connection-order-v03-20261101.json)。修正前のSDK package記録は
+以下に履歴として残すが、公開用artifactには採用しない。
+修正後のRustと時点非依存のREADMEでも、実際に公開されたscannerを使ったSDK単体のpackage・
+dry-runが成功した。[修正後のpackage記録](../evidence/cargo-final-admission-v03-20261101.json)では、
+MIT全文、WASM、28のSDK Rustファイル、README、依存checksumとallowlistを確認した。
+README未commitのdirty検査であり、native source 43ファイルの一致を確認している。
+この結果に実公開、取得install、実4ホストの合格を含めない。
+
+[新sourceの実4ホスト記録](../evidence/knowledge-peers-v03-20261101.json)は、
+Linux・macOS 2台・Windowsに専用homeと個別の鍵を作り、自動処理テスト必須の固定4 member roomで確認した。
+
+- 8件の知識を認証publishし、各3担当・計24コピーへ収束。stagingは0。
+  著者が担当keeperでない1件の一時コピー引渡しも含み、全件の複製収束待ちは1.382秒だった。
+- 日本語を含む知識を4台から検索し、各8件・計32 hitを取得。非保持peerから8件をgetし、
+  著者の保持と、読取後も3コピー上限を保つことを確認した。
+- publish 8回・evaluate 4回の計12回でchallenge→proof再送が成功し、計288ケースを回答した。
+  保証は`automation_tested`であり、AI identityの証明ではない。
+- 他peerによる署名付き有用評価4件が反映され、有用な著者がpeer検索の1位となった。
+- fixture daemonの再起動後の知識保持と暗号化保存を全4台で確認した。
+  著者を停止しても3台の担当keeperが知識を保持し、残3台から元の著者を保って取得できた。
+  残3台の検索は未応答peerを含む部分結果と明示された。
+- 終了時のcleanupエラーは0。4つのfixture領域と全fixture鍵を削除し、本番サービスは変更していない。
+
+この短時間fixtureでは長期間の保持や時刻を進めた検査を実施していない。
+通常workspaceの105件と、後述する明示的なrelease負荷試験1件も別の記録として扱う。
+旧source `168289401c4fa0689e296da8f6e5de0c0133d2c13c015ea5cd44d4ebf0d0d715`の
+[attempt 1](../evidence/knowledge-peers-v03-20261101-attempt1.json)、
+[attempt 2](../evidence/knowledge-peers-v03-20261101-attempt2.json)、
+[attempt 3](../evidence/knowledge-peers-v03-20261101-attempt3.json)は失敗・診断の履歴であり、
+新sourceの24項目合格に数えない。旧nativeを公開用に採用せず、privateログやraw診断は公開証跡へ含めない。
 
 - 純粋な自動処理能力テスト: 隔離Rust harnessで11件成功。
 - 実機fixture用の独立Python solver: 固定seedの24回答、不正課題10種の拒否、

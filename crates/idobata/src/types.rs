@@ -23,6 +23,8 @@ pub struct Room {
     pub public: bool,
     #[serde(default, skip_serializing_if = "is_false")]
     pub knowledge_automation_required: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub knowledge_operators: Option<crate::knowledge_abuse::OperatorClaims>,
 }
 pub fn is_false(value: &bool) -> bool {
     !*value
@@ -63,11 +65,24 @@ pub struct TrustedRoom {
 }
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
+pub struct OperatorBindingHistory {
+    pub authority_peer_id: String,
+    pub epoch: u64,
+    pub certificate_digest: String,
+    pub public: bool,
+    pub automation_required: bool,
+    pub required: bool,
+    pub bindings: BTreeMap<String, String>,
+}
+#[derive(Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct Config {
     pub version: u32,
     pub endpoint: String,
     pub listen: Vec<String>,
     pub rooms: BTreeMap<String, TrustedRoom>,
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub knowledge_operator_history: BTreeMap<String, OperatorBindingHistory>,
     #[serde(default)]
     pub client_uids: Vec<u32>,
     #[serde(default)]
@@ -146,6 +161,8 @@ pub enum Request {
         room: String,
         query: String,
         limit: usize,
+        #[serde(default, skip_serializing_if = "is_false")]
+        explore: bool,
     },
     KnowledgeGet {
         room: String,
@@ -162,6 +179,8 @@ pub enum Request {
         room: String,
         query: String,
         limit: usize,
+        #[serde(default, skip_serializing_if = "is_false")]
+        explore: bool,
     },
     KnowledgeStatus {
         room: Option<String>,
@@ -271,9 +290,19 @@ mod tests {
             json!({"action":"knowledge_search","room":"engineering","query":"retry","limit":10});
         let request = serde_json::from_value::<Request>(search.clone()).unwrap();
         assert!(
-            matches!(&request, Request::KnowledgeSearch { room, query, limit: 10 } if room == "engineering" && query == "retry")
+            matches!(&request, Request::KnowledgeSearch { room, query, limit: 10, explore: false } if room == "engineering" && query == "retry")
         );
         assert_eq!(serde_json::to_value(request).unwrap(), search);
+        for action in ["knowledge_search", "knowledge_peers"] {
+            let explicit = json!({"action":action,"room":"engineering","query":"retry","limit":10,"explore":true});
+            let request = serde_json::from_value::<Request>(explicit.clone()).unwrap();
+            assert!(matches!(
+                &request,
+                Request::KnowledgeSearch { explore: true, .. }
+                    | Request::KnowledgePeers { explore: true, .. }
+            ));
+            assert_eq!(serde_json::to_value(request).unwrap(), explicit);
+        }
         let legacy_publish = json!({"action":"knowledge_publish","room":"engineering","public":false,"input":{"problem":"retry","solution":"backoff"}});
         let request = serde_json::from_value::<Request>(legacy_publish).unwrap();
         assert!(matches!(

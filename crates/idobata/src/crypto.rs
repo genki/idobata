@@ -84,7 +84,9 @@ pub fn validate_room(room: &TrustedRoom, policy: &str, at: u64) -> Result<()> {
     let cert = &room.certificate;
     let r = &cert.signed;
     if r.version
-        != if r.knowledge_automation_required {
+        != if r.knowledge_operators.is_some() {
+            4
+        } else if r.knowledge_automation_required {
             3
         } else if r.public {
             2
@@ -103,6 +105,16 @@ pub fn validate_room(room: &TrustedRoom, policy: &str, at: u64) -> Result<()> {
         || r.members.len() > 32
     {
         return Err(INVALID);
+    }
+    if let Some(claims) = &r.knowledge_operators {
+        claims.validate().map_err(|_| INVALID)?;
+        if claims
+            .bindings
+            .keys()
+            .any(|peer| !r.members.iter().any(|member| &member.peer_id == peer))
+        {
+            return Err(INVALID);
+        }
     }
     // Only an already verified certificate may be cached. Time and policy checks
     // above are always repeated, and every byte of the trust pin is in the key.

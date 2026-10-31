@@ -156,6 +156,8 @@ enum KnowledgeCommand {
         query: String,
         #[arg(long, default_value_t = 10)]
         limit: usize,
+        #[arg(long)]
+        explore: bool,
     },
     Get {
         #[arg(long)]
@@ -180,6 +182,8 @@ enum KnowledgeCommand {
         query: String,
         #[arg(long, default_value_t = 10)]
         limit: usize,
+        #[arg(long)]
+        explore: bool,
     },
     Status {
         #[arg(long)]
@@ -270,6 +274,7 @@ enum RoomCommand {
         #[arg(long)]
         room: String,
     },
+    #[command(alias = "invite")]
     Create {
         #[arg(long)]
         room: String,
@@ -283,6 +288,8 @@ enum RoomCommand {
         public: bool,
         #[arg(long)]
         require_automation: bool,
+        #[arg(long)]
+        operators_file: Option<PathBuf>,
     },
     Join {
         #[arg(long)]
@@ -826,11 +833,7 @@ async fn execute(cli: Cli) -> Result<i32> {
         Command::Room { command } => {
             match command {
                 RoomCommand::Leave { room } => {
-                    let mut config = config::load(&home)?;
-                    if config.rooms.remove(&room).is_none() {
-                        return Err(INVALID);
-                    }
-                    config::save(&home, &config)?;
+                    config::leave_room(&home, &room)?;
                     print(&json!({"status":"room_left"}));
                 }
                 RoomCommand::Create {
@@ -840,6 +843,7 @@ async fn execute(cli: Cli) -> Result<i32> {
                     output,
                     public,
                     require_automation,
+                    operators_file,
                 } => {
                     let members = serde_json::from_slice::<Vec<Member>>(&util::read_bounded(
                         &members_file,
@@ -849,13 +853,22 @@ async fn execute(cli: Cli) -> Result<i32> {
                     if output.exists() {
                         return Err(INVALID);
                     }
-                    let cert = config::create_room_with_policy(
+                    let operators = operators_file
+                        .map(|path| {
+                            serde_json::from_slice::<idobata::knowledge_abuse::OperatorClaims>(
+                                &util::read_bounded(&path, 65536)?,
+                            )
+                            .map_err(|_| INVALID)
+                        })
+                        .transpose()?;
+                    let cert = config::create_room_with_operators(
                         &home,
                         &room,
                         members,
                         expires_hours,
                         public,
                         require_automation,
+                        operators,
                     )?;
                     export(&output, &cert)?;
                     print(
@@ -897,9 +910,17 @@ async fn execute(cli: Cli) -> Result<i32> {
                 public,
                 proof: read_proof(proof.as_deref())?,
             },
-            KnowledgeCommand::Search { room, query, limit } => {
-                Request::KnowledgeSearch { room, query, limit }
-            }
+            KnowledgeCommand::Search {
+                room,
+                query,
+                limit,
+                explore,
+            } => Request::KnowledgeSearch {
+                room,
+                query,
+                limit,
+                explore,
+            },
             KnowledgeCommand::Get { room, id } => Request::KnowledgeGet { room, id },
             KnowledgeCommand::Evaluate {
                 room,
@@ -912,9 +933,17 @@ async fn execute(cli: Cli) -> Result<i32> {
                 input: stdin_json(stdin)?,
                 proof: read_proof(proof.as_deref())?,
             },
-            KnowledgeCommand::Peers { room, query, limit } => {
-                Request::KnowledgePeers { room, query, limit }
-            }
+            KnowledgeCommand::Peers {
+                room,
+                query,
+                limit,
+                explore,
+            } => Request::KnowledgePeers {
+                room,
+                query,
+                limit,
+                explore,
+            },
             KnowledgeCommand::Status { room } => Request::KnowledgeStatus { room },
         },
         Command::Info => Request::Info,
@@ -1140,7 +1169,13 @@ mod tests {
         let cli = Cli::try_parse_from(["idobata", "knowledge", "search", "--room", "engineering"])
             .unwrap();
         let Command::Knowledge {
-            command: KnowledgeCommand::Search { room, query, limit },
+            command:
+                KnowledgeCommand::Search {
+                    room,
+                    query,
+                    limit,
+                    explore: false,
+                },
         } = cli.command
         else {
             panic!("wrong command");
@@ -1248,6 +1283,58 @@ mod tests {
                 }
             }
         ));
+    }
+
+    #[test]
+    fn operator_policy_and_explicit_exploration_survive_cli_parsing() {
+        for action in ["search", "peers"] {
+            let ordinary =
+                Cli::try_parse_from(["idobata", "knowledge", action, "--room", "engineering"])
+                    .unwrap();
+            assert!(matches!(
+                ordinary.command,
+                Command::Knowledge {
+                    command: KnowledgeCommand::Search { explore: false, .. }
+                        | KnowledgeCommand::Peers { explore: false, .. }
+                }
+            ));
+            let explicit = Cli::try_parse_from([
+                "idobata",
+                "knowledge",
+                action,
+                "--room",
+                "engineering",
+                "--explore",
+            ])
+            .unwrap();
+            assert!(matches!(
+                explicit.command,
+                Command::Knowledge {
+                    command: KnowledgeCommand::Search { explore: true, .. }
+                        | KnowledgeCommand::Peers { explore: true, .. }
+                }
+            ));
+        }
+        for action in ["create", "invite"] {
+            let parsed = Cli::try_parse_from([
+                "idobata",
+                "room",
+                action,
+                "--room",
+                "engineering",
+                "--members-file",
+                "members.json",
+                "--output",
+                "invite.json",
+                "--operators-file",
+                "operators.json",
+                "--require-automation",
+            ])
+            .unwrap();
+            assert!(matches!(parsed.command, Command::Room { command:
+                RoomCommand::Create { operators_file: Some(path), require_automation: true, .. }
+            } if path == Path::new("operators.json")));
+        }
     }
 
     #[test]

@@ -19,5 +19,6 @@ pub mod util;
 pub mod windows_security;
 
 pub mod knowledge;
+pub mod knowledge_abuse;
 pub mod knowledge_rating;
 pub mod knowledge_runtime;

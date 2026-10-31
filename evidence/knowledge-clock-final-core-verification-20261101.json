@@ -1,0 +1,116 @@
+{
+  "version": 1,
+  "date": "2026-11-01",
+  "scope": "Clock-corrected operator-policy final local verification",
+  "source": {
+    "manifest": "knowledge-clock-final-source-manifest-20261101.json",
+    "manifest_sha256": "8420a963443f4d95800cd5970a74e09d0f5e66b8d218faef43d3a8bd01e18bce",
+    "tree_sha256": "4cf185f2c0ff9d1653ff5609b11b7aeacf8fb040d2340bbf3dd3b65a50f3e77d",
+    "files": 37,
+    "runtime_sha256": "ceff75c8d44b3eb3d617ce0cb1c01de52009f922fe4f6e4b3fc67cb47549a335",
+    "source_archive_sha256": "8b32dd63bfd112adecfa0c82a0234068c609c51edc5eef86eb46d9bfb064b6bb",
+    "unchanged_after_all_checks": true
+  },
+  "checks": [
+    {
+      "name": "fmt",
+      "command": "cargo fmt --all -- --check",
+      "exit_code": 0,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "clippy",
+      "command": "cargo clippy --workspace --all-targets --locked -- -D warnings",
+      "exit_code": 0,
+      "log_sha256": "5ef191dcbc3211e441eb7e7b65c1167c544d3c0151e3f9efe715534d95152d71"
+    },
+    {
+      "name": "workspace",
+      "command": "cargo test --workspace --locked",
+      "exit_code": 0,
+      "log_sha256": "b9cc020ce2fd28bfa6fa9509249cd7f3cb24d1a7b7108d117e494a3e951917e6",
+      "passed": 178,
+      "failed": 0,
+      "ignored": 2
+    },
+    {
+      "name": "operator_quota_release",
+      "command": "cargo test --release -p idobata --lib --locked knowledge::tests::two_adversarial_operator_quota_search_and_atomic_admission_stress -- --ignored --exact --nocapture",
+      "exit_code": 0,
+      "log_sha256": "ae115c7b880d74da0c66bf3227aa1446699534786030291fd7a53e374cce2a23",
+      "passed": 1,
+      "failed": 0,
+      "ignored": 0
+    },
+    {
+      "name": "large_review_release",
+      "command": "/home/vagrant/idobata/target/release/deps/idobata-1ef5da5559794695 knowledge_runtime::tests::large_valid_review_aggregate_fits_transport_without_dropping_review_tails --ignored --exact --nocapture",
+      "exit_code": 0,
+      "log_sha256": "9553cec19e5544f45941277328ee0cda836f5eee738b16d2d6177e3fdb5d35de",
+      "passed": 1,
+      "failed": 0,
+      "ignored": 0
+    }
+  ],
+  "default_suite_execution": "default parallel; all four actual daemon integration tests enabled",
+  "ignored_reason": "Two explicit optimized stress checks are excluded from debug parallel tests to avoid CPU starvation of real-time IPC fixtures; both are separately passed in release without changing production deadlines.",
+  "release_execution_note": "The first release check compiled this exact source. The second used that exact optimized test executable directly because a separate native build held the Cargo target lock. Only the waiting Cargo test process was stopped; no test failure and no native build interruption.",
+  "release_test_executable": {
+    "source_tree_sha256": "4cf185f2c0ff9d1653ff5609b11b7aeacf8fb040d2340bbf3dd3b65a50f3e77d",
+    "test_executable_sha256": "34de64b7b6c39447e213bf1c096f665d03b5167bcc506e880cbf9b63f54519e1",
+    "source_files_match": true,
+    "waiting_cargo_only_stopped": true,
+    "native_build_untouched": true,
+    "command": "/home/vagrant/idobata/target/release/deps/idobata-1ef5da5559794695 knowledge_runtime::tests::large_valid_review_aggregate_fits_transport_without_dropping_review_tails --ignored --exact --nocapture"
+  },
+  "quota_stress": {
+    "records": 631,
+    "adversarial_operators": 2,
+    "unconfirmed_bytes_per_operator": [
+      2094217,
+      2094217
+    ],
+    "operator_limit_bytes": 2097152,
+    "normal_ms": 164.091881,
+    "explore_ms": 139.530631,
+    "atomic_rejected_admission_ms": 444.072293,
+    "operation_deadline_seconds": 7,
+    "accepted_staging_preserved": true,
+    "promoted_candidate_preserved": true,
+    "ciphertext_unchanged_on_rejection": true
+  },
+  "large_review_stress": {
+    "durable_store_admission_seconds": 0.96,
+    "test_seconds": 1.5,
+    "review_tails_not_trimmed": true
+  },
+  "clock_fix_read_only_review": {
+    "only_runtime_changed": true,
+    "signature_and_serialization_unchanged": true,
+    "strict_fresh_verifier_unchanged": true,
+    "ttl_seconds": 120,
+    "global_deadline_seconds": 7,
+    "issuer_attempt_seconds": 2,
+    "future_packet_authentication_before_wait": true,
+    "current_authorization_and_freshness_rechecked_after_wait": true,
+    "original_attempt_expiry_discards_packet_and_falls_back": true,
+    "issuer_nonce_one_use_unchanged": true,
+    "additional_concrete_defects_found": 0,
+    "historical_failure_exact_issuer_not_reconstructed": true
+  },
+  "before_clockfix_history": {
+    "manifest": "knowledge-operator-source-manifest-20261101.json",
+    "verification": "knowledge-operator-core-verification-20261101.json",
+    "preserved_without_overwrite": true
+  },
+  "wasm_sha256": "e765bdca9f335bed3c26c2dee1bce39e9eb652e2af2552945c1818934d88e4fd",
+  "profile_sha256": "3ca5e1645686c34c2ec61b346b2022a685f6ef413cfb46ec46418f8073a615ea",
+  "limitations": [
+    "Operator independence and fixed credit rely on a trusted registering room authority.",
+    "Correctness is not inferred from signatures, automation or helpfulness claims.",
+    "Current four deployment hosts have one operator and do not supply independent promotion votes.",
+    "Economic code is a pure nontransferable accounting model and moves no currency.",
+    "These local checks do not replace the new native four-host fixture or authorize deployment."
+  ],
+  "production_mutations": false
+}

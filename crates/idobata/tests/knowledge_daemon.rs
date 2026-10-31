@@ -40,14 +40,17 @@ struct Fixture {
 
 impl Fixture {
     fn new() -> Self {
+        Self::with_size(2)
+    }
+    fn with_size(size: usize) -> Self {
         let _ = rustls::crypto::ring::default_provider().install_default();
         let temporary = tempfile::tempdir().unwrap();
         // Reserve both ephemeral ports together, so the two fixtures cannot
         // accidentally choose the same address before the daemons start.
-        let listeners: Vec<_> = (0..2)
+        let listeners: Vec<_> = (0..size)
             .map(|_| std::net::TcpListener::bind("127.0.0.1:0").unwrap())
             .collect();
-        let homes: Vec<_> = (0..2)
+        let homes: Vec<_> = (0..size)
             .map(|index| temporary.path().join(format!("node-{index}")))
             .collect();
         let members: Vec<_> = homes
@@ -65,7 +68,9 @@ impl Fixture {
             })
             .collect();
         let shared = config::create_room(&homes[0], "exchange", members.clone(), 1).unwrap();
-        config::join_room(&homes[1], "exchange", shared, &members[0].peer_id).unwrap();
+        for home in homes.iter().skip(1) {
+            config::join_room(home, "exchange", shared.clone(), &members[0].peer_id).unwrap();
+        }
         config::create_room(&homes[0], "isolated", vec![members[0].clone()], 1).unwrap();
         let endpoints = homes
             .iter()
@@ -163,6 +168,24 @@ async fn knowledge_ipc_routes_signed_records_queries_and_evaluations_between_dae
         .await;
     assert_eq!(published.code, 0, "{}", published.result);
     let id = published.result["id"].as_str().unwrap().to_owned();
+    let normal = fixture
+        .call(
+            1,
+            Request::KnowledgeSearch {
+                room: "exchange".into(),
+                query: "retry".into(),
+                limit: 10,
+                explore: false,
+            },
+        )
+        .await;
+    assert_eq!(normal.code, 0);
+    assert!(normal.result["hits"].as_array().unwrap().is_empty());
+    assert_eq!(
+        normal.result["reason"],
+        "insufficient_independent_operators"
+    );
+    assert_eq!(normal.result["exploration_available"], true);
     let found = fixture
         .call(
             1,
@@ -170,6 +193,7 @@ async fn knowledge_ipc_routes_signed_records_queries_and_evaluations_between_dae
                 room: "exchange".into(),
                 query: "retry".into(),
                 limit: 10,
+                explore: true,
             },
         )
         .await;
@@ -238,7 +262,8 @@ async fn knowledge_ipc_routes_signed_records_queries_and_evaluations_between_dae
         .await;
     assert_eq!(reviewed.code, 0);
     assert_eq!(reviewed.result["quality"]["useful_votes"], 0);
-    assert_eq!(reviewed.result["quality"]["negative_votes"], 1);
+    assert_eq!(reviewed.result["quality"]["negative_votes"], 0);
+    assert_eq!(reviewed.result["confirmation"], "unconfirmed");
     assert_eq!(
         reviewed.result["record"]["author_peer_id"],
         fixture.members[0].peer_id
@@ -251,6 +276,7 @@ async fn knowledge_ipc_routes_signed_records_queries_and_evaluations_between_dae
                 room: "exchange".into(),
                 query: "retry".into(),
                 limit: 10,
+                explore: true,
             },
         )
         .await;
@@ -499,7 +525,9 @@ async fn required_automation_admission_returns_a_task_before_storing_and_accepts
             },
         )
         .await;
-    assert_eq!(fetched.result["quality"]["useful_votes"], 1);
+    assert_eq!(fetched.result["quality"]["useful_votes"], 0);
+    assert_eq!(fetched.result["confirmation"], "unconfirmed");
+    assert!(!fetched.result["reviews"].as_array().unwrap().is_empty());
     assert_eq!(fetched.result["untrusted"], true);
 }
 
@@ -562,6 +590,7 @@ async fn authenticated_shared_peer_cannot_query_another_room_over_knowledge_prot
             room_id: private_id,
             query: "retry".into(),
             limit: 10,
+            explore: true,
         },
     )
     .await;
@@ -578,8 +607,429 @@ async fn authenticated_shared_peer_cannot_query_another_room_over_knowledge_prot
             room_id: shared_id,
             query: "retry".into(),
             limit: 10,
+            explore: true,
         },
     )
     .await;
     assert!(matches!(accepted, WireReply::Hits { hits, truncated: false } if hits.is_empty()));
+}
+
+fn test_admission(
+    issuer: &libp2p::identity::Keypair,
+    room: &TrustedRoom,
+    subject: &str,
+    digest: &str,
+    purpose: &str,
+) -> idobata::automation::AutomationProof {
+    let challenge =
+        idobata::automation::create_challenge(issuer, room, subject, digest, purpose, util::now())
+            .unwrap();
+    let answer = answer_public_tasks(challenge);
+    let receipt = idobata::automation::certify_answer(issuer, room, &answer, util::now()).unwrap();
+    idobata::automation::AutomationProof { answer, receipt }
+}
+
+fn certified_record(
+    author: &libp2p::identity::Keypair,
+    issuer: &libp2p::identity::Keypair,
+    room: &TrustedRoom,
+    problem: String,
+) -> idobata::knowledge::RecordPacket {
+    let mut packet = idobata::knowledge::prepare_record(
+        author,
+        room,
+        KnowledgeInput {
+            problem,
+            solution: "Check the documented result before retrying.".into(),
+            context: "A synthetic integration fixture with authority-attested operator labels."
+                .into(),
+            references: vec![],
+            kind: "answer".into(),
+        },
+        false,
+        util::now(),
+    )
+    .unwrap();
+    packet.admission = Some(test_admission(
+        issuer,
+        room,
+        &author.public().to_peer_id().to_string(),
+        &packet.record.signed.id,
+        "publish",
+    ));
+    idobata::knowledge::validate_record(&packet, room, util::now()).unwrap();
+    packet
+}
+
+fn certified_review(
+    reviewer: &libp2p::identity::Keypair,
+    issuer: &libp2p::identity::Keypair,
+    room: &TrustedRoom,
+    record: &idobata::knowledge::RecordPacket,
+    verdict: &str,
+    sequence: u64,
+) -> idobata::knowledge::ReviewPacket {
+    let input = ReviewInput {
+        verdict: verdict.into(),
+        evidence: "Checked the stated procedure in this synthetic fixture.".into(),
+        references: vec![],
+    };
+    let digest = idobata::knowledge::review_action_digest_for_room(
+        room,
+        &record.record.signed.id,
+        &reviewer.public().to_peer_id().to_string(),
+        &input,
+    )
+    .unwrap();
+    let mut review =
+        idobata::knowledge::prepare_review(reviewer, room, record, input, sequence, util::now())
+            .unwrap();
+    review.admission = Some(test_admission(
+        issuer,
+        room,
+        &reviewer.public().to_peer_id().to_string(),
+        &digest,
+        "evaluate",
+    ));
+    idobata::knowledge::validate_review(&review, record, room, util::now()).unwrap();
+    review
+}
+
+fn mutable_claim_ids(
+    stored: &idobata::knowledge::StoredKnowledge,
+) -> (Vec<String>, Vec<Vec<String>>) {
+    let mut reviews = stored
+        .reviews
+        .iter()
+        .map(|review| review.review.signed.id.clone())
+        .collect::<Vec<_>>();
+    reviews.sort();
+    let mut conflicts = stored
+        .review_conflicts
+        .iter()
+        .map(|proof| {
+            let mut pair = vec![
+                proof.first.review.signed.id.clone(),
+                proof.second.review.signed.id.clone(),
+            ];
+            pair.sort();
+            pair
+        })
+        .collect::<Vec<_>>();
+    conflicts.sort();
+    (reviews, conflicts)
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn synthetic_operator_votes_and_opposite_forks_converge_before_nonkeeper_handoff() {
+    use idobata::knowledge::{self, Store};
+    use idobata::knowledge_abuse::OperatorClaims;
+    let _cluster = CLUSTER_SLOT.lock().await;
+    let mut fixture = Fixture::with_size(6);
+    let keys = fixture
+        .homes
+        .iter()
+        .map(|home| crypto::load_key(home).unwrap())
+        .collect::<Vec<_>>();
+    // These are deliberately SYNTHETIC authority attestations, not evidence of
+    // six independent real-world operators. The test checks policy mechanics.
+    let claims = OperatorClaims {
+        bindings: fixture
+            .members
+            .iter()
+            .enumerate()
+            .map(|(index, member)| (member.peer_id.clone(), format!("synthetic-{index}")))
+            .collect(),
+        credits: (0..6)
+            .map(|index| (format!("synthetic-{index}"), 1000))
+            .collect(),
+    };
+    let mut cold_members = fixture.members.clone();
+    cold_members
+        .iter_mut()
+        .for_each(|member| member.addresses.clear());
+    let signed = config::create_room_with_operators(
+        &fixture.homes[0],
+        "exchange",
+        cold_members,
+        1,
+        false,
+        true,
+        Some(claims),
+    )
+    .unwrap();
+    for home in fixture.homes.iter().skip(1) {
+        config::join_room(
+            home,
+            "exchange",
+            signed.clone(),
+            &fixture.members[0].peer_id,
+        )
+        .unwrap();
+    }
+    let old_room = config::load(&fixture.homes[0]).unwrap().rooms["exchange"].clone();
+    // Choose a real HRW assignment excluding the source author and offline
+    // reviewer 5, so exactly three live keeper daemons exercise handoff.
+    let mut selected = None;
+    for index in 0..128 {
+        let packet = certified_record(
+            &keys[0],
+            &keys[5],
+            &old_room,
+            format!("How should convergent fork evidence be handled case {index}?"),
+        );
+        let keepers = knowledge::replica_peers(
+            &old_room.certificate.signed,
+            &packet.record.signed.id,
+            knowledge::REPLICAS,
+        );
+        if !keepers.contains(&fixture.members[0].peer_id)
+            && !keepers.contains(&fixture.members[5].peer_id)
+        {
+            selected = Some((packet, keepers));
+            break;
+        }
+    }
+    let (packet, keeper_peers) = selected.expect("fixture could not select nonkeeper author");
+    let keeper_indices = keeper_peers
+        .iter()
+        .map(|peer| {
+            fixture
+                .members
+                .iter()
+                .position(|member| &member.peer_id == peer)
+                .unwrap()
+        })
+        .collect::<Vec<_>>();
+    let good = [1, 2, 3]
+        .into_iter()
+        .map(|index| certified_review(&keys[index], &keys[0], &old_room, &packet, "useful", 1))
+        .collect::<Vec<_>>();
+    let positive = certified_review(&keys[4], &keys[0], &old_room, &packet, "useful", 7);
+    let negative = certified_review(&keys[4], &keys[0], &old_room, &packet, "incorrect", 7);
+    for &index in &keeper_indices {
+        fixture.start(index).await;
+    }
+    let old_config = config::load(&fixture.homes[0]).unwrap();
+    let mut sender = network::build(keys[0].clone(), &old_config).await.unwrap();
+    network::refresh(
+        &mut sender,
+        &old_config,
+        &mut BTreeSet::new(),
+        &fixture.members[0].peer_id,
+    );
+    for (position, &index) in keeper_indices.iter().enumerate() {
+        let peer: PeerId = fixture.members[index].peer_id.parse().unwrap();
+        sender.add_peer_address(peer, fixture.members[index].addresses[0].parse().unwrap());
+        let mut offered = good.clone();
+        offered.push(if position == 1 {
+            negative.clone()
+        } else {
+            positive.clone()
+        });
+        let reply = wire_call(
+            &mut sender,
+            peer,
+            WireRequest::Store {
+                room_id: old_room.certificate.signed.room_id.clone(),
+                packet: Box::new(packet.clone()),
+                reviews: offered,
+                review_conflicts: vec![],
+            },
+        )
+        .await;
+        assert!(matches!(reply, WireReply::Stored { .. }));
+        let store = Store::open(&fixture.homes[index]).unwrap();
+        let stored = store
+            .get(&packet.record.signed.room_id, &packet.record.signed.id)
+            .unwrap();
+        assert!(stored.review_conflicts.is_empty());
+        let bad_vote = stored
+            .reviews
+            .iter()
+            .find(|review| review.review.signed.reviewer_peer_id == fixture.members[4].peer_id)
+            .unwrap();
+        assert_eq!(
+            bad_vote.review.signed.verdict,
+            if position == 1 { "incorrect" } else { "useful" }
+        );
+    }
+    // While no peer addresses were advertised, different keepers durably held
+    // opposite FULL admitted claims. Enable gossip only after proving that state.
+    drop(sender);
+    let renewed = config::create_room_with_operators(
+        &fixture.homes[0],
+        "exchange",
+        fixture.members.clone(),
+        1,
+        false,
+        true,
+        None,
+    )
+    .unwrap();
+    for home in fixture.homes.iter().skip(1) {
+        config::join_room(
+            home,
+            "exchange",
+            renewed.clone(),
+            &fixture.members[0].peer_id,
+        )
+        .unwrap();
+    }
+    let current = config::load(&fixture.homes[0]).unwrap();
+    let mut source = Store::open(&fixture.homes[0]).unwrap();
+    source.set_rooms(current.rooms.values().cloned());
+    source.set_operator_history(&current.knowledge_operator_history);
+    source.insert(packet.clone(), true, util::now()).unwrap();
+    drop(source);
+    fixture.start(0).await;
+    tokio::time::timeout(Duration::from_secs(30), async {
+        loop {
+            let mut observations = vec![];
+            let mut complete = true;
+            for &index in &keeper_indices {
+                let store = Store::open(&fixture.homes[index]).unwrap();
+                if let Some(stored) =
+                    store.get(&packet.record.signed.room_id, &packet.record.signed.id)
+                {
+                    complete &= !stored.staging && stored.review_conflicts.len() == 1;
+                    observations.push(mutable_claim_ids(stored));
+                } else {
+                    complete = false;
+                }
+            }
+            let source = Store::open(&fixture.homes[0]).unwrap();
+            complete &= source
+                .get(&packet.record.signed.room_id, &packet.record.signed.id)
+                .is_none();
+            complete &=
+                observations.len() == 3 && observations.windows(2).all(|pair| pair[0] == pair[1]);
+            if complete {
+                break;
+            }
+            tokio::time::sleep(Duration::from_millis(100)).await;
+        }
+    })
+    .await
+    .expect("opposite admitted forks did not converge before source handoff");
+    let keeper = keeper_indices[0];
+    let room = &current.rooms["exchange"];
+    let mut store = Store::open(&fixture.homes[keeper]).unwrap();
+    store.set_rooms(current.rooms.values().cloned());
+    store.set_operator_history(&current.knowledge_operator_history);
+    let stored = store
+        .get(&packet.record.signed.room_id, &packet.record.signed.id)
+        .unwrap();
+    let evidence = knowledge::verified_evidence_with_conflicts(
+        &stored.packet,
+        &stored.reviews,
+        &stored.review_conflicts,
+        room,
+    );
+    let assessment = knowledge::assess_evidence(&stored.packet, room, &evidence);
+    assert!(
+        assessment.promoted,
+        "a contested fourth operator cannot veto three independent endorsements"
+    );
+    assert_eq!(assessment.positive_groups, 3);
+    assert_eq!(assessment.negative_groups, 0);
+    let collusion = (0..128)
+        .find_map(|index| {
+            let packet = certified_record(
+                &keys[0],
+                &keys[5],
+                room,
+                format!("How can two colluding operator endorsements be contained case {index}?"),
+            );
+            let assigned = knowledge::replica_peers(
+                &room.certificate.signed,
+                &packet.record.signed.id,
+                knowledge::REPLICAS,
+            );
+            keeper_indices
+                .iter()
+                .any(|index| assigned.contains(&fixture.members[*index].peer_id))
+                .then_some(packet)
+        })
+        .unwrap();
+    let fake_support = [4, 5]
+        .into_iter()
+        .map(|index| certified_review(&keys[index], &keys[0], room, &collusion, "useful", 10))
+        .collect::<Vec<_>>();
+    // A different current member is the transport relayer; original author and
+    // reviewer provenance remain unchanged and all admission proofs are valid.
+    let client_config = config::load(&fixture.homes[5]).unwrap();
+    let mut client = network::build(keys[5].clone(), &client_config)
+        .await
+        .unwrap();
+    network::refresh(
+        &mut client,
+        &client_config,
+        &mut BTreeSet::new(),
+        &fixture.members[5].peer_id,
+    );
+    // It may not be this record's keeper. Pick an assigned live keeper where
+    // possible; all six fixture identities are current authorized members.
+    let assigned = knowledge::replica_peers(
+        &room.certificate.signed,
+        &collusion.record.signed.id,
+        knowledge::REPLICAS,
+    );
+    let target = keeper_indices
+        .iter()
+        .copied()
+        .find(|index| assigned.contains(&fixture.members[*index].peer_id))
+        .unwrap_or(keeper);
+    let target_peer = fixture.members[target].peer_id.parse().unwrap();
+    let reply = wire_call(
+        &mut client,
+        target_peer,
+        WireRequest::Store {
+            room_id: room.certificate.signed.room_id.clone(),
+            packet: Box::new(collusion.clone()),
+            reviews: fake_support,
+            review_conflicts: vec![],
+        },
+    )
+    .await;
+    assert!(matches!(reply, WireReply::Stored { .. }));
+    let normal = fixture
+        .call(
+            target,
+            Request::KnowledgeSearch {
+                room: "exchange".into(),
+                query: "colluding operator".into(),
+                limit: 10,
+                explore: false,
+            },
+        )
+        .await;
+    assert_eq!(normal.code, 0);
+    assert!(
+        !normal.result["hits"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|hit| hit["id"] == collusion.record.signed.id)
+    );
+    let promoted = fixture
+        .call(
+            keeper,
+            Request::KnowledgeSearch {
+                room: "exchange".into(),
+                query: "convergent fork".into(),
+                limit: 10,
+                explore: false,
+            },
+        )
+        .await;
+    assert_eq!(promoted.code, 0);
+    assert!(
+        promoted.result["hits"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|hit| hit["id"] == packet.record.signed.id
+                && hit["confirmation"] == "operator_corroborated")
+    );
 }

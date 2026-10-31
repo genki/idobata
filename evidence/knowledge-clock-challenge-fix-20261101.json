@@ -1,0 +1,94 @@
+{
+  "status": "focused_checks_passed",
+  "recorded_at": "2026-10-31T18:56:59.984649+00:00",
+  "failed_native_source_archive_sha256": "11e80bc8d6bb2151a5b69defc9698ea51866cd202e1c9157892fcc065fc7326b",
+  "failed_fixture_report": "knowledge-operator-peers-v03-20261101-before-clock-fix.json",
+  "observed_failure": {
+    "stage": "publish",
+    "phase": "challenge",
+    "generic_host_index": 2,
+    "error_code_from_source_constant": 30,
+    "error": "invalid_input_or_configuration",
+    "stored": false,
+    "enqueued": false,
+    "partial_state_possible": false,
+    "cleanup_error_count": 0
+  },
+  "failure_branch": "subject completion of the no-proof signed challenge",
+  "original_packet_issuer_and_signed_timestamps_were_not_logged": true,
+  "retrospective_packet_level_proof_of_original_failure": false,
+  "warm_clock_measurement": {
+    "host_samples": [
+      {
+        "host": "mac_a",
+        "samples": 12,
+        "best": {
+          "low": -0.233521,
+          "high": -0.226687,
+          "rtt": 0.006834
+        }
+      },
+      {
+        "host": "mac_b",
+        "samples": 12,
+        "best": {
+          "low": -0.003019,
+          "high": 0.014952,
+          "rtt": 0.017971
+        }
+      }
+    ],
+    "mac_b_ahead_of_mac_a_seconds_interval": [
+      0.223668,
+      0.248473
+    ]
+  },
+  "controlled_frozen_library_reproduction": {
+    "valid_signed_challenge_one_second_future_historical_accepts": true,
+    "current_subject_fresh_accepts": false,
+    "at_issuer_second_fresh_accepts": true,
+    "exact_expiry_accepts": false,
+    "future_301_seconds_accepts": false,
+    "key_files_created": false,
+    "production_changes": false
+  },
+  "changed_source": {
+    "path": "crates/idobata/src/knowledge_runtime.rs",
+    "sha256": "ceff75c8d44b3eb3d617ce0cb1c01de52009f922fe4f6e4b3fc67cb47549a335"
+  },
+  "fix": {
+    "scope": "subject Runtime only; no wire or automation verifier API changes",
+    "signed_future_challenge_preverified_before_queue": true,
+    "prequeue_binds_current_authorization_and_transport_issuer": true,
+    "asynchronous_poll_no_blocking_sleep": true,
+    "max_existing_gates": 16,
+    "maximum_challenge_packet_bytes": 16384,
+    "original_issuer_attempt_seconds": 2,
+    "original_global_deadline_seconds": 7,
+    "when_clock_catches_up": "unchanged strict fresh verification against current configuration",
+    "when_issuer_attempt_expires": "drop held packet; existing bounded next-issuer fallback",
+    "when_global_deadline_expires": "existing code40 timeout; no stored record",
+    "issuer_ttl_seconds": 120,
+    "issuer_nonce_single_use_unchanged": true,
+    "historical_receipt_ordering_unchanged": true
+  },
+  "tests": {
+    "runtime_passed": 35,
+    "failed": 0,
+    "explicit_optimized_stress_ignored": 1,
+    "seconds": 14.46,
+    "one_second_future_wait_then_code31": true,
+    "future_beyond_attempt_falls_back": true,
+    "original_global_timeout": true,
+    "ready_current_revocation_rejected": true,
+    "ready_forward_clock_jump_past_expiry_rejected": true,
+    "invalid_scope_subject_transport_signature_rejected": true,
+    "future_301_seconds_rejected": true,
+    "ttl_121_seconds_rejected": true,
+    "exact_expiry_rejected": true,
+    "issuer_before_issue_rejected": true,
+    "issuer_replay_rejected": true
+  },
+  "production_services_keys_rooms_or_clocks_changed": false,
+  "requires_combined_checks_and_new_native_candidates": true
+}

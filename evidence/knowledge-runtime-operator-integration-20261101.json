@@ -1,0 +1,95 @@
+{
+  "status": "focused_checks_passed",
+  "recorded_at": "2026-10-31T18:19:34.209818+00:00",
+  "source_scope": "owned Rust files; final whole-workspace archive and checks are recorded separately",
+  "source_sha256": {
+    "crates/idobata/src/knowledge_runtime.rs": "7b7d6ceac0afd7321399f06b2f3466f475fbd457f54d86b11e3eb57d12556c54",
+    "crates/idobata/tests/knowledge_daemon.rs": "f81e69f7737002f5babc2b5d7306f870f225552e97726ae7a5d0431b89c4c07f"
+  },
+  "production_services_or_rooms_changed": false,
+  "owned_rustfmt_check": "passed",
+  "runtime_unit_tests": {
+    "passed": 31,
+    "failed": 0,
+    "explicit_optimized_stress_ignored": 1,
+    "latest_seconds": 10.45
+  },
+  "ipc_transport_integration": {
+    "passed": 4,
+    "failed": 0,
+    "seconds": 79.7,
+    "production_deadlines_relaxed": false,
+    "legacy_room_normal_search_empty": true,
+    "explicit_exploration_and_id_get_preserved": true
+  },
+  "synthetic_attestation_case": {
+    "attested_fixture_identities": 6,
+    "live_daemon_instances": 4,
+    "test_os_processes": 1,
+    "real_independent_operator_count_proven": false,
+    "separate_real_four_host_fixture": false,
+    "full_signed_authorization_and_automation_admission": true,
+    "opposite_first_fork_arrival_proven_before_gossip": true,
+    "three_keeper_latest_reviews_and_conflicts_converged": true,
+    "nonkeeper_source_copy_removed_after_receipts": true,
+    "contested_fourth_operator_cannot_veto_three_external_endorsements": true,
+    "two_colluding_operator_endorsements_do_not_promote": true
+  },
+  "focused_invariants": {
+    "remote_ranking_metadata_recomputed": true,
+    "unconfirmed_candidate_flood_cannot_displace_promoted": true,
+    "same_operator_32_keys_share_rate_budget": true,
+    "legacy_room_history_cannot_reopen_rate_or_nonce_budget": true,
+    "spent_nonces_count_toward_operator_limit_after_restart": true,
+    "old_nonce_unknown_classification_not_upgraded": true,
+    "global_review_sequence_survives_quota_eviction_restart_and_concurrent_preparation": true,
+    "forks_on_nonquery_historical_records_do_not_reenter_author_prior": true,
+    "alternate_valid_admission_witnesses_do_not_change_fork_digest_or_ack_state": true,
+    "own_evaluation_applied_requires_retained_claim_before_bundle_mutation": true
+  },
+  "limits": {
+    "operator_remote_burst": 32,
+    "operator_remote_refill_per_second": 4,
+    "operator_active_or_spent_nonces": 32,
+    "global_active_or_spent_nonces": 256,
+    "nonce_ttl_seconds": 120,
+    "background_backstop_seconds": 30,
+    "query_deadline_seconds": 7,
+    "ipc_deadline_seconds": 10,
+    "knowledge_transport_seconds": 15
+  },
+  "semantic_marker": {
+    "operator_policy_version": 1
+  },
+  "publication_scope": "Existing public feed remains legacy-only; dormant public_entries API unchanged.",
+  "next_checks": [
+    "combined workspace fmt/clippy/tests after all owners freeze",
+    "optimized stress/scaling",
+    "new native builds",
+    "new real four-host Case A fixture"
+  ],
+  "own_review_slot_regression": {
+    "before_fix_expected_rejection_test_failed": true,
+    "after_fix_passed": true,
+    "error_code": 30,
+    "reason": "knowledge_review_slot_unavailable",
+    "body_and_staging_unchanged_on_rejection": true,
+    "reserved_sequence_not_rolled_back": true,
+    "registered_and_unknown_newer_own_sequences_accepted": true
+  },
+  "independent_read_only_review": {
+    "v4_config_pin_and_cli": "no_additional_concrete_defect_found",
+    "epoch_budget": "pure_model_only_no_durable_ledger_or_currency",
+    "old_binary_only_rollback_after_new_schema_writes": "not_guaranteed_compatible"
+  },
+  "final_whole_workspace_source_archive_sha256": "11e80bc8d6bb2151a5b69defc9698ea51866cd202e1c9157892fcc065fc7326b",
+  "combined_validation": {
+    "reported_by": "combined_validation_owner",
+    "normal_tests_passed": 174,
+    "failed": 0,
+    "optimized_stress_checks_passed": 2,
+    "strict_workspace_alltargets_clippy": "passed",
+    "workspace_fmt": "passed",
+    "source_compiled_tree_sha256": "2207cffac06fa37fafb00861a7d7d60bd6df8085f76fb13036f777034574a73e"
+  }
+}

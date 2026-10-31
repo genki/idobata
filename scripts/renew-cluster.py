@@ -4,6 +4,7 @@ import argparse
 import base64
 import json
 from pathlib import Path
+import re
 import shlex
 import subprocess
 import tempfile
@@ -12,32 +13,79 @@ import time
 
 def run(args,data=None,timeout=90):
     p=subprocess.run(args,input=data,text=True,capture_output=True,timeout=timeout)
-    if p.returncode:raise RuntimeError('参加許可の更新に失敗: '+args[0]+': '+p.stderr[-250:])
+    if p.returncode:raise RuntimeError('参加許可の更新に失敗: '+args[0]+' (exit '+str(p.returncode)+')')
     return p.stdout
 
 
 def windows_join(node,room,certificate,authority):
-    text=base64.b64encode(json.dumps(certificate).encode()).decode()
+    if re.fullmatch(r'[a-z0-9_-]{1,32}', room) is None:
+        raise ValueError('invalid_room_alias')
+    home=node.get('home','C:/ProgramData/idobata').replace('\\','/').rstrip('/')
+    binary=node.get('binary','C:/Program Files/idobata/idobata.exe').replace('\\','/')
+    if (re.fullmatch(r'[A-Za-z]:/[^\r\n]+',home) is None
+            or re.fullmatch(r'[A-Za-z]:/[^\r\n]+',binary) is None
+            or any(part in ['', '.', '..'] for part in home[3:].split('/'))
+            or any(part in ['', '.', '..'] for part in binary[3:].split('/'))
+            or any(ord(character)<32 for character in home+binary)):
+        raise ValueError('invalid_windows_home')
+    suffix=str(time.time_ns())
+    invite=home+'/'+room+'-invite-'+suffix+'.json'
+    task='idobata-room-maintenance-'+suffix
+    quote=lambda value:"'"+str(value).replace("'","''")+"'"
+    arguments=subprocess.list2cmdline(['--home',home,'room','join','--room',room,
+                                      '--invite-file',invite,'--trust-authority',authority])
     script=r'''
 $ErrorActionPreference='Stop';$ProgressPreference='SilentlyContinue';[Console]::OutputEncoding=[Text.UTF8Encoding]::new()
-$invite='C:\ProgramData\idobata\INVITE'
-[IO.File]::WriteAllBytes($invite,[Convert]::FromBase64String('CERTIFICATE'))
-icacls $invite /setowner '*S-1-5-19' /Q | Out-Null
-$action=New-ScheduledTaskAction -Execute 'C:\Program Files\idobata\idobata.exe' -Argument '--home C:\ProgramData\idobata room join --room ROOM --invite-file C:\ProgramData\idobata\INVITE --trust-authority AUTHORITY'
+$invite=INVITE
+$task=TASK
+try {
+$acl=[System.Security.AccessControl.FileSecurity]::new()
+$acl.SetAccessRuleProtection($true,$false)
+foreach($sid in @('S-1-5-19','S-1-5-18','S-1-5-32-544')) {
+ $acl.AddAccessRule([System.Security.AccessControl.FileSystemAccessRule]::new([System.Security.Principal.SecurityIdentifier]::new($sid),'FullControl','Allow'))
+}
+$acl.SetOwner([System.Security.Principal.SecurityIdentifier]::new('S-1-5-19'))
+Set-Acl -LiteralPath $invite -AclObject $acl
+$action=New-ScheduledTaskAction -Execute BINARY -Argument ARGUMENTS
 $principal=New-ScheduledTaskPrincipal -UserId 'S-1-5-19' -LogonType ServiceAccount
-Register-ScheduledTask -TaskName 'idobata-room-maintenance' -Action $action -Principal $principal -Force | Out-Null
-Start-ScheduledTask -TaskName 'idobata-room-maintenance'
+Register-ScheduledTask -TaskName $task -Action $action -Principal $principal | Out-Null
+Start-ScheduledTask -TaskName $task
 Start-Sleep -Milliseconds 500
 for($i=0;$i -lt 60;$i++) {
- if ((Get-ScheduledTask -TaskName 'idobata-room-maintenance').State -ne 'Running') {break}
+ if ((Get-ScheduledTask -TaskName $task).State -ne 'Running') {break}
  Start-Sleep -Milliseconds 500
 }
-$result=(Get-ScheduledTaskInfo -TaskName 'idobata-room-maintenance').LastTaskResult
+$state=(Get-ScheduledTask -TaskName $task).State
+if ($state -eq 'Running') { throw 'room join timeout' }
+$result=(Get-ScheduledTaskInfo -TaskName $task).LastTaskResult
 if($result -ne 0){throw ('room join exit '+$result)}
+} finally {
+ $existing=Get-ScheduledTask -TaskName $task -ErrorAction SilentlyContinue
+ if ($existing) {
+  if ($existing.State -eq 'Running') { Stop-ScheduledTask -TaskName $task }
+  Unregister-ScheduledTask -TaskName $task -Confirm:$false
+ }
+ if (Test-Path -LiteralPath $invite) { Remove-Item -LiteralPath $invite -Force }
+}
 '''
-    script=script.replace('INVITE',room+'-invite.json').replace('CERTIFICATE',text).replace('ROOM',room).replace('AUTHORITY',authority)
+    for placeholder,value in [('INVITE',invite),('TASK',task),('BINARY',binary),('ARGUMENTS',arguments)]:
+        script=script.replace(placeholder,quote(value))
     encoded=base64.b64encode(script.encode('utf-16le')).decode()
-    run(['ssh','-o','BatchMode=yes',node['ssh'],'powershell.exe -NoProfile -NonInteractive -EncodedCommand '+encoded])
+    with tempfile.TemporaryDirectory(prefix='idobata-renew-') as directory:
+        local=Path(directory)/'invite.json'
+        local.write_text(json.dumps(certificate,ensure_ascii=False),encoding='utf-8')
+        local.chmod(0o600)
+        try:
+            run(['scp','-q','-o','BatchMode=yes','-o','ConnectTimeout=12',str(local),node['ssh']+':'+invite])
+            run(['ssh','-o','BatchMode=yes',node['ssh'],'powershell.exe -NoProfile -NonInteractive -EncodedCommand '+encoded])
+        finally:
+            cleanup=("$ErrorActionPreference='Stop';$task="+quote(task)+
+                     ";$existing=Get-ScheduledTask -TaskName $task -ErrorAction SilentlyContinue;"
+                     "if($existing){if($existing.State -eq 'Running'){Stop-ScheduledTask -TaskName $task};"
+                     "Unregister-ScheduledTask -TaskName $task -Confirm:$false};"
+                     "if(Test-Path -LiteralPath "+quote(invite)+"){Remove-Item -LiteralPath "+quote(invite)+" -Force}")
+            cleanup=base64.b64encode(cleanup.encode('utf-16le')).decode()
+            run(['ssh','-o','BatchMode=yes',node['ssh'],'powershell.exe -NoProfile -NonInteractive -EncodedCommand '+cleanup])
 
 
 def main():

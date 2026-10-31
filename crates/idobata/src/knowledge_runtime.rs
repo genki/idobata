@@ -5,11 +5,14 @@ use crate::{
     config, crypto,
     error::{Error, INVALID, Result, STORAGE},
     ipc,
-    knowledge::{self, KnowledgeHit, RecordPacket, ReviewPacket, Store},
-    knowledge_rating::{self, Evidence},
-    network,
+    knowledge::{self, KnowledgeHit, RecordPacket, ReviewConflict, ReviewPacket, Store},
+    knowledge_abuse::{
+        self, CandidatePool, ExposureLimits, OperatorGroup, PoolLimits, SearchMode,
+        VerifiedEvidence,
+    },
+    knowledge_rating, network,
     scanner::Scanner,
-    types::{Config, Reply, Request, Signed, TrustedRoom},
+    types::{Config, OperatorBindingHistory, Reply, Request, Signed, TrustedRoom},
     util,
 };
 use libp2p::{
@@ -36,6 +39,9 @@ const CACHE_ENTRIES: usize = 16;
 const POLL_BATCH: usize = 2;
 const BACKGROUND_REQUEST_TIMEOUT: Duration = Duration::from_secs(30);
 const ROUTES: usize = knowledge::MAX_OBJECTS * knowledge::REPLICAS;
+const NONCE_BUCKET_CAPACITY: usize = 32;
+const NONCE_CAPACITY: usize = 256;
+const MAX_REVIEW_SEQUENCE: u64 = 9_007_199_254_740_991;
 const RECEIPT_DOMAIN: &str = "idobata.knowledge.storage.v1";
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -53,11 +59,15 @@ pub enum WireRequest {
         room_id: String,
         packet: Box<RecordPacket>,
         reviews: Vec<ReviewPacket>,
+        #[serde(default, skip_serializing_if = "Vec::is_empty")]
+        review_conflicts: Vec<ReviewConflict>,
     },
     Search {
         room_id: String,
         query: String,
         limit: usize,
+        #[serde(default)]
+        explore: bool,
     },
     Get {
         room_id: String,
@@ -82,13 +92,17 @@ pub struct StorageReceipt {
 #[serde(tag = "status", rename_all = "snake_case", deny_unknown_fields)]
 pub enum WireReply {
     Challenge {
-        challenge: ChallengePacket,
+        challenge: Box<ChallengePacket>,
     },
     Certified {
         receipt: Signed<AutomationReceipt>,
     },
     Stored {
         receipt: Signed<StorageReceipt>,
+        #[serde(default, skip_serializing_if = "Vec::is_empty")]
+        reviews: Vec<ReviewPacket>,
+        #[serde(default, skip_serializing_if = "Vec::is_empty")]
+        review_conflicts: Vec<ReviewConflict>,
     },
     Hits {
         hits: Vec<KnowledgeHit>,
@@ -113,9 +127,11 @@ struct Query {
     query: String,
     id: Option<String>,
     peers_mode: bool,
+    explore: bool,
+    policy_filtered: usize,
+    operator_history: Option<OperatorBindingHistory>,
     hits: BTreeMap<String, KnowledgeHit>,
     providers: BTreeMap<String, BTreeSet<String>>,
-    conflicts: BTreeMap<(String, String), u64>,
     queue: VecDeque<PeerId>,
     planned: BTreeSet<String>,
     inflight: usize,
@@ -155,6 +171,7 @@ enum GateAction {
     Evaluate {
         record: Box<RecordPacket>,
         previous: Vec<ReviewPacket>,
+        conflicts: Vec<ReviewConflict>,
         review: ReviewPacket,
     },
 }
@@ -165,6 +182,7 @@ struct GatePending {
     purpose: String,
     action: Option<GateAction>,
     answer: Option<AutomationAnswer>,
+    deferred_challenge: Option<Box<ChallengePacket>>,
     issuer: PeerId,
     candidates: VecDeque<PeerId>,
     attempt_until: Instant,
@@ -184,16 +202,24 @@ struct Nonce {
     digest: String,
     expires_at: u64,
     spent: bool,
+    #[serde(default = "unknown_bucket")]
+    bucket: String,
+}
+fn unknown_bucket() -> String {
+    "unknown".into()
 }
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct NonceState {
     version: u32,
     entries: Vec<Nonce>,
+    #[serde(default)]
+    review_sequence: u64,
 }
 struct Nonces {
     path: PathBuf,
     state: NonceState,
+    capacity_rejections: u64,
 }
 impl Nonces {
     fn open(home: &Path) -> Result<Self> {
@@ -208,12 +234,19 @@ impl Nonces {
                 .map(|entry| &entry.id)
                 .collect::<BTreeSet<_>>();
             if state.version != 1
-                || state.entries.len() > 256
+                || state.review_sequence > MAX_REVIEW_SEQUENCE
+                || state.entries.len() > NONCE_CAPACITY
                 || unique.len() != state.entries.len()
                 || state.entries.iter().any(|entry| {
                     !util::valid_id(&entry.id)
                         || !util::valid_id(&entry.digest)
                         || entry.expires_at > 9_007_199_254_740_991
+                        || entry.bucket.is_empty()
+                        || entry.bucket.len() > 256
+                        || !entry
+                            .bucket
+                            .bytes()
+                            .all(|b| b.is_ascii_alphanumeric() || b"-_.:".contains(&b))
                 })
             {
                 return Err(STORAGE);
@@ -223,14 +256,57 @@ impl Nonces {
             NonceState {
                 version: 1,
                 entries: vec![],
+                review_sequence: 0,
             }
         };
-        Ok(Self { path, state })
+        Ok(Self {
+            path,
+            state,
+            capacity_rejections: 0,
+        })
     }
+    fn seed_review_sequence(&mut self, floor: u64) -> Result<()> {
+        if floor > MAX_REVIEW_SEQUENCE {
+            return Err(INVALID);
+        }
+        if floor > self.state.review_sequence {
+            let mut state = self.state.clone();
+            state.review_sequence = floor;
+            util::atomic_write(&self.path, &util::canonical(&state)?)?;
+            self.state = state;
+        }
+        Ok(())
+    }
+    fn reserve_review_sequence(&mut self, floor: u64) -> Result<u64> {
+        let sequence = self
+            .state
+            .review_sequence
+            .max(floor)
+            .checked_add(1)
+            .filter(|value| *value <= MAX_REVIEW_SEQUENCE)
+            .ok_or(Error::new(30, "knowledge_review_sequence_exhausted"))?;
+        let mut state = self.state.clone();
+        state.review_sequence = sequence;
+        util::atomic_write(&self.path, &util::canonical(&state)?)?;
+        self.state = state;
+        Ok(sequence)
+    }
+    #[cfg(test)]
     fn issue(&mut self, challenge: &ChallengePacket) -> Result<()> {
+        self.issue_in_bucket(challenge, "unknown")
+    }
+    fn issue_in_bucket(&mut self, challenge: &ChallengePacket, bucket: &str) -> Result<()> {
         let mut state = self.state.clone();
         state.entries.retain(|entry| entry.expires_at > util::now());
-        if state.entries.len() >= 256 {
+        if state.entries.len() >= NONCE_CAPACITY
+            || state
+                .entries
+                .iter()
+                .filter(|entry| entry.bucket == bucket)
+                .count()
+                >= NONCE_BUCKET_CAPACITY
+        {
+            self.capacity_rejections = self.capacity_rejections.saturating_add(1);
             return Err(Error::new(30, "automation_challenge_capacity"));
         }
         let value = &challenge.challenge.signed;
@@ -242,6 +318,7 @@ impl Nonces {
             digest: util::hash(&util::canonical(challenge)?),
             expires_at: value.expires_at,
             spent: false,
+            bucket: bucket.into(),
         });
         util::atomic_write(&self.path, &util::canonical(&state)?)?;
         self.state = state;
@@ -309,6 +386,8 @@ pub struct Runtime {
     retry: BTreeMap<(String, String), Instant>,
     cache: BTreeMap<String, Cached>,
     remote_rates: BTreeMap<PeerId, Rate>,
+    operator_rates: BTreeMap<String, Rate>,
+    operator_rate_rejections: u64,
     mutation_rates: BTreeMap<String, Rate>,
     cursor: usize,
     last_inventory: Instant,
@@ -317,15 +396,42 @@ pub struct Runtime {
     inventory_pages: VecDeque<(PeerId, String, Option<String>)>,
     repairs: VecDeque<(PeerId, String, String)>,
 }
+#[cfg(test)]
 fn transfer_digest(packet: &RecordPacket, reviews: &[ReviewPacket]) -> Result<String> {
+    transfer_digest_with_conflicts(packet, reviews, &[])
+}
+fn transfer_digest_with_conflicts(
+    packet: &RecordPacket,
+    reviews: &[ReviewPacket],
+    conflicts: &[ReviewConflict],
+) -> Result<String> {
     let mut ids = reviews
         .iter()
         .map(|r| r.review.signed.id.as_str())
         .collect::<Vec<_>>();
     ids.sort();
+    if conflicts.is_empty() {
+        return Ok(util::hash(&util::canonical(&(
+            packet.record.signed.id.as_str(),
+            ids,
+        ))?));
+    }
+    let mut proofs = conflicts
+        .iter()
+        .map(|proof| {
+            let mut ids = [
+                &proof.first.review.signed.id,
+                &proof.second.review.signed.id,
+            ];
+            ids.sort();
+            ids
+        })
+        .collect::<Vec<_>>();
+    proofs.sort();
     Ok(util::hash(&util::canonical(&(
         packet.record.signed.id.as_str(),
         ids,
+        proofs,
     ))?))
 }
 fn scan_query(query: &str) -> Result<()> {
@@ -365,23 +471,21 @@ fn query_bytes(q: &Query) -> usize {
     serde_json::to_vec(&(&q.hits, &q.providers))
         .map_or(usize::MAX, |v| v.len())
         .saturating_add(q.query.len())
+        .saturating_add(util::canonical(&q.operator_history).map_or(usize::MAX, |v| v.len()))
         .saturating_add(util::canonical(&q.room).map_or(usize::MAX, |v| v.len()))
-        .saturating_add(q.conflicts.len().saturating_mul(256))
         .saturating_add(q.planned.iter().map(String::len).sum::<usize>())
 }
-fn evidence_for<'a>(hits: impl Iterator<Item = &'a KnowledgeHit>) -> Vec<Evidence> {
+fn evidence_for<'a>(
+    hits: impl Iterator<Item = &'a KnowledgeHit>,
+    room: &TrustedRoom,
+) -> Vec<VerifiedEvidence> {
     hits.flat_map(|hit| {
-        hit.reviews.iter().map(|r| {
-            let review = &r.review.signed;
-            Evidence {
-                record_id: review.record_id.clone(),
-                author: hit.packet.record.signed.author_peer_id.clone(),
-                reviewer: review.reviewer_peer_id.clone(),
-                useful: review.verdict == "useful",
-                sequence: review.sequence,
-                created_at: review.created_at,
-            }
-        })
+        knowledge::verified_evidence_with_conflicts(
+            &hit.packet,
+            &hit.reviews,
+            &hit.review_conflicts,
+            room,
+        )
     })
     .collect()
 }
@@ -396,14 +500,36 @@ fn truncate_utf8(text: &str, max: usize) -> String {
 impl Runtime {
     pub fn open(home: &Path, key: identity::Keypair) -> Result<Self> {
         let own = key.public().to_peer_id().to_string();
+        let mut store = Store::open(home)?;
+        let config = config::load(home)?;
+        store.set_operator_history(&config.knowledge_operator_history);
+        store.set_rooms(config.rooms.into_values());
+        let mut nonces = Nonces::open(home)?;
+        let sequence_floor = store
+            .state
+            .records
+            .iter()
+            .flat_map(|stored| {
+                stored.reviews.iter().chain(
+                    stored
+                        .review_conflicts
+                        .iter()
+                        .flat_map(|proof| [&proof.first, &proof.second]),
+                )
+            })
+            .filter(|review| review.review.signed.reviewer_peer_id == own)
+            .map(|review| review.review.signed.sequence)
+            .max()
+            .unwrap_or(0);
+        nonces.seed_review_sequence(sequence_floor)?;
         Ok(Self {
             home: home.into(),
             key,
             own,
-            store: Store::open(home)?,
+            store,
             #[cfg(test)]
             poll_record_validations: 0,
-            nonces: Nonces::open(home)?,
+            nonces,
             gates: BTreeMap::new(),
             next_gate: 0,
             pending: BTreeMap::new(),
@@ -415,6 +541,8 @@ impl Runtime {
             retry: BTreeMap::new(),
             cache: BTreeMap::new(),
             remote_rates: BTreeMap::new(),
+            operator_rates: BTreeMap::new(),
+            operator_rate_rejections: 0,
             mutation_rates: BTreeMap::new(),
             cursor: 0,
             last_inventory: Instant::now() - Duration::from_secs(60),
@@ -469,6 +597,50 @@ impl Runtime {
             })
             .take(16.0, 4.0, Instant::now())
     }
+    #[cfg(test)]
+    fn operator_bucket(room: &TrustedRoom, peer: &str) -> String {
+        Self::operator_bucket_with_history(room, peer, &BTreeMap::new())
+    }
+    fn operator_bucket_with_history(
+        room: &TrustedRoom,
+        peer: &str,
+        histories: &BTreeMap<String, OperatorBindingHistory>,
+    ) -> String {
+        match knowledge::resource_group(room, peer, histories) {
+            OperatorGroup::Registered(group) => {
+                format!("registered:{}:{group}", room.authority_peer_id)
+            }
+            OperatorGroup::Unknown => unknown_bucket(),
+        }
+    }
+    #[cfg(test)]
+    fn allow_operator_remote(&mut self, room: &TrustedRoom, peer: &str) -> bool {
+        self.allow_operator_remote_with_history(room, peer, &BTreeMap::new())
+    }
+    fn allow_operator_remote_with_history(
+        &mut self,
+        room: &TrustedRoom,
+        peer: &str,
+        histories: &BTreeMap<String, OperatorBindingHistory>,
+    ) -> bool {
+        let bucket = Self::operator_bucket_with_history(room, peer, histories);
+        let allowed =
+            if !self.operator_rates.contains_key(&bucket) && self.operator_rates.len() >= 1024 {
+                false
+            } else {
+                self.operator_rates
+                    .entry(bucket)
+                    .or_insert(Rate {
+                        tokens: 32.0,
+                        updated: Instant::now(),
+                    })
+                    .take(32.0, 4.0, Instant::now())
+            };
+        if !allowed {
+            self.operator_rate_rejections = self.operator_rate_rejections.saturating_add(1);
+        }
+        allowed
+    }
     fn allow_mutation(&mut self, owner: &str) -> bool {
         if !self.mutation_rates.contains_key(owner) && self.mutation_rates.len() >= 64 {
             return false;
@@ -489,12 +661,14 @@ impl Runtime {
         for review in &hit.reviews {
             knowledge::validate_review_for_verified_record(review, &hit.packet, room, util::now())?;
         }
+        knowledge::validate_conflicts(&hit.packet, &hit.review_conflicts, room, util::now())?;
         Ok(())
     }
     fn known_hit_current(&self, hit: &KnowledgeHit, room: &TrustedRoom) -> bool {
         // Load, admission and cache insertion already verified these immutable
         // bytes. Re-pin the original proof to the current profile and authority.
         hit.reviews.len() <= knowledge::MAX_REVIEWERS
+            && hit.review_conflicts.len() <= knowledge::MAX_REVIEWERS
             && same_pin(&hit.packet.certificate, room)
             && hit.packet.record.signed.policy_id == Scanner::policy_id()
             && (!room.certificate.signed.knowledge_automation_required
@@ -503,12 +677,22 @@ impl Runtime {
             && hit
                 .reviews
                 .iter()
-                .all(|review| same_pin(&review.certificate, room))
+                .chain(
+                    hit.review_conflicts
+                        .iter()
+                        .flat_map(|proof| [&proof.first, &proof.second]),
+                )
+                .all(|review| {
+                    same_pin(&review.certificate, room)
+                        && (!room.certificate.signed.knowledge_automation_required
+                            || review.admission.is_some())
+                })
     }
     fn local_hit(&self, room: &str, id: &str) -> Option<KnowledgeHit> {
         self.store.get(room, id).map(|stored| KnowledgeHit {
             packet: stored.packet.clone(),
             reviews: stored.reviews.clone(),
+            review_conflicts: stored.review_conflicts.clone(),
             quality: knowledge_rating::quality(
                 id,
                 &stored.packet.record.signed.author_peer_id,
@@ -561,7 +745,27 @@ impl Runtime {
         );
     }
     pub fn metrics(&self) -> Value {
-        json!({"storage": self.store.metrics(), "pending_replications": self.pending.values().filter(|v| matches!(v, Work::Store { .. })).count(), "pending_repairs": self.repairs.len() + self.pending.values().filter(|work| matches!(work, Work::Repair { .. })).count(), "pending_inventory_pages": self.inventory_pages.len() + self.pending.values().filter(|work| matches!(work, Work::Inventory { .. })).count(), "expired_background_requests": self.expired_background_requests, "staging_records": self.store.state.records.iter().filter(|s| s.staging).count(), "active_queries": self.queries.len(), "pending_automation": self.gates.len(), "query_bytes": self.queries.values().map(query_bytes).sum::<usize>(), "cache_bytes": self.cache.values().map(|c| c.bytes).sum::<usize>(), "replication_factor": knowledge::REPLICAS, "receipt_claims_are_availability_proofs": false})
+        let mut metrics = json!({"storage": self.store.metrics(), "pending_replications": self.pending.values().filter(|v| matches!(v, Work::Store { .. })).count(), "pending_repairs": self.repairs.len() + self.pending.values().filter(|work| matches!(work, Work::Repair { .. })).count(), "pending_inventory_pages": self.inventory_pages.len() + self.pending.values().filter(|work| matches!(work, Work::Inventory { .. })).count(), "expired_background_requests": self.expired_background_requests, "staging_records": self.store.state.records.iter().filter(|s| s.staging).count(), "active_queries": self.queries.len(), "pending_automation": self.gates.len(), "query_bytes": self.queries.values().map(query_bytes).sum::<usize>(), "cache_bytes": self.cache.values().map(|c| c.bytes).sum::<usize>(), "replication_factor": knowledge::REPLICAS, "receipt_claims_are_availability_proofs": false});
+        metrics["operator_rate_buckets"] = self.operator_rates.len().into();
+        metrics["operator_policy_version"] = 1.into();
+        metrics["operator_rate_rejections"] = self.operator_rate_rejections.into();
+        metrics["nonce_capacity_per_operator"] = NONCE_BUCKET_CAPACITY.into();
+        metrics["nonce_capacity_global"] = NONCE_CAPACITY.into();
+        metrics["nonce_capacity_rejections"] = self.nonces.capacity_rejections.into();
+        metrics["review_sequence_counter"] = self.nonces.state.review_sequence.into();
+        metrics["active_challenge_buckets"] = self
+            .nonces
+            .state
+            .entries
+            .iter()
+            .filter(|entry| entry.expires_at > util::now())
+            .map(|entry| &entry.bucket)
+            .collect::<BTreeSet<_>>()
+            .len()
+            .into();
+        metrics["operator_remote_burst"] = 32.into();
+        metrics["operator_remote_refill_per_second"] = 4.into();
+        metrics
     }
     /// This is only this keeper's recent public subset, never a whole-room feed.
     pub fn public_entries(&self, room: &TrustedRoom) -> Vec<crate::publication::PublicEntry> {
@@ -647,7 +851,11 @@ impl Runtime {
         let record = &stored.packet.record.signed;
         let keepers =
             knowledge::replica_peers(&room.certificate.signed, &record.id, knowledge::REPLICAS);
-        let digest = transfer_digest(&stored.packet, &stored.reviews)?;
+        let digest = transfer_digest_with_conflicts(
+            &stored.packet,
+            &stored.reviews,
+            &stored.review_conflicts,
+        )?;
         let acks = keepers
             .iter()
             .filter(|peer| {
@@ -722,6 +930,9 @@ impl Runtime {
             Ok(config) => config,
             Err(error) => return Err((error, response)),
         };
+        self.store.set_rooms(config.rooms.values().cloned());
+        self.store
+            .set_operator_history(&config.knowledge_operator_history);
         if matches!(
             request,
             Request::KnowledgePublish { .. } | Request::KnowledgeEvaluate { .. }
@@ -771,15 +982,20 @@ impl Runtime {
                 if !self.known_hit_current(&hit, &room) {
                     return Err(INVALID);
                 }
-                let sequence = hit
+                let digest = knowledge::review_action_digest_for_room(&room, id, &self.own, input)?;
+                let floor = hit
                     .reviews
                     .iter()
+                    .chain(
+                        hit.review_conflicts
+                            .iter()
+                            .flat_map(|proof| [&proof.first, &proof.second]),
+                    )
                     .filter(|review| review.review.signed.reviewer_peer_id == self.own)
                     .map(|review| review.review.signed.sequence)
                     .max()
-                    .unwrap_or(0)
-                    .checked_add(1)
-                    .ok_or(INVALID)?;
+                    .unwrap_or(0);
+                let sequence = self.nonces.reserve_review_sequence(floor)?;
                 let review = knowledge::prepare_review(
                     &self.key,
                     &room,
@@ -788,12 +1004,6 @@ impl Runtime {
                     sequence,
                     util::now(),
                 )?;
-                let digest = knowledge::review_action_digest(
-                    &room.certificate.signed.room_id,
-                    id,
-                    &self.own,
-                    input,
-                )?;
                 Ok(Some(GateIntent {
                     room,
                     digest,
@@ -801,6 +1011,7 @@ impl Runtime {
                     action: GateAction::Evaluate {
                         record: Box::new(hit.packet),
                         previous: hit.reviews,
+                        conflicts: hit.review_conflicts,
                         review,
                     },
                     answer: proof.clone(),
@@ -848,15 +1059,20 @@ impl Runtime {
                 if !self.known_hit_current(&hit, &room) {
                     return Err(INVALID);
                 }
-                let sequence = hit
+                let _ = knowledge::review_action_digest_for_room(&room, id, &self.own, input)?;
+                let floor = hit
                     .reviews
                     .iter()
+                    .chain(
+                        hit.review_conflicts
+                            .iter()
+                            .flat_map(|proof| [&proof.first, &proof.second]),
+                    )
                     .filter(|r| r.review.signed.reviewer_peer_id == self.own)
                     .map(|r| r.review.signed.sequence)
                     .max()
-                    .unwrap_or(0)
-                    .checked_add(1)
-                    .ok_or(INVALID)?;
+                    .unwrap_or(0);
+                let sequence = self.nonces.reserve_review_sequence(floor)?;
                 let review = knowledge::create_review(
                     &self.key,
                     &room,
@@ -865,28 +1081,33 @@ impl Runtime {
                     sequence,
                     util::now(),
                 )?;
-                if !self.store.insert(hit.packet.clone(), true, util::now())? {
-                    return Err(STORAGE);
-                }
-                for old in hit.reviews {
-                    let offered = old.clone();
-                    let _ = self.store.evaluate(old, util::now())?;
-                    if !self.review_retained(&room, &hit.packet.record.signed.id, &offered) {
-                        return Err(STORAGE);
-                    }
-                }
-                let offered = review.clone();
-                let _ = self.store.evaluate(review, util::now())?;
-                if !self.review_retained(&room, &hit.packet.record.signed.id, &offered) {
-                    return Err(STORAGE);
-                }
+                self.ensure_own_review_retained(
+                    &room,
+                    &hit.packet,
+                    &hit.reviews,
+                    &hit.review_conflicts,
+                    &review,
+                )?;
+                let mut reviews = hit.reviews;
+                reviews.push(review);
+                self.store.insert_with_reviews_and_conflicts(
+                    hit.packet,
+                    reviews,
+                    hit.review_conflicts,
+                    true,
+                    util::now(),
+                )?;
                 Ok(
                     json!({"status": "accepted", "id": id, "evaluation_applied": true, "replication_complete": false, "untrusted": false}),
                 )
             }
             Request::KnowledgeStatus { room } => self.status(&config, room.as_deref()),
-            Request::KnowledgeSearch { room, query, limit }
-            | Request::KnowledgePeers { room, query, limit } => {
+            Request::KnowledgeSearch {
+                room, query, limit, ..
+            }
+            | Request::KnowledgePeers {
+                room, query, limit, ..
+            } => {
                 self.room(&config, room)?;
                 scan_query(query)?;
                 if *limit == 0 || *limit > 20 {
@@ -912,10 +1133,20 @@ impl Runtime {
             self.poll(swarm);
             return Ok(());
         }
-        let (alias, query, id, limit, peers_mode) = match request {
-            Request::KnowledgeSearch { room, query, limit } => (room, query, None, limit, false),
-            Request::KnowledgePeers { room, query, limit } => (room, query, None, limit, true),
-            Request::KnowledgeGet { room, id } => (room, String::new(), Some(id), 1, false),
+        let (alias, query, id, limit, peers_mode, explore) = match request {
+            Request::KnowledgeSearch {
+                room,
+                query,
+                limit,
+                explore,
+            } => (room, query, None, limit, false, explore),
+            Request::KnowledgePeers {
+                room,
+                query,
+                limit,
+                explore,
+            } => (room, query, None, limit, true, explore),
+            Request::KnowledgeGet { room, id } => (room, String::new(), Some(id), 1, false, true),
             _ => unreachable!(),
         };
         let room = match self.room(&config, &alias) {
@@ -930,8 +1161,17 @@ impl Runtime {
                 .into_iter()
                 .collect()
         } else {
-            self.store
-                .search(&room.certificate.signed.room_id, &query, 20, util::now())
+            self.store.search_mode(
+                &room.certificate.signed.room_id,
+                &query,
+                20,
+                util::now(),
+                if explore {
+                    SearchMode::Explore
+                } else {
+                    SearchMode::Normal
+                },
+            )
         };
         let queue: VecDeque<PeerId> = room
             .certificate
@@ -942,15 +1182,21 @@ impl Runtime {
             .filter_map(|m| m.peer_id.parse().ok())
             .collect();
         let planned = queue.iter().map(ToString::to_string).collect();
+        let operator_history = config
+            .knowledge_operator_history
+            .get(&room.certificate.signed.room_id)
+            .cloned();
         let mut pending = Query {
             response,
             room,
             query,
             id,
             peers_mode,
+            explore,
+            policy_filtered: 0,
+            operator_history,
             hits: BTreeMap::new(),
             providers: BTreeMap::new(),
-            conflicts: BTreeMap::new(),
             queue,
             planned,
             inflight: 0,
@@ -1073,6 +1319,7 @@ impl Runtime {
                 purpose: intent.purpose,
                 action: intent.answer.as_ref().map(|_| intent.action),
                 answer: intent.answer,
+                deferred_challenge: None,
                 issuer,
                 candidates,
                 attempt_until: Instant::now() + Duration::from_secs(2),
@@ -1081,23 +1328,53 @@ impl Runtime {
         );
         Ok(())
     }
-    fn review_retained(&self, room: &TrustedRoom, id: &str, offered: &ReviewPacket) -> bool {
-        self.store
-            .get(&room.certificate.signed.room_id, id)
-            .is_some_and(|stored| {
-                stored.reviews.iter().any(|retained| {
-                    let a = &retained.review.signed;
-                    let b = &offered.review.signed;
-                    a.reviewer_peer_id == b.reviewer_peer_id
-                        && (a.sequence > b.sequence || (a.sequence == b.sequence && a.id == b.id))
-                        && same_pin(&retained.certificate, room)
-                        && (!room.certificate.signed.knowledge_automation_required
-                            || retained.admission.is_some())
-                })
-            })
+    fn ensure_own_review_retained(
+        &self,
+        room: &TrustedRoom,
+        packet: &RecordPacket,
+        previous: &[ReviewPacket],
+        conflicts: &[ReviewConflict],
+        offered: &ReviewPacket,
+    ) -> Result<()> {
+        let stored = self
+            .store
+            .get(&packet.record.signed.room_id, &packet.record.signed.id);
+        let mut reviews = stored.map(|row| row.reviews.clone()).unwrap_or_default();
+        reviews.extend_from_slice(previous);
+        let mut proofs = stored
+            .map(|row| row.review_conflicts.clone())
+            .unwrap_or_default();
+        proofs.extend_from_slice(conflicts);
+        // Two bounded merges preserve every existing fork while avoiding a
+        // 65th transient review when local and cached latest views differ.
+        let (mut reviews, proofs) =
+            knowledge::canonical_review_state(packet, room, reviews, proofs)?;
+        reviews.push(offered.clone());
+        let (reviews, proofs) = knowledge::canonical_review_state(packet, room, reviews, proofs)?;
+        let retained = reviews
+            .iter()
+            .chain(
+                proofs
+                    .iter()
+                    .flat_map(|proof| [&proof.first, &proof.second]),
+            )
+            .any(|retained| {
+                let old = &retained.review.signed;
+                let new = &offered.review.signed;
+                old.reviewer_peer_id == new.reviewer_peer_id
+                    && (old.sequence > new.sequence
+                        || (old.sequence == new.sequence && old.id == new.id))
+            });
+        if !retained {
+            return Err(Error::new(30, "knowledge_review_slot_unavailable"));
+        }
+        Ok(())
     }
     fn incoming(&mut self, peer: PeerId, request: WireRequest) -> Result<WireReply> {
         let config = config::load(&self.home)?;
+        self.store.set_rooms(config.rooms.values().cloned());
+        self.store
+            .set_operator_history(&config.knowledge_operator_history);
         let id = match &request {
             WireRequest::Challenge { room_id, .. } => room_id,
             WireRequest::Certify { answer } => &answer.challenge.challenge.signed.room_id,
@@ -1107,7 +1384,12 @@ impl Runtime {
             | WireRequest::Inventory { room_id, .. } => room_id,
         };
         let room = self.authorized(&config, id, &peer)?;
-        if !self.allow_remote(peer) {
+        if !self.allow_operator_remote_with_history(
+            &room,
+            &peer.to_string(),
+            &config.knowledge_operator_history,
+        ) || !self.allow_remote(peer)
+        {
             return Err(Error::new(30, "knowledge_peer_rate_limited"));
         }
         match request {
@@ -1129,8 +1411,17 @@ impl Runtime {
                     &purpose,
                     util::now(),
                 )?;
-                self.nonces.issue(&challenge)?;
-                Ok(WireReply::Challenge { challenge })
+                self.nonces.issue_in_bucket(
+                    &challenge,
+                    &Self::operator_bucket_with_history(
+                        &room,
+                        &peer.to_string(),
+                        &config.knowledge_operator_history,
+                    ),
+                )?;
+                Ok(WireReply::Challenge {
+                    challenge: Box::new(challenge),
+                })
             }
             WireRequest::Certify { answer } => {
                 if answer.challenge.challenge.signed.subject_peer_id != peer.to_string()
@@ -1143,7 +1434,10 @@ impl Runtime {
                 Ok(WireReply::Certified { receipt })
             }
             WireRequest::Store {
-                packet, reviews, ..
+                packet,
+                reviews,
+                review_conflicts,
+                ..
             } => {
                 let hit = KnowledgeHit {
                     quality: knowledge_rating::quality(
@@ -1153,12 +1447,19 @@ impl Runtime {
                     ),
                     packet: *packet,
                     reviews,
+                    review_conflicts,
                     score: 0.0,
                 };
                 if hit.reviews.len() > knowledge::MAX_REVIEWERS {
                     return Err(INVALID);
                 }
                 knowledge::validate_record(&hit.packet, &room, util::now())?;
+                knowledge::validate_conflicts(
+                    &hit.packet,
+                    &hit.review_conflicts,
+                    &room,
+                    util::now(),
+                )?;
                 if hit.reviews.iter().any(|review| {
                     !same_pin(&review.certificate, &room)
                         || (room.certificate.signed.knowledge_automation_required
@@ -1176,36 +1477,21 @@ impl Runtime {
                     .store
                     .get(&room.certificate.signed.room_id, &id)
                     .is_some_and(|s| s.staging);
-                if !self
-                    .store
-                    .insert(hit.packet.clone(), staging, util::now())?
-                {
-                    return Err(STORAGE);
-                }
-                for review in &hit.reviews {
-                    let exact = self
-                        .store
-                        .get(&room.certificate.signed.room_id, &id)
-                        .is_some_and(|stored| {
-                            stored.reviews.iter().any(|old| {
-                                util::canonical(old).ok() == util::canonical(review).ok()
-                            })
-                        });
-                    if !exact {
-                        let _ = self.store.evaluate(review.clone(), util::now())?;
-                    }
-                }
+                self.store.insert_with_reviews_and_conflicts(
+                    hit.packet.clone(),
+                    hit.reviews,
+                    hit.review_conflicts,
+                    staging,
+                    util::now(),
+                )?;
                 let stored = self
                     .store
                     .get(&room.certificate.signed.room_id, &id)
                     .ok_or(STORAGE)?;
-                knowledge::validate_record(&stored.packet, &room, util::now())?;
-                for review in &hit.reviews {
-                    if !self.review_retained(&room, &id, review) {
-                        return Err(STORAGE);
-                    }
-                }
-                let digest = transfer_digest(&hit.packet, &hit.reviews)?;
+                let retained = stored.reviews.clone();
+                let retained_conflicts = stored.review_conflicts.clone();
+                let digest =
+                    transfer_digest_with_conflicts(&stored.packet, &retained, &retained_conflicts)?;
                 let receipt = StorageReceipt {
                     room_id: room.certificate.signed.room_id.clone(),
                     id,
@@ -1220,9 +1506,16 @@ impl Runtime {
                         public_key: crypto::public(&self.key),
                         signed: receipt,
                     },
+                    reviews: retained,
+                    review_conflicts: retained_conflicts,
                 })
             }
-            WireRequest::Search { query, limit, .. } => {
+            WireRequest::Search {
+                query,
+                limit,
+                explore,
+                ..
+            } => {
                 scan_query(&query)?;
                 if limit == 0 || limit > 20 {
                     return Err(INVALID);
@@ -1230,7 +1523,17 @@ impl Runtime {
                 let mut invalid = false;
                 let hits = self
                     .store
-                    .search(&room.certificate.signed.room_id, &query, limit, util::now())
+                    .search_mode(
+                        &room.certificate.signed.room_id,
+                        &query,
+                        limit,
+                        util::now(),
+                        if explore {
+                            SearchMode::Explore
+                        } else {
+                            SearchMode::Normal
+                        },
+                    )
                     .into_iter()
                     .filter(|hit| {
                         let valid = self.known_hit_current(hit, &room);
@@ -1328,7 +1631,11 @@ impl Runtime {
                     Err(INVALID)
                 };
                 let reply = reply.unwrap_or_else(|error| WireReply::Rejected { code: error.code });
-                if let Ok(bytes) = serde_json::to_vec(&reply) {
+                if let Ok(mut bytes) = serde_json::to_vec(&reply) {
+                    if bytes.len() > RESPONSE_BYTES {
+                        bytes = serde_json::to_vec(&WireReply::Rejected { code: 30 })
+                            .unwrap_or_default();
+                    }
                     let _ = swarm
                         .behaviour_mut()
                         .knowledge
@@ -1409,9 +1716,7 @@ impl Runtime {
             return Err(INVALID);
         }
         let stored = self.store.get(room_id, id).ok_or(INVALID)?;
-        if !same_pin(&stored.packet.certificate, &room)
-            || transfer_digest(&stored.packet, &stored.reviews)? != digest
-        {
+        if !same_pin(&stored.packet.certificate, &room) {
             return Err(INVALID);
         }
         crypto::verify(
@@ -1420,6 +1725,83 @@ impl Runtime {
             value,
             &receipt.signature,
         )
+    }
+    fn apply_storage_receipt(
+        &mut self,
+        config: &Config,
+        peer: PeerId,
+        expected: ReceiptExpectation<'_>,
+        receipt: Signed<StorageReceipt>,
+        reviews: Vec<ReviewPacket>,
+        conflicts: Vec<ReviewConflict>,
+    ) -> Result<()> {
+        if reviews.len() > knowledge::MAX_REVIEWERS {
+            return Err(INVALID);
+        }
+        let room = self.authorized(config, expected.room_id, &peer)?;
+        let stored = self
+            .store
+            .get(expected.room_id, expected.id)
+            .ok_or(INVALID)?;
+        let packet = stored.packet.clone();
+        let before =
+            transfer_digest_with_conflicts(&packet, &stored.reviews, &stored.review_conflicts)?;
+        knowledge::validate_conflicts(&packet, &conflicts, &room, util::now())?;
+        let mut reviewers = BTreeSet::new();
+        for review in &reviews {
+            knowledge::validate_review_for_verified_record(review, &packet, &room, util::now())?;
+            if !reviewers.insert(&review.review.signed.reviewer_peer_id) {
+                return Err(INVALID);
+            }
+        }
+        let actual_digest = transfer_digest_with_conflicts(&packet, &reviews, &conflicts)?;
+        self.verify_receipt(
+            config,
+            peer,
+            ReceiptExpectation {
+                digest: &actual_digest,
+                ..expected
+            },
+            &receipt,
+        )?;
+        // The keeper signs its actual retained state. Merge its complete,
+        // verified mutable metadata before comparing digests; a valid conflict
+        // is evidence, never a reason to retain an optimistic old assessment.
+        let staging = stored.staging;
+        self.store.insert_with_reviews_and_conflicts(
+            packet,
+            reviews,
+            conflicts,
+            staging,
+            util::now(),
+        )?;
+        let after = self
+            .store
+            .get(expected.room_id, expected.id)
+            .ok_or(STORAGE)?;
+        let after_digest =
+            transfer_digest_with_conflicts(&after.packet, &after.reviews, &after.review_conflicts)?;
+        if before != after_digest {
+            self.acks.retain(|(id, _), _| id != expected.id);
+            self.retry.retain(|(id, _), _| id != expected.id);
+        }
+        if before == expected.digest
+            && after_digest == expected.digest
+            && actual_digest == expected.digest
+        {
+            if self.acks.len() >= ROUTES {
+                self.acks.pop_first();
+            }
+            self.acks.insert(
+                (expected.id.into(), peer.to_string()),
+                (
+                    expected.digest.into(),
+                    expected.epoch,
+                    receipt.signed.stored_at,
+                ),
+            );
+        }
+        Ok(())
     }
     fn merge_hit(query: &mut Query, mut incoming: KnowledgeHit, provider: &str) {
         if query.exhausted {
@@ -1443,81 +1825,112 @@ impl Runtime {
             return;
         }
         let previous = query.hits.get(&id).cloned();
-        if previous.is_none() && query.hits.len() >= QUERY_HITS {
-            query.truncated = true;
-            return;
-        }
         if let Some(old) = &previous {
             incoming.packet = old.packet.clone();
         }
-        let mut reviews = BTreeMap::<String, ReviewPacket>::new();
-        for packet in previous
-            .iter()
-            .flat_map(|h| h.reviews.iter())
-            .chain(incoming.reviews.iter())
-        {
-            let value = &packet.review.signed;
-            let key = (id.clone(), value.reviewer_peer_id.clone());
-            if let Some(sequence) = query.conflicts.get(&key).copied() {
-                if value.sequence <= sequence {
-                    continue;
-                }
-                query.conflicts.remove(&key);
-            }
-            if let Some(old) = reviews.get(&value.reviewer_peer_id) {
-                let old = &old.review.signed;
-                if value.sequence == old.sequence && value.id != old.id {
-                    reviews.remove(&value.reviewer_peer_id);
-                    query.conflicts.insert(key, value.sequence);
-                    query.truncated = true;
-                    continue;
-                }
-                if value.sequence <= old.sequence {
-                    continue;
-                }
-            }
-            reviews.insert(value.reviewer_peer_id.clone(), packet.clone());
-        }
-        incoming.reviews = reviews.into_values().collect();
-        incoming.reviews.sort_by(|a, b| {
-            b.review
-                .signed
-                .created_at
-                .cmp(&a.review.signed.created_at)
-                .then_with(|| {
-                    a.review
-                        .signed
-                        .reviewer_peer_id
-                        .cmp(&b.review.signed.reviewer_peer_id)
-                })
-        });
-        if incoming.reviews.len() > knowledge::MAX_REVIEWERS {
-            incoming.reviews.truncate(knowledge::MAX_REVIEWERS);
+        let mut reviews = previous
+            .as_ref()
+            .map(|hit| hit.reviews.clone())
+            .unwrap_or_default();
+        reviews.extend(incoming.reviews);
+        let mut conflicts = previous
+            .as_ref()
+            .map(|hit| hit.review_conflicts.clone())
+            .unwrap_or_default();
+        conflicts.extend(incoming.review_conflicts);
+        let Ok((reviews, conflicts)) =
+            knowledge::canonical_review_state(&incoming.packet, &query.room, reviews, conflicts)
+        else {
             query.truncated = true;
-        }
+            return;
+        };
+        incoming.reviews = reviews;
+        incoming.review_conflicts = conflicts;
         query.hits.insert(id.clone(), incoming);
         query
             .providers
-            .entry(id.clone())
+            .entry(id)
             .or_default()
             .insert(provider.into());
-        if query_bytes(query) > QUERY_BYTES
-            || query.conflicts.len() > QUERY_HITS * knowledge::MAX_REVIEWERS
-        {
-            // Stop explicitly rather than keep an arbitrarily large partial
-            // evidence set or restore a positive vote excluded by a fork.
-            query.truncated = true;
-            query.hits.clear();
-            query.providers.clear();
-            query.conflicts.clear();
-            query.deadline = Instant::now();
-            query.exhausted = true;
+        Self::bound_query(query);
+    }
+    fn bound_query(query: &mut Query) {
+        let registry = knowledge::registry(&query.room);
+        let evidence = evidence_for(query.hits.values(), &query.room);
+        let mut pool = CandidatePool::new(PoolLimits {
+            total: QUERY_HITS,
+            per_operator: 16,
+            unconfirmed: 16,
+            unconfirmed_per_operator: 2,
+        })
+        .expect("fixed query limits");
+        for hit in query.hits.values_mut() {
+            let record = &hit.packet.record.signed;
+            let assessment = knowledge::assess_evidence_with_history(
+                &hit.packet,
+                &query.room,
+                &evidence,
+                query.operator_history.as_ref(),
+            );
+            hit.quality = assessment.quality.clone();
+            if query.id.is_none() && !query.explore && !assessment.promoted {
+                query.policy_filtered = query.policy_filtered.saturating_add(1);
+                continue;
+            }
+            let relevance = if query.id.is_some() {
+                1.0
+            } else {
+                knowledge_rating::lexical_relevance(
+                    &record.problem,
+                    &record.solution,
+                    &record.context,
+                    &query.query,
+                )
+            };
+            pool.offer_assessed(
+                &registry,
+                &record.id,
+                &record.author_peer_id,
+                relevance,
+                assessment,
+            );
+        }
+        let selected = pool.select(
+            SearchMode::Explore,
+            ExposureLimits {
+                total: QUERY_HITS,
+                unconfirmed: 16,
+                unconfirmed_per_operator: 2,
+            },
+        );
+        let mut hits = std::mem::take(&mut query.hits);
+        let ids = selected
+            .iter()
+            .map(|candidate| &candidate.id)
+            .collect::<BTreeSet<_>>();
+        query.providers.retain(|id, _| ids.contains(id));
+        // The pool sorts promoted entries first. Unconfirmed large bodies can
+        // therefore never reserve the byte budget ahead of a promoted result.
+        for candidate in selected {
+            if let Some(mut hit) = hits.remove(&candidate.id) {
+                hit.quality = candidate.assessment.quality;
+                hit.score = candidate.score;
+                query.hits.insert(candidate.id.clone(), hit);
+                if query_bytes(query) > QUERY_BYTES {
+                    query.hits.remove(&candidate.id);
+                    query.providers.remove(&candidate.id);
+                    query.truncated = true;
+                }
+            }
         }
     }
     fn completed(&mut self, work: Work, peer: PeerId, reply: Option<WireReply>) {
         let Ok(config) = config::load(&self.home) else {
             return;
         };
+        self.store.set_rooms(config.rooms.values().cloned());
+        self.store
+            .set_operator_history(&config.knowledge_operator_history);
         match work {
             Work::GateChallenge(id, expected) => self.complete_gate(
                 id,
@@ -1542,28 +1955,25 @@ impl Runtime {
                 sent_at,
             } => {
                 if peer == expected
-                    && let Some(WireReply::Stored { receipt }) = reply
-                    && self
-                        .verify_receipt(
-                            &config,
-                            peer,
-                            ReceiptExpectation {
-                                room_id: &room,
-                                id: &id,
-                                digest: &digest,
-                                epoch,
-                                sent_at,
-                            },
-                            &receipt,
-                        )
-                        .is_ok()
+                    && let Some(WireReply::Stored {
+                        receipt,
+                        reviews,
+                        review_conflicts,
+                    }) = reply
                 {
-                    if self.acks.len() >= ROUTES {
-                        self.acks.pop_first();
-                    }
-                    self.acks.insert(
-                        (id, peer.to_string()),
-                        (digest, epoch, receipt.signed.stored_at),
+                    let _ = self.apply_storage_receipt(
+                        &config,
+                        peer,
+                        ReceiptExpectation {
+                            room_id: &room,
+                            id: &id,
+                            digest: &digest,
+                            epoch,
+                            sent_at,
+                        },
+                        receipt,
+                        reviews,
+                        review_conflicts,
                     );
                 }
             }
@@ -1621,6 +2031,11 @@ impl Runtime {
                 let Some(query) = self.queries.get_mut(&query_id) else {
                     return;
                 };
+                query.room = room;
+                query.operator_history = config
+                    .knowledge_operator_history
+                    .get(&query.room.certificate.signed.room_id)
+                    .cloned();
                 query.responded += 1;
                 query.truncated |= truncated || invalid;
                 for hit in valid {
@@ -1700,15 +2115,13 @@ impl Runtime {
                             .store
                             .get(&room, &id)
                             .is_some_and(|stored| stored.staging);
-                        if self
-                            .store
-                            .insert(hit.packet, staging, util::now())
-                            .unwrap_or(false)
-                        {
-                            for review in hit.reviews {
-                                let _ = self.store.evaluate(review, util::now());
-                            }
-                        }
+                        let _ = self.store.insert_with_reviews_and_conflicts(
+                            hit.packet,
+                            hit.reviews,
+                            hit.review_conflicts,
+                            staging,
+                            util::now(),
+                        );
                     }
                 }
             }
@@ -1722,6 +2135,51 @@ impl Runtime {
         certify: bool,
         config: &Config,
     ) {
+        self.complete_gate_at(id, peer, reply, certify, config, util::now());
+    }
+    fn complete_gate_at(
+        &mut self,
+        id: u64,
+        peer: PeerId,
+        reply: Option<WireReply>,
+        certify: bool,
+        config: &Config,
+        wall_now: u64,
+    ) {
+        // A valid issuer can be slightly ahead of the subject's wall clock.
+        // Hold only a fully authenticated future packet in the existing bounded
+        // gate, then apply the unchanged strict fresh check once its time begins.
+        // The monotonic global deadline is never extended or restarted.
+        if !certify
+            && let Some(WireReply::Challenge { challenge }) = &reply
+            && let Some(pending) = self.gates.get(&id)
+            && pending.issuer == peer
+            && pending.deadline > Instant::now()
+            && challenge.challenge.signed.issued_at > wall_now
+        {
+            let valid = self
+                .authorized(config, &pending.room.certificate.signed.room_id, &peer)
+                .and_then(|room| {
+                    if !same_pin(&pending.room, &room)
+                        || crypto::public_key(&challenge.challenge.public_key)?.to_peer_id() != peer
+                    {
+                        return Err(INVALID);
+                    }
+                    automation::verify_challenge(
+                        challenge,
+                        &room,
+                        &self.own,
+                        &pending.digest,
+                        &pending.purpose,
+                        wall_now,
+                        false,
+                    )
+                });
+            if valid.is_ok() {
+                self.gates.get_mut(&id).unwrap().deferred_challenge = Some(challenge.clone());
+                return;
+            }
+        }
         if !certify
             && !matches!(&reply, Some(WireReply::Challenge { .. }))
             && let Some(pending) = self.gates.get_mut(&id)
@@ -1757,7 +2215,7 @@ impl Runtime {
                     &self.own,
                     &pending.digest,
                     &pending.purpose,
-                    util::now(),
+                    wall_now,
                     true,
                 )?;
                 if crypto::public_key(&challenge.challenge.public_key)?.to_peer_id() != peer {
@@ -1788,46 +2246,39 @@ impl Runtime {
                 &pending.digest,
                 &pending.purpose,
                 at,
-                util::now(),
+                wall_now,
             )?;
             let result = match action {
                 GateAction::Publish(mut packet) => {
                     packet.admission = Some(proof);
-                    knowledge::validate_record(&packet, &room, util::now())?;
+                    knowledge::validate_record(&packet, &room, wall_now)?;
                     let id = packet.record.signed.id.clone();
                     let keepers = knowledge::replica_peers(
                         &room.certificate.signed,
                         &id,
                         knowledge::REPLICAS,
                     );
-                    if !self.store.insert(packet, true, util::now())? {
+                    if !self.store.insert(packet, true, wall_now)? {
                         return Err(STORAGE);
                     }
                     json!({"status": "accepted", "id": id, "stored": true, "replication_factor": knowledge::REPLICAS, "assigned_keepers": keepers, "degraded": keepers.len() < knowledge::REPLICAS, "replication_complete": false, "assurance": "automation_tested", "untrusted": false})
                 }
                 GateAction::Evaluate {
                     record,
-                    previous,
+                    mut previous,
+                    conflicts,
                     mut review,
                 } => {
                     review.admission = Some(proof);
-                    knowledge::validate_review(&review, &record, &room, util::now())?;
+                    knowledge::validate_review(&review, &record, &room, wall_now)?;
                     let id = record.record.signed.id.clone();
-                    if !self.store.insert(*record, true, util::now())? {
-                        return Err(STORAGE);
-                    }
-                    for old in previous {
-                        let offered = old.clone();
-                        let _ = self.store.evaluate(old, util::now())?;
-                        if !self.review_retained(&room, &id, &offered) {
-                            return Err(STORAGE);
-                        }
-                    }
-                    let offered = review.clone();
-                    let _ = self.store.evaluate(review, util::now())?;
-                    if !self.review_retained(&room, &id, &offered) {
-                        return Err(STORAGE);
-                    }
+                    self.ensure_own_review_retained(
+                        &room, &record, &previous, &conflicts, &review,
+                    )?;
+                    previous.push(review);
+                    self.store.insert_with_reviews_and_conflicts(
+                        *record, previous, conflicts, true, wall_now,
+                    )?;
                     json!({"status": "accepted", "id": id, "evaluation_applied": true, "replication_complete": false, "assurance": "automation_tested", "untrusted": false})
                 }
             };
@@ -1841,6 +2292,36 @@ impl Runtime {
             ),
         };
         let _ = pending.response.send(reply);
+    }
+    fn resume_deferred_gates(&mut self, config: &Config, wall_now: u64) {
+        let ready = self
+            .gates
+            .iter()
+            .filter(|(_, pending)| {
+                pending.attempt_until > Instant::now()
+                    && pending
+                        .deferred_challenge
+                        .as_ref()
+                        .is_some_and(|packet| packet.challenge.signed.issued_at <= wall_now)
+            })
+            .map(|(id, pending)| (*id, pending.issuer))
+            .collect::<Vec<_>>();
+        for (id, peer) in ready {
+            if let Some(challenge) = self
+                .gates
+                .get_mut(&id)
+                .and_then(|pending| pending.deferred_challenge.take())
+            {
+                self.complete_gate_at(
+                    id,
+                    peer,
+                    Some(WireReply::Challenge { challenge }),
+                    false,
+                    config,
+                    wall_now,
+                );
+            }
+        }
     }
     fn retry_gates(&mut self, config: &Config, swarm: &mut Swarm<network::Behaviour>) {
         let due = self
@@ -1862,6 +2343,9 @@ impl Runtime {
             let Some(mut pending) = self.gates.remove(&id) else {
                 continue;
             };
+            // A signed future timestamp cannot occupy more than this issuer's
+            // original attempt budget. Drop it before trying the next member.
+            pending.deferred_challenge = None;
             let mut sent = false;
             while let Some(peer) = pending.candidates.pop_front() {
                 let Ok(room) =
@@ -1995,6 +2479,20 @@ impl Runtime {
             })
             .collect::<BTreeSet<PeerId>>();
         self.remote_rates.retain(|peer, _| peers.contains(peer));
+        let buckets = rooms
+            .values()
+            .flat_map(|room| {
+                room.certificate.signed.members.iter().map(|member| {
+                    Self::operator_bucket_with_history(
+                        room,
+                        &member.peer_id,
+                        &config.knowledge_operator_history,
+                    )
+                })
+            })
+            .collect::<BTreeSet<_>>();
+        self.operator_rates
+            .retain(|bucket, _| buckets.contains(bucket));
         self.mutation_rates
             .retain(|_, rate| rate.updated.elapsed() < Duration::from_secs(3600));
         self.last_prune = Instant::now();
@@ -2040,7 +2538,11 @@ impl Runtime {
             {
                 continue;
             }
-            let Ok(digest) = transfer_digest(&stored.packet, &stored.reviews) else {
+            let Ok(digest) = transfer_digest_with_conflicts(
+                &stored.packet,
+                &stored.reviews,
+                &stored.review_conflicts,
+            ) else {
                 continue;
             };
             let due = keepers.into_iter().filter(|other| {
@@ -2061,11 +2563,20 @@ impl Runtime {
                 self.poll_record_validations += 1;
             }
             if knowledge::validate_record(&stored.packet, &room, util::now()).is_err()
-                || stored.reviews.iter().any(|review| {
-                    !same_pin(&review.certificate, &room)
-                        || (room.certificate.signed.knowledge_automation_required
-                            && review.admission.is_none())
-                })
+                || stored
+                    .reviews
+                    .iter()
+                    .chain(
+                        stored
+                            .review_conflicts
+                            .iter()
+                            .flat_map(|proof| [&proof.first, &proof.second]),
+                    )
+                    .any(|review| {
+                        !same_pin(&review.certificate, &room)
+                            || (room.certificate.signed.knowledge_automation_required
+                                && review.admission.is_none())
+                    })
             {
                 continue;
             }
@@ -2081,6 +2592,7 @@ impl Runtime {
                     room_id: record.room_id.clone(),
                     packet: Box::new(stored.packet.clone()),
                     reviews: stored.reviews.clone(),
+                    review_conflicts: stored.review_conflicts.clone(),
                 };
                 if self.retry.len() >= ROUTES {
                     self.retry.pop_first();
@@ -2138,7 +2650,11 @@ impl Runtime {
                 return;
             }
         };
+        self.store.set_rooms(config.rooms.values().cloned());
+        self.store
+            .set_operator_history(&config.knowledge_operator_history);
         self.prune_metadata(&config);
+        self.resume_deferred_gates(&config, util::now());
         self.retry_gates(&config, swarm);
         let finished = self
             .queries
@@ -2192,6 +2708,7 @@ impl Runtime {
                         room_id: room_id.clone(),
                         query: query.query.clone(),
                         limit: 20,
+                        explore: query.explore,
                     }
                 };
                 query.room = current;
@@ -2312,38 +2829,49 @@ impl Runtime {
                 .any(|peer| !query.planned.contains(peer));
         let partial =
             query.failed > 0 || query.inflight > 0 || !query.queue.is_empty() || query.truncated;
-        let mut all = evidence_for(query.hits.values());
+        let mut all = evidence_for(query.hits.values(), &room);
+        let relevant_authors = query
+            .hits
+            .values()
+            .map(|hit| hit.packet.record.signed.author_peer_id.as_str())
+            .collect::<BTreeSet<_>>();
         // Historical storage was verified at insertion/load. Re-pin it to this
         // current room before using its observations as a bounded author prior.
         for stored in &self.store.state.records {
             if stored.packet.record.signed.room_id != room.certificate.signed.room_id
+                || !relevant_authors.contains(stored.packet.record.signed.author_peer_id.as_str())
                 || !same_pin(&stored.packet.certificate, &room)
             {
                 continue;
             }
-            let author = &stored.packet.record.signed.author_peer_id;
-            for review in &stored.reviews {
-                let value = &review.review.signed;
-                all.push(Evidence {
-                    record_id: value.record_id.clone(),
-                    author: author.clone(),
-                    reviewer: value.reviewer_peer_id.clone(),
-                    useful: value.verdict == "useful",
-                    sequence: value.sequence,
-                    created_at: value.created_at,
-                });
-            }
+            all.extend(knowledge::verified_evidence_with_conflicts(
+                &stored.packet,
+                &stored.reviews,
+                &stored.review_conflicts,
+                &room,
+            ));
         }
-        all.retain(|vote| {
-            query
-                .conflicts
-                .get(&(vote.record_id.clone(), vote.reviewer.clone()))
-                .is_none_or(|sequence| vote.sequence > *sequence)
-        });
         let mut hits = query.hits.into_values().collect::<Vec<_>>();
+        let registry = knowledge::registry(&room);
+        let mut assessments = BTreeMap::new();
+        let mut pool = CandidatePool::new(PoolLimits {
+            total: QUERY_HITS,
+            per_operator: 16,
+            unconfirmed: 16,
+            unconfirmed_per_operator: 2,
+        })
+        .expect("fixed query limits");
         for hit in &mut hits {
             let record = &hit.packet.record.signed;
-            hit.quality = knowledge_rating::quality(&record.id, &record.author_peer_id, &all);
+            let assessment = knowledge::assess_evidence_with_history(
+                &hit.packet,
+                &room,
+                &all,
+                config
+                    .knowledge_operator_history
+                    .get(&room.certificate.signed.room_id),
+            );
+            hit.quality = assessment.quality.clone();
             hit.score = knowledge_rating::search_score(
                 knowledge_rating::lexical_relevance(
                     &record.problem,
@@ -2353,6 +2881,27 @@ impl Runtime {
                 ),
                 &hit.quality,
             );
+            if query.id.is_none() && !query.explore && !assessment.promoted {
+                query.policy_filtered = query.policy_filtered.saturating_add(1);
+            } else {
+                pool.offer_assessed(
+                    &registry,
+                    &record.id,
+                    &record.author_peer_id,
+                    if query.id.is_some() {
+                        1.0
+                    } else {
+                        knowledge_rating::lexical_relevance(
+                            &record.problem,
+                            &record.solution,
+                            &record.context,
+                            &query.query,
+                        )
+                    },
+                    assessment.clone(),
+                );
+            }
+            assessments.insert(record.id.clone(), assessment);
         }
         hits.retain(|hit| {
             query.id.is_some()
@@ -2369,6 +2918,38 @@ impl Runtime {
                 .total_cmp(&a.score)
                 .then_with(|| a.packet.record.signed.id.cmp(&b.packet.record.signed.id))
         });
+        let explicit_id = query.id.is_some();
+        if !explicit_id {
+            let selected = pool.select(
+                if query.explore {
+                    SearchMode::Explore
+                } else {
+                    SearchMode::Normal
+                },
+                ExposureLimits {
+                    total: query.limit,
+                    ..ExposureLimits::default()
+                },
+            );
+            let mut available = hits
+                .into_iter()
+                .map(|hit| (hit.packet.record.signed.id.clone(), hit))
+                .collect::<BTreeMap<_, _>>();
+            hits = selected
+                .into_iter()
+                .filter_map(|candidate| available.remove(&candidate.id))
+                .collect();
+        }
+        let registered_groups = room
+            .certificate
+            .signed
+            .members
+            .iter()
+            .map(|member| registry.group(&member.peer_id))
+            .filter(|group| *group != OperatorGroup::Unknown)
+            .collect::<BTreeSet<_>>()
+            .len();
+        let no_results = hits.is_empty();
         let mut result = if let Some(id) = query.id {
             if let Some(hit) = hits
                 .into_iter()
@@ -2376,7 +2957,7 @@ impl Runtime {
             {
                 self.remember(hit.clone());
                 let reviews = hit.reviews.iter().map(|review| json!({"reviewer_peer_id": review.review.signed.reviewer_peer_id, "sequence": review.review.signed.sequence, "verdict": review.review.signed.verdict, "evidence": review.review.signed.evidence, "references": review.review.signed.references, "verified": true, "untrusted": true})).collect::<Vec<_>>();
-                json!({"status": "found", "found": true, "record": hit.packet.record.signed, "signature": hit.packet.record.signature, "public_key": hit.packet.record.public_key, "quality": hit.quality, "total_reviews": reviews.len(), "reviews": reviews, "reviews_truncated": false, "untrusted": true})
+                json!({"status": "found", "found": true, "record": hit.packet.record.signed, "signature": hit.packet.record.signature, "public_key": hit.packet.record.public_key, "quality": hit.quality, "assessment": assessments.get(&id), "confirmation": if assessments.get(&id).is_some_and(|value| value.promoted) { "operator_corroborated" } else { "unconfirmed" }, "total_reviews": reviews.len(), "review_conflict_count": hit.review_conflicts.len(), "reviews": reviews, "reviews_truncated": false, "untrusted": true})
             } else {
                 json!({"status": if partial { "incomplete" } else { "not_found" }, "found": false, "untrusted": true})
             }
@@ -2403,12 +2984,33 @@ impl Runtime {
             let mut rows = vec![];
             for hit in hits {
                 let record = &hit.packet.record.signed;
-                rows.push(json!({"id": record.id, "problem": record.problem, "kind": record.kind, "author_peer_id": record.author_peer_id, "created_at": record.created_at, "quality": hit.quality, "score": hit.score, "providers": query.providers.get(&record.id).cloned().unwrap_or_default(), "verified": true, "untrusted": true}));
+                rows.push(json!({"id": record.id, "problem": record.problem, "kind": record.kind, "author_peer_id": record.author_peer_id, "created_at": record.created_at, "quality": hit.quality, "assessment": assessments.get(&record.id), "confirmation": if assessments.get(&record.id).is_some_and(|value| value.promoted) { "operator_corroborated" } else { "unconfirmed" }, "score": hit.score, "providers": query.providers.get(&record.id).cloned().unwrap_or_default(), "verified": true, "untrusted": true}));
                 self.remember(hit);
             }
             json!({"status": "ok", "hits": rows, "untrusted": true})
         };
         result["partial"] = partial.into();
+        result["search_mode"] = if explicit_id {
+            "explicit_id"
+        } else if query.explore {
+            "explore"
+        } else {
+            "normal"
+        }
+        .into();
+        result["exploration_available"] = true.into();
+        result["registered_operator_groups"] = registered_groups.into();
+        result["policy_filtered_observations"] = query.policy_filtered.into();
+        result["operator_independence_is_assumed"] = true.into();
+        if no_results && !explicit_id && !query.explore {
+            result["reason"] = if registered_groups < knowledge_abuse::REQUIRED_POSITIVE_GROUPS + 1
+            {
+                "insufficient_independent_operators"
+            } else {
+                "no_promoted_knowledge"
+            }
+            .into();
+        }
         result["responded_peers"] = query.responded.into();
         result["failed_peers"] = (query.failed + query.inflight + query.queue.len()).into();
         while serde_json::to_vec(&result).is_ok_and(|bytes| bytes.len() > IPC_BYTES) {
@@ -2484,7 +3086,7 @@ mod tests {
             at: u64,
         ) -> TrustedRoom {
             let room = Room {
-                version: if public { 2 } else { 1 },
+                version: 4,
                 room_id: util::hash(b"runtime test room"),
                 epoch,
                 issued_at: at.saturating_sub(10),
@@ -2500,6 +3102,19 @@ mod tests {
                     .collect(),
                 public,
                 knowledge_automation_required: false,
+                knowledge_operators: Some(knowledge_abuse::OperatorClaims {
+                    bindings: keys
+                        .iter()
+                        .map(|key| {
+                            let peer = key.public().to_peer_id().to_string();
+                            (peer.clone(), format!("operator-{peer}"))
+                        })
+                        .collect(),
+                    credits: keys
+                        .iter()
+                        .map(|key| (format!("operator-{}", key.public().to_peer_id()), 1000))
+                        .collect(),
+                }),
             };
             TrustedRoom {
                 authority_peer_id: authority.public().to_peer_id().to_string(),
@@ -2551,6 +3166,7 @@ mod tests {
         }
         fn hit(&self, packet: RecordPacket, reviews: Vec<ReviewPacket>) -> KnowledgeHit {
             KnowledgeHit {
+                review_conflicts: vec![],
                 quality: knowledge_rating::quality(
                     &packet.record.signed.id,
                     &packet.record.signed.author_peer_id,
@@ -2570,9 +3186,11 @@ mod tests {
                     query: query.into(),
                     id: None,
                     peers_mode: false,
+                    explore: true,
+                    policy_filtered: 0,
+                    operator_history: None,
                     hits: BTreeMap::new(),
                     providers: BTreeMap::new(),
-                    conflicts: BTreeMap::new(),
                     queue: VecDeque::new(),
                     planned: self
                         .keys
@@ -2678,7 +3296,11 @@ mod tests {
                 sent_at: util::now(),
             },
             peer,
-            Some(WireReply::Stored { receipt }),
+            Some(WireReply::Stored {
+                receipt,
+                reviews: vec![],
+                review_conflicts: vec![],
+            }),
         );
         assert!(runtime.acks.is_empty());
     }
@@ -2699,6 +3321,7 @@ mod tests {
         let request = || WireRequest::Store {
             room_id: fixture.room.certificate.signed.room_id.clone(),
             packet: Box::new(packet.clone()),
+            review_conflicts: vec![],
             reviews: vec![review.clone()],
         };
         assert!(runtime.incoming(sender, request()).is_err());
@@ -2893,8 +3516,12 @@ mod tests {
             fixture.hit(packet.clone(), vec![incorrect]),
             &runtime.own,
         );
-        assert!(query.hits[&packet.record.signed.id].reviews.is_empty());
-        assert!(query.truncated);
+        assert_eq!(query.hits[&packet.record.signed.id].reviews.len(), 1);
+        assert_eq!(
+            query.hits[&packet.record.signed.id].review_conflicts.len(),
+            1
+        );
+        assert!(!query.truncated);
         runtime
             .store
             .insert(packet.clone(), false, util::now())
@@ -2902,7 +3529,7 @@ mod tests {
         runtime.store.evaluate(useful, util::now()).unwrap();
         runtime.finish_query(query, &config::load(&fixture.home).unwrap());
         let result = response.try_recv().unwrap().result;
-        assert_eq!(result["partial"], true);
+        assert_eq!(result["partial"], false);
         assert_eq!(result["hits"][0]["quality"]["useful_votes"], 0);
         assert!(result["hits"][0]["score"].as_f64().unwrap() < 1e100);
         assert_eq!(result["hits"][0]["untrusted"], true);
@@ -2912,8 +3539,7 @@ mod tests {
             hit.packet.record.signed.id = util::hash(index.to_string().as_bytes());
             Runtime::merge_hit(&mut query, hit, &runtime.own);
         }
-        assert_eq!(query.hits.len(), QUERY_HITS);
-        assert!(query.truncated);
+        assert_eq!(query.hits.len(), 2); // one author/operator gets only two unconfirmed candidates
         assert!(query_bytes(&query) <= QUERY_BYTES);
         let (mut query, _) = fixture.query("");
         for index in 0..2 {
@@ -3083,7 +3709,11 @@ mod tests {
                     sent_at: util::now(),
                 },
                 peer,
-                Some(WireReply::Stored { receipt }),
+                Some(WireReply::Stored {
+                    receipt,
+                    reviews: vec![],
+                    review_conflicts: vec![],
+                }),
             );
         }
         runtime.poll_records(&config::load(&fixture.home).unwrap(), &mut swarm);
@@ -3121,7 +3751,11 @@ mod tests {
                     sent_at: util::now(),
                 },
                 peer,
-                Some(WireReply::Stored { receipt }),
+                Some(WireReply::Stored {
+                    receipt,
+                    reviews: vec![],
+                    review_conflicts: vec![],
+                }),
             );
         }
         restarted.poll_records(&config::load(&fixture.home).unwrap(), &mut swarm);
@@ -3204,6 +3838,7 @@ mod tests {
         let request = WireRequest::Store {
             room_id: room.certificate.signed.room_id.clone(),
             packet: Box::new(packet.clone()),
+            review_conflicts: vec![],
             reviews: reviews.clone(),
         };
         assert!(serde_json::to_vec(&request).unwrap().len() > 512 * 1024);
@@ -3315,7 +3950,7 @@ mod tests {
     }
     fn required_fixture() -> Fixture {
         let mut fixture = Fixture::new(3);
-        fixture.room.certificate.signed.version = 3;
+        fixture.room.certificate.signed.version = 4;
         fixture.room.certificate.signed.epoch = 2;
         fixture
             .room
@@ -3391,6 +4026,7 @@ mod tests {
                 purpose: "publish".into(),
                 action: None,
                 answer: None,
+                deferred_challenge: None,
                 issuer: issuer_peer,
                 candidates: VecDeque::new(),
                 attempt_until: Instant::now() + Duration::from_secs(2),
@@ -3414,7 +4050,7 @@ mod tests {
         );
         assert!(caller.store.state.records.is_empty());
         assert!(issuer.store.state.records.is_empty());
-        let answer = solve_public_test_tasks(challenge.clone());
+        let answer = solve_public_test_tasks((*challenge).clone());
         let mut invalid = answer.clone();
         invalid.answers[0] ^= 1;
         assert!(
@@ -3480,6 +4116,7 @@ mod tests {
                 purpose: "publish".into(),
                 action: Some(GateAction::Publish(packet)),
                 answer: Some(answer),
+                deferred_challenge: None,
                 issuer: issuer_peer,
                 candidates: VecDeque::new(),
                 attempt_until: Instant::now() + Duration::from_secs(2),
@@ -3527,6 +4164,7 @@ mod tests {
                 digest: util::hash(b"public digest"),
                 expires_at: util::now() + 120,
                 spent: false,
+                bucket: unknown_bucket(),
             })
             .collect();
         util::atomic_write(&nonces.path, &util::canonical(&nonces.state).unwrap()).unwrap();
@@ -3567,6 +4205,7 @@ mod tests {
                 purpose: "publish".into(),
                 action: Some(GateAction::Publish(packet)),
                 answer: None,
+                deferred_challenge: None,
                 issuer: first,
                 candidates: VecDeque::from([second]),
                 attempt_until: Instant::now() - Duration::from_secs(1),
@@ -3592,7 +4231,7 @@ mod tests {
     #[tokio::test]
     async fn two_peer_cold_challenge_retries_issuer_only_once() {
         let mut fixture = Fixture::new(2);
-        fixture.room.certificate.signed.version = 3;
+        fixture.room.certificate.signed.version = 4;
         fixture
             .room
             .certificate
@@ -3725,6 +4364,7 @@ mod tests {
             &WireRequest::Store {
                 room_id: room.clone(),
                 packet: Box::new(packet.clone()),
+                review_conflicts: vec![],
                 reviews: vec![],
             },
             Work::Store {
@@ -3757,6 +4397,8 @@ mod tests {
                 message: Message::Response {
                     request_id,
                     response: serde_json::to_vec(&WireReply::Stored {
+                        reviews: vec![],
+                        review_conflicts: vec![],
                         receipt: fixture.receipt(1, &packet, &[]),
                     })
                     .unwrap(),
@@ -3789,6 +4431,7 @@ mod tests {
             &WireRequest::Store {
                 room_id: room.clone(),
                 packet: Box::new(packet.clone()),
+                review_conflicts: vec![],
                 reviews: vec![],
             },
             Work::Store {
@@ -3833,6 +4476,7 @@ mod tests {
                 room_id: room.clone(),
                 query: "procedure".into(),
                 limit: 1,
+                explore: true,
             },
             Work::Query(1, peer)
         ));
@@ -3975,5 +4619,1229 @@ mod tests {
         runtime.expire_background(Instant::now() + BACKGROUND_REQUEST_TIMEOUT);
         assert_eq!(runtime.expired_background_requests, 0);
         assert!(runtime.inventory_pages.is_empty());
+    }
+
+    fn shared_operator_rooms() -> (Fixture, TrustedRoom, identity::Keypair, identity::Keypair) {
+        let mut fixture = Fixture::new(32);
+        fixture.room.certificate.signed.knowledge_operators =
+            Some(knowledge_abuse::OperatorClaims {
+                bindings: fixture
+                    .keys
+                    .iter()
+                    .map(|key| {
+                        (
+                            key.public().to_peer_id().to_string(),
+                            "one-controller".into(),
+                        )
+                    })
+                    .collect(),
+                credits: BTreeMap::from([("one-controller".into(), 1000)]),
+            });
+        fixture.room.certificate.signature = crypto::sign(
+            &fixture.authority,
+            "idobata.room.v1",
+            &fixture.room.certificate.signed,
+        )
+        .unwrap();
+        fixture.install(&fixture.room);
+        let extra = identity::Keypair::generate_ed25519();
+        let legitimate = identity::Keypair::generate_ed25519();
+        let mut second = Fixture::certificate(
+            &fixture.authority,
+            &[&fixture.keys[0], &extra, &legitimate],
+            1,
+            false,
+            util::now(),
+        );
+        second.certificate.signed.room_id = util::hash(b"a second operator-rate room");
+        second.certificate.signed.knowledge_operators = Some(knowledge_abuse::OperatorClaims {
+            bindings: BTreeMap::from([
+                (
+                    fixture.keys[0].public().to_peer_id().to_string(),
+                    "one-controller".into(),
+                ),
+                (
+                    extra.public().to_peer_id().to_string(),
+                    "one-controller".into(),
+                ),
+                (
+                    legitimate.public().to_peer_id().to_string(),
+                    "other-controller".into(),
+                ),
+            ]),
+            credits: BTreeMap::from([
+                ("one-controller".into(), 1000),
+                ("other-controller".into(), 1000),
+            ]),
+        });
+        second.certificate.signature = crypto::sign(
+            &fixture.authority,
+            "idobata.room.v1",
+            &second.certificate.signed,
+        )
+        .unwrap();
+        assert!(crypto::validate_room(&second, &Scanner::policy_id(), util::now()).is_ok());
+        (fixture, second, extra, legitimate)
+    }
+
+    #[test]
+    fn thirty_two_same_operator_keys_share_remote_rate_and_other_operator_remains_available() {
+        let (fixture, second, extra, legitimate) = shared_operator_rooms();
+        let mut runtime = fixture.runtime();
+        for key in fixture.keys.iter().skip(1) {
+            let peer = key.public().to_peer_id();
+            assert!(runtime.allow_operator_remote(&fixture.room, &peer.to_string()));
+            assert!(runtime.allow_remote(peer));
+        }
+        assert!(runtime.allow_operator_remote(&second, &extra.public().to_peer_id().to_string()));
+        assert!(!runtime.allow_operator_remote(
+            &fixture.room,
+            &fixture.keys[1].public().to_peer_id().to_string()
+        ));
+        assert!(
+            runtime.allow_operator_remote(&second, &legitimate.public().to_peer_id().to_string())
+        );
+        assert_eq!(runtime.operator_rates.len(), 2);
+        let bucket = Runtime::operator_bucket(&second, &extra.public().to_peer_id().to_string());
+        assert_eq!(
+            bucket,
+            Runtime::operator_bucket(
+                &fixture.room,
+                &fixture.keys[1].public().to_peer_id().to_string()
+            )
+        );
+        runtime.operator_rates.get_mut(&bucket).unwrap().updated -= Duration::from_secs(1);
+        for _ in 0..4 {
+            assert!(
+                runtime.allow_operator_remote(&second, &extra.public().to_peer_id().to_string())
+            );
+        }
+        assert!(!runtime.allow_operator_remote(&second, &extra.public().to_peer_id().to_string()));
+    }
+
+    #[test]
+    fn nonce_operator_limit_includes_spent_entries_across_rooms_and_restart() {
+        let (fixture, second, extra, legitimate) = shared_operator_rooms();
+        let mut nonces = Nonces::open(&fixture.home).unwrap();
+        for (index, key) in fixture
+            .keys
+            .iter()
+            .skip(1)
+            .chain(std::iter::once(&extra))
+            .enumerate()
+        {
+            let room = if index == 31 { &second } else { &fixture.room };
+            let subject = key.public().to_peer_id().to_string();
+            let challenge = automation::create_challenge(
+                &fixture.keys[0],
+                room,
+                &subject,
+                &util::hash(index.to_string().as_bytes()),
+                "publish",
+                util::now(),
+            )
+            .unwrap();
+            nonces
+                .issue_in_bucket(&challenge, &Runtime::operator_bucket(room, &subject))
+                .unwrap();
+            if index % 2 == 0 {
+                nonces.spend(&challenge).unwrap();
+            }
+        }
+        let mut nonces = Nonces::open(&fixture.home).unwrap();
+        assert_eq!(nonces.state.entries.len(), NONCE_BUCKET_CAPACITY);
+        assert_eq!(
+            nonces
+                .state
+                .entries
+                .iter()
+                .filter(|entry| entry.spent)
+                .count(),
+            16
+        );
+        let subject = extra.public().to_peer_id().to_string();
+        let challenge = automation::create_challenge(
+            &fixture.keys[0],
+            &second,
+            &subject,
+            &util::hash(b"one too many"),
+            "publish",
+            util::now(),
+        )
+        .unwrap();
+        let original = std::fs::read(&nonces.path).unwrap();
+        assert_eq!(
+            nonces
+                .issue_in_bucket(&challenge, &Runtime::operator_bucket(&second, &subject))
+                .unwrap_err()
+                .code,
+            30
+        );
+        assert!(std::fs::read(&nonces.path).unwrap() == original);
+        let subject = legitimate.public().to_peer_id().to_string();
+        let challenge = automation::create_challenge(
+            &fixture.keys[0],
+            &second,
+            &subject,
+            &util::hash(b"independent bucket"),
+            "publish",
+            util::now(),
+        )
+        .unwrap();
+        nonces
+            .issue_in_bucket(&challenge, &Runtime::operator_bucket(&second, &subject))
+            .unwrap();
+        assert_eq!(Nonces::open(&fixture.home).unwrap().state.entries.len(), 33);
+    }
+
+    #[test]
+    fn legacy_nonce_buckets_remain_unknown_and_sequence_reservations_survive_restart_and_failure() {
+        let fixture = Fixture::new(3);
+        let entries = (0..32).map(|index| json!({"id": util::hash(index.to_string().as_bytes()), "digest": util::hash(b"legacy nonce digest"), "expires_at": util::now()+120, "spent": index%2==0})).collect::<Vec<_>>();
+        util::atomic_write(
+            &fixture.home.join("automation-nonces.json"),
+            &serde_json::to_vec(&json!({"version":1,"entries":entries})).unwrap(),
+        )
+        .unwrap();
+        let mut nonces = Nonces::open(&fixture.home).unwrap();
+        assert!(
+            nonces
+                .state
+                .entries
+                .iter()
+                .all(|entry| entry.bucket == "unknown")
+        );
+        assert_eq!(nonces.reserve_review_sequence(40).unwrap(), 41);
+        assert_eq!(nonces.reserve_review_sequence(0).unwrap(), 42);
+        let mut reopened = Nonces::open(&fixture.home).unwrap();
+        assert_eq!(reopened.reserve_review_sequence(0).unwrap(), 43);
+        let durable = std::fs::read(&reopened.path).unwrap();
+        std::fs::remove_file(&reopened.path).unwrap();
+        std::fs::create_dir(&reopened.path).unwrap();
+        assert!(reopened.reserve_review_sequence(0).is_err());
+        assert_eq!(reopened.state.review_sequence, 43);
+        std::fs::remove_dir(&reopened.path).unwrap();
+        util::atomic_write(&reopened.path, &durable).unwrap();
+        reopened.seed_review_sequence(MAX_REVIEW_SEQUENCE).unwrap();
+        assert!(reopened.reserve_review_sequence(0).is_err());
+        assert_eq!(
+            Nonces::open(&fixture.home).unwrap().state.review_sequence,
+            MAX_REVIEW_SEQUENCE
+        );
+    }
+
+    #[tokio::test]
+    async fn concurrent_gate_preparations_reserve_distinct_sequences_before_any_commit() {
+        let fixture = required_fixture();
+        let mut runtime = fixture.runtime();
+        let mut input = gate_input();
+        input.problem = "How are concurrent review preparations ordered?".into();
+        let mut packet =
+            knowledge::prepare_record(&fixture.keys[1], &fixture.room, input, false, util::now())
+                .unwrap();
+        let challenge = automation::create_challenge(
+            &fixture.keys[2],
+            &fixture.room,
+            &fixture.keys[1].public().to_peer_id().to_string(),
+            &packet.record.signed.id,
+            "publish",
+            util::now(),
+        )
+        .unwrap();
+        let answer = solve_public_test_tasks(challenge);
+        let receipt =
+            automation::certify_answer(&fixture.keys[2], &fixture.room, &answer, util::now())
+                .unwrap();
+        packet.admission = Some(AutomationProof { answer, receipt });
+        let id = packet.record.signed.id.clone();
+        runtime.store.insert(packet, false, util::now()).unwrap();
+        let mut swarm = network::build(
+            fixture.keys[0].clone(),
+            &config::load(&fixture.home).unwrap(),
+        )
+        .await
+        .unwrap();
+        for owner in ["first-agent", "second-agent"] {
+            let (response, _) = tokio::sync::oneshot::channel();
+            assert!(
+                runtime
+                    .start_command(
+                        owner,
+                        Request::KnowledgeEvaluate {
+                            room: "room".into(),
+                            id: id.clone(),
+                            input: ReviewInput {
+                                verdict: "useful".into(),
+                                evidence: "A checked result.".into(),
+                                references: vec![]
+                            },
+                            proof: None
+                        },
+                        response,
+                        &mut swarm
+                    )
+                    .is_ok()
+            );
+        }
+        assert_eq!(runtime.nonces.state.review_sequence, 2);
+        assert_eq!(runtime.gates.len(), 2);
+        assert_eq!(
+            runtime
+                .gates
+                .values()
+                .map(|pending| &pending.digest)
+                .collect::<BTreeSet<_>>()
+                .len(),
+            1
+        );
+        assert!(
+            runtime
+                .store
+                .get(&fixture.room.certificate.signed.room_id, &id)
+                .unwrap()
+                .reviews
+                .is_empty()
+        );
+        assert_eq!(
+            Nonces::open(&fixture.home).unwrap().state.review_sequence,
+            2
+        );
+    }
+    fn binding_history(room: &TrustedRoom) -> BTreeMap<String, OperatorBindingHistory> {
+        BTreeMap::from([(
+            room.certificate.signed.room_id.clone(),
+            OperatorBindingHistory {
+                authority_peer_id: room.authority_peer_id.clone(),
+                epoch: room.certificate.signed.epoch,
+                certificate_digest: util::hash(&util::canonical(&room.certificate).unwrap()),
+                public: room.certificate.signed.public,
+                automation_required: room.certificate.signed.knowledge_automation_required,
+                required: true,
+                bindings: room
+                    .certificate
+                    .signed
+                    .knowledge_operators
+                    .as_ref()
+                    .unwrap()
+                    .bindings
+                    .clone(),
+            },
+        )])
+    }
+
+    #[test]
+    fn legacy_room_cannot_reopen_registered_operators_rate_or_nonce_budget() {
+        let (fixture, _, _, _) = shared_operator_rooms();
+        let histories = binding_history(&fixture.room);
+        let mut legacy = fixture.room.clone();
+        legacy.certificate.signed.room_id = util::hash(b"legacy same authority resource test");
+        legacy.certificate.signed.version = 1;
+        legacy.certificate.signed.knowledge_operators = None;
+        legacy.certificate.signature = crypto::sign(
+            &fixture.authority,
+            "idobata.room.v1",
+            &legacy.certificate.signed,
+        )
+        .unwrap();
+        crypto::validate_room(&legacy, &Scanner::policy_id(), util::now()).unwrap();
+        let subject = fixture.keys[1].public().to_peer_id().to_string();
+        assert_eq!(
+            knowledge::registry(&legacy).group(&subject),
+            OperatorGroup::Unknown
+        );
+        let mut runtime = fixture.runtime();
+        let mut nonces = Nonces::open(&fixture.home).unwrap();
+        for index in 0..32 {
+            let room = if index % 2 == 0 {
+                &fixture.room
+            } else {
+                &legacy
+            };
+            let challenge = automation::create_challenge(
+                &fixture.keys[0],
+                room,
+                &subject,
+                &util::hash(index.to_string().as_bytes()),
+                "publish",
+                util::now(),
+            )
+            .unwrap();
+            nonces
+                .issue_in_bucket(
+                    &challenge,
+                    &Runtime::operator_bucket_with_history(room, &subject, &histories),
+                )
+                .unwrap();
+        }
+        for index in 0..32 {
+            let room = if index % 2 == 0 {
+                &fixture.room
+            } else {
+                &legacy
+            };
+            assert!(runtime.allow_operator_remote_with_history(room, &subject, &histories));
+        }
+        assert!(!runtime.allow_operator_remote_with_history(&legacy, &subject, &histories));
+        assert_eq!(runtime.operator_rates.len(), 1);
+        let challenge = automation::create_challenge(
+            &fixture.keys[0],
+            &legacy,
+            &subject,
+            &util::hash(b"over shared nonce limit"),
+            "publish",
+            util::now(),
+        )
+        .unwrap();
+        assert!(
+            nonces
+                .issue_in_bucket(
+                    &challenge,
+                    &Runtime::operator_bucket_with_history(&legacy, &subject, &histories)
+                )
+                .is_err()
+        );
+        assert_eq!(nonces.state.entries.len(), 32);
+        assert!(
+            nonces
+                .state
+                .entries
+                .iter()
+                .all(|entry| entry.bucket != unknown_bucket())
+        );
+    }
+
+    #[test]
+    fn forged_remote_quality_cannot_admit_unconfirmed_normal_result() {
+        let fixture = Fixture::new(4);
+        let mut runtime = fixture.runtime();
+        let packet = fixture.record("How is forged ranking metadata rejected?");
+        let (mut query, mut receiver) = fixture.query("forged ranking");
+        query.explore = false;
+        query.inflight = 1;
+        runtime.queries.insert(1, query);
+        let mut hit = fixture.hit(packet, vec![]);
+        hit.quality.value = 1.0;
+        hit.quality.confidence = 1.0;
+        hit.quality.useful_votes = 32;
+        hit.quality.author_reputation = 1.0;
+        hit.score = 1e200;
+        let peer = fixture.keys[2].public().to_peer_id();
+        runtime.completed(
+            Work::Query(1, peer),
+            peer,
+            Some(WireReply::Hits {
+                hits: vec![hit],
+                truncated: false,
+            }),
+        );
+        let query = runtime.queries.remove(&1).unwrap();
+        assert!(query.hits.is_empty());
+        runtime.finish_query(query, &config::load(&fixture.home).unwrap());
+        let result = receiver.try_recv().unwrap().result;
+        assert!(result["hits"].as_array().unwrap().is_empty());
+        assert_eq!(result["exploration_available"], true);
+        assert!(runtime.cache.is_empty());
+    }
+
+    #[test]
+    fn promoted_candidate_survives_same_operator_unconfirmed_candidate_flood() {
+        let fixture = Fixture::new(4);
+        let mut runtime = fixture.runtime();
+        let packet = fixture.record("How is confirmed knowledge retained in candidate selection?");
+        let reviews = [0, 2, 3]
+            .into_iter()
+            .map(|index| {
+                knowledge::create_review(
+                    &fixture.keys[index],
+                    &fixture.room,
+                    &packet,
+                    ReviewInput {
+                        verdict: "useful".into(),
+                        evidence: "Checked documented behavior.".into(),
+                        references: vec![],
+                    },
+                    1,
+                    util::now(),
+                )
+                .unwrap()
+            })
+            .collect();
+        let (mut query, mut receiver) = fixture.query("");
+        for index in 0..8 {
+            let spam = fixture.record(&format!("How is an unconfirmed entry {index} handled?"));
+            Runtime::merge_hit(&mut query, fixture.hit(spam, vec![]), &runtime.own);
+        }
+        Runtime::merge_hit(
+            &mut query,
+            fixture.hit(packet.clone(), reviews),
+            &runtime.own,
+        );
+        assert!(query.hits.contains_key(&packet.record.signed.id));
+        runtime.finish_query(query, &config::load(&fixture.home).unwrap());
+        let result = receiver.try_recv().unwrap().result;
+        let hits = result["hits"].as_array().unwrap();
+        assert_eq!(hits[0]["id"], packet.record.signed.id);
+        assert_eq!(hits[0]["confirmation"], "operator_corroborated");
+        assert!(hits.len() <= 2); // one promoted + one unconfirmed from the same operator
+    }
+
+    #[test]
+    fn nonquery_local_conflict_cannot_reenter_author_prior() {
+        let fixture = Fixture::new(3);
+        let mut runtime = fixture.runtime();
+        let historical = fixture.record("How was previous behavior checked?");
+        let positive = fixture.review(&historical, 1, "useful");
+        let negative = fixture.review(&historical, 1, "incorrect");
+        runtime
+            .store
+            .insert_with_reviews_and_conflicts(
+                historical,
+                vec![positive, negative],
+                vec![],
+                false,
+                util::now(),
+            )
+            .unwrap();
+        assert_eq!(runtime.store.state.records[0].review_conflicts.len(), 1);
+        let current = fixture.record("How is the next operation checked?");
+        let (mut query, mut receiver) = fixture.query("next operation");
+        Runtime::merge_hit(&mut query, fixture.hit(current, vec![]), &runtime.own);
+        runtime.finish_query(query, &config::load(&fixture.home).unwrap());
+        let result = receiver.try_recv().unwrap().result;
+        assert_eq!(result["hits"][0]["quality"]["author_reputation"], 0.5);
+    }
+
+    fn admit_review_with(
+        fixture: &Fixture,
+        packet: &RecordPacket,
+        mut review: ReviewPacket,
+        issuer: usize,
+    ) -> ReviewPacket {
+        let input = ReviewInput {
+            verdict: review.review.signed.verdict.clone(),
+            evidence: review.review.signed.evidence.clone(),
+            references: review.review.signed.references.clone(),
+        };
+        let digest = knowledge::review_action_digest_for_room(
+            &fixture.room,
+            &packet.record.signed.id,
+            &review.review.signed.reviewer_peer_id,
+            &input,
+        )
+        .unwrap();
+        let challenge = automation::create_challenge(
+            &fixture.keys[issuer],
+            &fixture.room,
+            &review.review.signed.reviewer_peer_id,
+            &digest,
+            "evaluate",
+            util::now(),
+        )
+        .unwrap();
+        let answer = solve_public_test_tasks(challenge);
+        let receipt =
+            automation::certify_answer(&fixture.keys[issuer], &fixture.room, &answer, util::now())
+                .unwrap();
+        review.admission = Some(AutomationProof { answer, receipt });
+        knowledge::validate_review(&review, packet, &fixture.room, util::now()).unwrap();
+        review
+    }
+
+    #[test]
+    fn alternate_valid_fork_witnesses_keep_digest_and_existing_receipts() {
+        let fixture = Fixture::new(3);
+        let mut runtime = fixture.runtime();
+        let packet = fixture.record("How are alternate admission witnesses identified?");
+        let positive = fixture.review(&packet, 1, "useful");
+        let negative = fixture.review(&packet, 1, "incorrect");
+        let first = ReviewConflict {
+            first: admit_review_with(&fixture, &packet, positive.clone(), 1),
+            second: admit_review_with(&fixture, &packet, negative.clone(), 1),
+        };
+        let alternate = ReviewConflict {
+            first: admit_review_with(&fixture, &packet, positive, 2),
+            second: admit_review_with(&fixture, &packet, negative, 2),
+        };
+        runtime
+            .store
+            .insert_with_reviews_and_conflicts(
+                packet.clone(),
+                vec![],
+                vec![first],
+                true,
+                util::now(),
+            )
+            .unwrap();
+        let current = runtime.store.state.records[0].clone();
+        let digest =
+            transfer_digest_with_conflicts(&packet, &current.reviews, &current.review_conflicts)
+                .unwrap();
+        assert_eq!(
+            digest,
+            transfer_digest_with_conflicts(
+                &packet,
+                &current.reviews,
+                std::slice::from_ref(&alternate)
+            )
+            .unwrap()
+        );
+        let peer = fixture.keys[2].public().to_peer_id();
+        runtime.acks.insert(
+            (packet.record.signed.id.clone(), peer.to_string()),
+            (digest.clone(), 1, util::now()),
+        );
+        let value = StorageReceipt {
+            room_id: fixture.room.certificate.signed.room_id.clone(),
+            id: packet.record.signed.id.clone(),
+            digest: digest.clone(),
+            keeper_peer_id: peer.to_string(),
+            epoch: 1,
+            stored_at: util::now(),
+        };
+        let receipt = Signed {
+            public_key: crypto::public(&fixture.keys[2]),
+            signature: crypto::sign(&fixture.keys[2], RECEIPT_DOMAIN, &value).unwrap(),
+            signed: value,
+        };
+        runtime
+            .apply_storage_receipt(
+                &config::load(&fixture.home).unwrap(),
+                peer,
+                ReceiptExpectation {
+                    room_id: &packet.record.signed.room_id,
+                    id: &packet.record.signed.id,
+                    digest: &digest,
+                    epoch: 1,
+                    sent_at: util::now(),
+                },
+                receipt,
+                current.reviews,
+                vec![alternate],
+            )
+            .unwrap();
+        assert_eq!(runtime.acks.len(), 1);
+        let stored = &runtime.store.state.records[0];
+        assert!(stored.staging);
+        assert_eq!(
+            digest,
+            transfer_digest_with_conflicts(
+                &stored.packet,
+                &stored.reviews,
+                &stored.review_conflicts
+            )
+            .unwrap()
+        );
+    }
+    #[tokio::test]
+    async fn quota_eviction_and_restart_do_not_reuse_own_review_sequence() {
+        let fixture = Fixture::new(5);
+        let mut runtime = fixture.runtime();
+        let packet = fixture.record("How is an older review sequence preserved after eviction?");
+        runtime
+            .store
+            .insert(packet.clone(), false, util::now())
+            .unwrap();
+        let cfg = config::load(&fixture.home).unwrap();
+        let mut swarm = network::build(fixture.keys[0].clone(), &cfg).await.unwrap();
+        let evaluate = |id: String| Request::KnowledgeEvaluate {
+            room: "room".into(),
+            id,
+            input: ReviewInput {
+                verdict: "useful".into(),
+                evidence: "Checked the result.".into(),
+                references: vec![],
+            },
+            proof: None,
+        };
+        let (response, mut reply) = tokio::sync::oneshot::channel();
+        assert!(
+            runtime
+                .start_command(
+                    "first",
+                    evaluate(packet.record.signed.id.clone()),
+                    response,
+                    &mut swarm
+                )
+                .is_ok()
+        );
+        assert_eq!(reply.try_recv().unwrap().code, 0);
+        assert_eq!(runtime.nonces.state.review_sequence, 1);
+        // Model a completed prior handoff, so quota can legitimately evict the
+        // unconfirmed old body. A still-pending staging body is never evictable.
+        runtime
+            .store
+            .transition_roles(&[], std::slice::from_ref(&packet.record.signed.id))
+            .unwrap();
+        let replacement = fixture.record("How is a promoted replacement retained under quota?");
+        let reviews = [2, 3, 4]
+            .into_iter()
+            .map(|index| {
+                knowledge::create_review(
+                    &fixture.keys[index],
+                    &fixture.room,
+                    &replacement,
+                    ReviewInput {
+                        verdict: "useful".into(),
+                        evidence: "Checked the documented output.".into(),
+                        references: vec![],
+                    },
+                    1,
+                    util::now(),
+                )
+                .unwrap()
+            })
+            .collect::<Vec<_>>();
+        let expected = knowledge::KnowledgeState {
+            version: 1,
+            records: vec![knowledge::StoredKnowledge {
+                packet: replacement.clone(),
+                reviews: reviews.clone(),
+                review_conflicts: vec![],
+                stored_at: util::now(),
+                staging: false,
+            }],
+        };
+        let overhead = std::fs::metadata(fixture.home.join("knowledge.enc"))
+            .unwrap()
+            .len() as usize
+            - util::canonical(&runtime.store.state).unwrap().len();
+        let quota = util::canonical(&expected).unwrap().len() + overhead + 32;
+        runtime.store = Store::with_quota(&fixture.home, quota).unwrap();
+        runtime.store.set_rooms(cfg.rooms.values().cloned());
+        runtime
+            .store
+            .set_operator_history(&cfg.knowledge_operator_history);
+        runtime
+            .store
+            .insert_with_reviews_and_conflicts(replacement, reviews, vec![], false, util::now())
+            .unwrap();
+        assert!(
+            runtime
+                .store
+                .get(&packet.record.signed.room_id, &packet.record.signed.id)
+                .is_none()
+        );
+        drop(runtime);
+        let mut runtime = fixture.runtime();
+        assert_eq!(runtime.nonces.state.review_sequence, 1);
+        // A verified network GET can bring the immutable old body back without
+        // its evicted review. The independent durable counter still advances.
+        runtime.remember(fixture.hit(packet.clone(), vec![]));
+        let (response, mut reply) = tokio::sync::oneshot::channel();
+        assert!(
+            runtime
+                .start_command(
+                    "after-restart",
+                    evaluate(packet.record.signed.id.clone()),
+                    response,
+                    &mut swarm
+                )
+                .is_ok()
+        );
+        assert_eq!(reply.try_recv().unwrap().code, 0);
+        let stored = runtime
+            .store
+            .get(&packet.record.signed.room_id, &packet.record.signed.id)
+            .unwrap();
+        assert_eq!(
+            stored
+                .reviews
+                .iter()
+                .find(|review| review.review.signed.reviewer_peer_id == runtime.own)
+                .unwrap()
+                .review
+                .signed
+                .sequence,
+            2
+        );
+    }
+    #[tokio::test]
+    async fn own_unknown_review_rejected_when_canonical_slot_would_discard_it() {
+        let mut fixture = Fixture::new(3);
+        fixture
+            .keys
+            .sort_by_key(|key| key.public().to_peer_id().to_string());
+        util::atomic_write(
+            &fixture.home.join("identity.key"),
+            &fixture.keys[0].to_protobuf_encoding().unwrap(),
+        )
+        .unwrap();
+        fixture.room.certificate.signed.version = 1;
+        fixture.room.certificate.signed.knowledge_operators = None;
+        fixture.room.certificate.signature = crypto::sign(
+            &fixture.authority,
+            "idobata.room.v1",
+            &fixture.room.certificate.signed,
+        )
+        .unwrap();
+        fixture.install(&fixture.room);
+        let mut runtime = fixture.runtime();
+        let packet = fixture.record("How is a full unknown review slot reported?");
+        let previous = knowledge::create_review(
+            &fixture.keys[2],
+            &fixture.room,
+            &packet,
+            ReviewInput {
+                verdict: "useful".into(),
+                evidence: "Checked the result.".into(),
+                references: vec![],
+            },
+            1,
+            util::now(),
+        )
+        .unwrap();
+        runtime
+            .store
+            .insert_with_reviews_and_conflicts(
+                packet.clone(),
+                vec![previous],
+                vec![],
+                false,
+                util::now(),
+            )
+            .unwrap();
+        let original = std::fs::read(fixture.home.join("knowledge.enc")).unwrap();
+        let mut swarm = network::build(
+            fixture.keys[0].clone(),
+            &config::load(&fixture.home).unwrap(),
+        )
+        .await
+        .unwrap();
+        let (response, _) = tokio::sync::oneshot::channel();
+        let result = runtime.start_command(
+            "agent",
+            Request::KnowledgeEvaluate {
+                room: "room".into(),
+                id: packet.record.signed.id.clone(),
+                input: ReviewInput {
+                    verdict: "incorrect".into(),
+                    evidence: "The result did not match.".into(),
+                    references: vec![],
+                },
+                proof: None,
+            },
+            response,
+            &mut swarm,
+        );
+        assert!(
+            result.is_err(),
+            "a body-present acknowledgement cannot claim a discarded own review was applied"
+        );
+        let (error, _) = result.err().unwrap();
+        assert_eq!(error.code, 30);
+        assert_eq!(error.error, "knowledge_review_slot_unavailable");
+        assert_eq!(
+            std::fs::read(fixture.home.join("knowledge.enc")).unwrap(),
+            original
+        );
+        assert!(!runtime.store.state.records[0].staging);
+        assert_eq!(runtime.nonces.state.review_sequence, 1);
+    }
+    #[tokio::test]
+    async fn registered_and_unknown_newer_own_sequences_remain_applicable() {
+        for registered in [true, false] {
+            let mut fixture = Fixture::new(3);
+            fixture
+                .keys
+                .sort_by_key(|key| std::cmp::Reverse(key.public().to_peer_id().to_string()));
+            util::atomic_write(
+                &fixture.home.join("identity.key"),
+                &fixture.keys[0].to_protobuf_encoding().unwrap(),
+            )
+            .unwrap();
+            if !registered {
+                fixture.room.certificate.signed.version = 1;
+                fixture.room.certificate.signed.knowledge_operators = None;
+                fixture.room.certificate.signature = crypto::sign(
+                    &fixture.authority,
+                    "idobata.room.v1",
+                    &fixture.room.certificate.signed,
+                )
+                .unwrap();
+                fixture.install(&fixture.room);
+            }
+            let mut runtime = fixture.runtime();
+            let packet = fixture.record("How should a newer own review replace the old one?");
+            let old = fixture.review(&packet, 5, "useful");
+            runtime
+                .store
+                .insert_with_reviews_and_conflicts(
+                    packet.clone(),
+                    vec![old],
+                    vec![],
+                    false,
+                    util::now(),
+                )
+                .unwrap();
+            let mut swarm = network::build(
+                fixture.keys[0].clone(),
+                &config::load(&fixture.home).unwrap(),
+            )
+            .await
+            .unwrap();
+            let (response, mut receiver) = tokio::sync::oneshot::channel();
+            assert!(
+                runtime
+                    .start_command(
+                        "agent",
+                        Request::KnowledgeEvaluate {
+                            room: "room".into(),
+                            id: packet.record.signed.id.clone(),
+                            input: ReviewInput {
+                                verdict: "incorrect".into(),
+                                evidence: "The checked outcome changed.".into(),
+                                references: vec![]
+                            },
+                            proof: None,
+                        },
+                        response,
+                        &mut swarm
+                    )
+                    .is_ok()
+            );
+            assert_eq!(receiver.try_recv().unwrap().code, 0);
+            let stored = runtime
+                .store
+                .get(&packet.record.signed.room_id, &packet.record.signed.id)
+                .unwrap();
+            assert_eq!(stored.reviews.len(), 1);
+            assert_eq!(stored.reviews[0].review.signed.sequence, 6);
+            assert_eq!(stored.reviews[0].review.signed.verdict, "incorrect");
+        }
+    }
+    fn waiting_gate(
+        fixture: &Fixture,
+        digest: &str,
+    ) -> (GatePending, tokio::sync::oneshot::Receiver<Reply>) {
+        let (response, receiver) = tokio::sync::oneshot::channel();
+        (
+            GatePending {
+                response,
+                room: fixture.room.clone(),
+                digest: digest.into(),
+                purpose: "publish".into(),
+                action: None,
+                answer: None,
+                deferred_challenge: None,
+                issuer: fixture.keys[1].public().to_peer_id(),
+                candidates: VecDeque::from([fixture.keys[2].public().to_peer_id()]),
+                attempt_until: Instant::now() + Duration::from_secs(2),
+                deadline: Instant::now() + Duration::from_secs(7),
+            },
+            receiver,
+        )
+    }
+
+    #[tokio::test]
+    async fn future_signed_challenge_waits_without_retry_or_deadline_extension() {
+        let fixture = required_fixture();
+        let mut runtime = fixture.runtime();
+        let config = config::load(&fixture.home).unwrap();
+        let mut swarm = network::build(fixture.keys[0].clone(), &config)
+            .await
+            .unwrap();
+        let at = util::now();
+        let digest = util::hash(b"future clock controlled action");
+        let challenge = automation::create_challenge(
+            &fixture.keys[1],
+            &fixture.room,
+            &runtime.own,
+            &digest,
+            "publish",
+            at + 1,
+        )
+        .unwrap();
+        // Existing strict freshness remains unchanged at issuer and in the pure
+        // API; only the subject waits asynchronously for the signed start time.
+        assert!(
+            automation::verify_challenge(
+                &challenge,
+                &fixture.room,
+                &runtime.own,
+                &digest,
+                "publish",
+                at,
+                true
+            )
+            .is_err()
+        );
+        let (pending, mut receiver) = waiting_gate(&fixture, &digest);
+        let original_deadline = pending.deadline;
+        let peer = pending.issuer;
+        runtime.gates.insert(1, pending);
+        runtime.complete_gate_at(
+            1,
+            peer,
+            Some(WireReply::Challenge {
+                challenge: Box::new(challenge.clone()),
+            }),
+            false,
+            &config,
+            at,
+        );
+        assert!(receiver.try_recv().is_err());
+        assert!(runtime.gates[&1].deferred_challenge.is_some());
+        assert_eq!(runtime.gates[&1].deadline, original_deadline);
+        runtime.retry_gates(&config, &mut swarm);
+        assert!(runtime.pending.is_empty());
+        assert_eq!(runtime.gates[&1].issuer, peer);
+        assert_eq!(runtime.gates[&1].candidates.len(), 1);
+        runtime.resume_deferred_gates(&config, at);
+        assert!(receiver.try_recv().is_err());
+        runtime.resume_deferred_gates(&config, at + 1);
+        let reply = receiver.try_recv().unwrap();
+        assert_eq!(reply.code, 31);
+        assert_eq!(reply.result["stored"], false);
+        assert!(runtime.gates.is_empty());
+        assert!(runtime.store.state.records.is_empty());
+        let answer = solve_public_test_tasks(challenge.clone());
+        assert!(automation::certify_answer(&fixture.keys[1], &fixture.room, &answer, at).is_err());
+        automation::certify_answer(&fixture.keys[1], &fixture.room, &answer, at + 1).unwrap();
+        assert!(
+            automation::certify_answer(&fixture.keys[1], &fixture.room, &answer, at + 121).is_err()
+        );
+        let issuer_home = fixture._temp.path().join("clock-nonce-issuer");
+        util::private_dir(&issuer_home).unwrap();
+        let mut nonces = Nonces::open(&issuer_home).unwrap();
+        nonces.issue(&challenge).unwrap();
+        nonces.spend(&challenge).unwrap();
+        assert!(nonces.spend(&challenge).is_err());
+    }
+
+    #[test]
+    fn deferred_challenges_reject_invalid_scope_signature_future_bound_and_expiry() {
+        let fixture = required_fixture();
+        let at = util::now() + 200;
+        let digest = util::hash(b"controlled scoped action");
+        for case in [
+            "scope",
+            "subject",
+            "transport",
+            "ttl",
+            "signature",
+            "future301",
+            "expiry",
+        ] {
+            let mut runtime = fixture.runtime();
+            let config = config::load(&fixture.home).unwrap();
+            let issued = match case {
+                "future301" => at + 301,
+                "expiry" => at - 121,
+                _ => at + 1,
+            };
+            let mut challenge = automation::create_challenge(
+                &fixture.keys[1],
+                &fixture.room,
+                &runtime.own,
+                &digest,
+                "publish",
+                issued,
+            )
+            .unwrap();
+            if case == "scope" {
+                challenge.challenge.signed.action_digest = util::hash(b"another action");
+                challenge.challenge.signature = crypto::sign(
+                    &fixture.keys[1],
+                    "idobata.automation.challenge.v1",
+                    &challenge.challenge.signed,
+                )
+                .unwrap();
+            }
+            if case == "subject" {
+                challenge.challenge.signed.subject_peer_id =
+                    fixture.keys[2].public().to_peer_id().to_string();
+            }
+            if case == "ttl" {
+                challenge.challenge.signed.expires_at += 1;
+            }
+            if ["subject", "ttl"].contains(&case) {
+                challenge.challenge.signature = crypto::sign(
+                    &fixture.keys[1],
+                    "idobata.automation.challenge.v1",
+                    &challenge.challenge.signed,
+                )
+                .unwrap();
+            }
+            if case == "signature" {
+                challenge.challenge.signature = "invalid".into();
+            }
+            let (pending, mut receiver) = waiting_gate(&fixture, &digest);
+            let peer = if case == "transport" {
+                fixture.keys[2].public().to_peer_id()
+            } else {
+                pending.issuer
+            };
+            runtime.gates.insert(1, pending);
+            runtime.complete_gate_at(
+                1,
+                peer,
+                Some(WireReply::Challenge {
+                    challenge: Box::new(challenge),
+                }),
+                false,
+                &config,
+                at,
+            );
+            assert_eq!(
+                receiver.try_recv().unwrap().code,
+                if case == "transport" { 40 } else { 30 },
+                "{case}"
+            );
+            assert!(runtime.gates.is_empty());
+            assert!(runtime.store.state.records.is_empty());
+        }
+    }
+
+    #[tokio::test]
+    async fn deferred_challenge_keeps_original_timeout_and_rechecks_current_membership() {
+        let fixture = required_fixture();
+        let config = config::load(&fixture.home).unwrap();
+        let mut swarm = network::build(fixture.keys[0].clone(), &config)
+            .await
+            .unwrap();
+        let digest = util::hash(b"current authorization for waiting task");
+        let at = util::now();
+        let mut runtime = fixture.runtime();
+        let challenge = automation::create_challenge(
+            &fixture.keys[1],
+            &fixture.room,
+            &runtime.own,
+            &digest,
+            "publish",
+            at + 5,
+        )
+        .unwrap();
+        let (pending, mut receiver) = waiting_gate(&fixture, &digest);
+        let peer = pending.issuer;
+        runtime.gates.insert(1, pending);
+        runtime.complete_gate_at(
+            1,
+            peer,
+            Some(WireReply::Challenge {
+                challenge: Box::new(challenge),
+            }),
+            false,
+            &config,
+            at,
+        );
+        assert!(runtime.gates[&1].deferred_challenge.is_some());
+        runtime.gates.get_mut(&1).unwrap().deadline = Instant::now() - Duration::from_secs(1);
+        runtime.poll(&mut swarm);
+        let failed = receiver.try_recv().unwrap();
+        assert_eq!(failed.code, 40);
+        assert_eq!(failed.result["error"], "automation_challenge_timeout");
+        assert!(runtime.gates.is_empty());
+        assert!(runtime.store.state.records.is_empty());
+        let challenge = automation::create_challenge(
+            &fixture.keys[1],
+            &fixture.room,
+            &runtime.own,
+            &digest,
+            "publish",
+            at + 1,
+        )
+        .unwrap();
+        let (pending, mut receiver) = waiting_gate(&fixture, &digest);
+        runtime.gates.insert(2, pending);
+        runtime.complete_gate_at(
+            2,
+            peer,
+            Some(WireReply::Challenge {
+                challenge: Box::new(challenge),
+            }),
+            false,
+            &config,
+            at,
+        );
+        let jump_challenge = automation::create_challenge(
+            &fixture.keys[1],
+            &fixture.room,
+            &runtime.own,
+            &digest,
+            "publish",
+            at + 1,
+        )
+        .unwrap();
+        let (jump_pending, mut jump_receiver) = waiting_gate(&fixture, &digest);
+        runtime.gates.insert(3, jump_pending);
+        runtime.complete_gate_at(
+            3,
+            peer,
+            Some(WireReply::Challenge {
+                challenge: Box::new(jump_challenge),
+            }),
+            false,
+            &config,
+            at,
+        );
+        // A forward wall-clock jump must not turn an expired task into code31.
+        // Resume only the jump gate here; the other deferred gate below tests
+        // a current-membership change before its own completion.
+        let held = runtime.gates.remove(&2).unwrap();
+        runtime.resume_deferred_gates(&config, at + 121);
+        assert_eq!(jump_receiver.try_recv().unwrap().code, 30);
+        runtime.gates.insert(2, held);
+        let current = Fixture::certificate(
+            &fixture.authority,
+            &[&fixture.keys[0], &fixture.keys[2]],
+            3,
+            false,
+            at,
+        );
+        fixture.install(&current);
+        runtime.resume_deferred_gates(&config::load(&fixture.home).unwrap(), at + 1);
+        assert_eq!(receiver.try_recv().unwrap().code, 30);
+        assert!(runtime.gates.is_empty());
+        assert!(runtime.store.state.records.is_empty());
+    }
+    #[tokio::test]
+    async fn future_challenge_cannot_outlive_issuer_attempt_or_suppress_fallback() {
+        let fixture = required_fixture();
+        let mut runtime = fixture.runtime();
+        let config = config::load(&fixture.home).unwrap();
+        let mut swarm = network::build(fixture.keys[0].clone(), &config)
+            .await
+            .unwrap();
+        let at = util::now();
+        let digest = util::hash(b"bounded future issuer occupation");
+        let challenge = automation::create_challenge(
+            &fixture.keys[1],
+            &fixture.room,
+            &runtime.own,
+            &digest,
+            "publish",
+            at + 3,
+        )
+        .unwrap();
+        let (pending, mut receiver) = waiting_gate(&fixture, &digest);
+        let first = pending.issuer;
+        let deadline = pending.deadline;
+        runtime.gates.insert(1, pending);
+        runtime.complete_gate_at(
+            1,
+            first,
+            Some(WireReply::Challenge {
+                challenge: Box::new(challenge),
+            }),
+            false,
+            &config,
+            at,
+        );
+        assert!(runtime.gates[&1].deferred_challenge.is_some());
+        runtime.gates.get_mut(&1).unwrap().attempt_until = Instant::now() - Duration::from_secs(1);
+        // Even a wall-clock jump to the signed start cannot revive an already
+        // exhausted issuer attempt; only the existing bounded fallback remains.
+        runtime.resume_deferred_gates(&config, at + 3);
+        assert!(receiver.try_recv().is_err());
+        runtime.retry_gates(&config, &mut swarm);
+        assert_eq!(
+            runtime.gates[&1].issuer,
+            fixture.keys[2].public().to_peer_id()
+        );
+        assert!(runtime.gates[&1].deferred_challenge.is_none());
+        assert_eq!(runtime.gates[&1].deadline, deadline);
+        assert_eq!(runtime.pending.len(), 1);
+        assert!(runtime.pending.values().all(|work|matches!(work,Work::GateChallenge(1,peer) if peer==&fixture.keys[2].public().to_peer_id())));
+        assert!(runtime.store.state.records.is_empty());
     }
 }

@@ -6,9 +6,13 @@ use crate::{
     automation::{self, AutomationProof},
     crypto,
     error::{Error, INVALID, Result, STORAGE},
+    knowledge_abuse::{
+        self, Assessment, AuthorContext, CandidatePool, ExposureLimits, OperatorGroup,
+        OperatorRegistry, PoolLimits, SearchMode, VerifiedEvidence,
+    },
     knowledge_rating::{self, Evidence, Quality},
     scanner::Scanner,
-    types::{Draft, Room, Signed, TrustedRoom},
+    types::{Draft, OperatorBindingHistory, Room, Signed, TrustedRoom},
     util,
 };
 use chacha20poly1305::{
@@ -61,6 +65,8 @@ pub struct KnowledgeRecord {
     pub author_peer_id: String,
     pub created_at: u64,
     pub policy_id: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub authorization_digest: Option<String>,
     pub problem: String,
     pub solution: String,
     pub context: String,
@@ -98,6 +104,8 @@ pub struct KnowledgeReview {
     pub created_at: u64,
     pub sequence: u64,
     pub policy_id: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub authorization_digest: Option<String>,
     pub verdict: String,
     pub evidence: String,
     pub references: Vec<String>,
@@ -112,11 +120,22 @@ pub struct ReviewPacket {
     pub admission: Option<AutomationProof>,
 }
 
+/// Two independently validated admitted signatures by the same reviewer at the
+/// same sequence for this record. A bare accusation never establishes a fork.
+#[derive(Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ReviewConflict {
+    pub first: ReviewPacket,
+    pub second: ReviewPacket,
+}
+
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct StoredKnowledge {
     pub packet: RecordPacket,
     pub reviews: Vec<ReviewPacket>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub review_conflicts: Vec<ReviewConflict>,
     pub stored_at: u64,
     pub staging: bool,
 }
@@ -142,6 +161,8 @@ impl Default for KnowledgeState {
 pub struct KnowledgeHit {
     pub packet: RecordPacket,
     pub reviews: Vec<ReviewPacket>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub review_conflicts: Vec<ReviewConflict>,
     pub quality: Quality,
     pub score: f64,
 }
@@ -275,8 +296,11 @@ fn matches_current(historical: &TrustedRoom, current: &TrustedRoom, at: u64) -> 
 fn validate_record_historical(packet: &RecordPacket, at: u64) -> Result<()> {
     let record = &packet.record.signed;
     let room = &packet.certificate.certificate.signed;
-    if record.version != 1
-        || !util::valid_id(&record.id)
+    if !authorization_matches(
+        record.version,
+        record.authorization_digest.as_deref(),
+        &packet.certificate,
+    ) || !util::valid_id(&record.id)
         || record.created_at > at.saturating_add(300)
         || record.created_at > MAX_SEQUENCE
         || record.room_id != room.room_id
@@ -330,13 +354,15 @@ pub fn prepare_record(
         return Err(INVALID);
     }
     crypto::validate_room(room, &Scanner::policy_id(), at)?;
+    let authorization_digest = authorization_digest(room)?;
     let mut record = KnowledgeRecord {
-        version: 1,
+        version: if authorization_digest.is_some() { 2 } else { 1 },
         id: String::new(),
         room_id: room.certificate.signed.room_id.clone(),
         author_peer_id: key.public().to_peer_id().to_string(),
         created_at: at,
         policy_id: Scanner::policy_id(),
+        authorization_digest,
         problem: input.problem,
         solution: input.solution,
         context: input.context,
@@ -402,6 +428,15 @@ fn review_digest(review: &KnowledgeReview) -> Result<String> {
         evidence: review.evidence.clone(),
         references: review.references.clone(),
     };
+    if let Some(authorization) = &review.authorization_digest {
+        return Ok(util::hash(&util::canonical(&(
+            &review.room_id,
+            &review.record_id,
+            &review.reviewer_peer_id,
+            input,
+            authorization,
+        ))?));
+    }
     Ok(util::hash(&util::canonical(&(
         &review.room_id,
         &review.record_id,
@@ -433,6 +468,59 @@ pub fn review_action_digest(
         created_at: 0,
         sequence: 1,
         policy_id: Scanner::policy_id(),
+        authorization_digest: None,
+        verdict: input.verdict.clone(),
+        evidence: input.evidence.clone(),
+        references: input.references.clone(),
+    };
+    scan_review(&review)?;
+    review_digest(&review)
+}
+
+pub fn authorization_digest(room: &TrustedRoom) -> Result<Option<String>> {
+    if room.certificate.signed.knowledge_operators.is_some() {
+        Ok(Some(util::hash(&util::canonical(&room.certificate)?)))
+    } else {
+        Ok(None)
+    }
+}
+
+fn authorization_matches(version: u32, digest: Option<&str>, room: &TrustedRoom) -> bool {
+    match (version, digest, authorization_digest(room)) {
+        (1, None, Ok(None)) => true,
+        (2, Some(actual), Ok(Some(expected))) => actual == expected,
+        _ => false,
+    }
+}
+
+/// Operator-policy admission is bound to the exact authority-signed room scope.
+/// The legacy helper remains byte-compatible for pre-operator automation proofs.
+pub fn review_action_digest_for_room(
+    room: &TrustedRoom,
+    record_id: &str,
+    reviewer: &str,
+    input: &ReviewInput,
+) -> Result<String> {
+    if !util::valid_id(&room.certificate.signed.room_id)
+        || !util::valid_id(record_id)
+        || reviewer.parse::<libp2p::PeerId>().is_err()
+    {
+        return Err(INVALID);
+    }
+    let review = KnowledgeReview {
+        version: if room.certificate.signed.knowledge_operators.is_some() {
+            2
+        } else {
+            1
+        },
+        id: String::new(),
+        room_id: room.certificate.signed.room_id.clone(),
+        record_id: record_id.into(),
+        reviewer_peer_id: reviewer.into(),
+        created_at: 0,
+        sequence: 1,
+        policy_id: Scanner::policy_id(),
+        authorization_digest: authorization_digest(room)?,
         verdict: input.verdict.clone(),
         evidence: input.evidence.clone(),
         references: input.references.clone(),
@@ -470,8 +558,11 @@ fn validate_review_historical(packet: &ReviewPacket, record: &RecordPacket, at: 
     let review = &packet.review.signed;
     let original = &record.record.signed;
     let room = &packet.certificate.certificate.signed;
-    if review.version != 1
-        || !util::valid_id(&review.id)
+    if !authorization_matches(
+        review.version,
+        review.authorization_digest.as_deref(),
+        &packet.certificate,
+    ) || !util::valid_id(&review.id)
         || review.sequence == 0
         || review.sequence > MAX_SEQUENCE
         || review.created_at > MAX_SEQUENCE
@@ -534,8 +625,9 @@ pub fn prepare_review(
         return Err(INVALID);
     }
     validate_record(record, room, at)?;
+    let authorization_digest = authorization_digest(room)?;
     let mut review = KnowledgeReview {
-        version: 1,
+        version: if authorization_digest.is_some() { 2 } else { 1 },
         id: String::new(),
         room_id: record.record.signed.room_id.clone(),
         record_id: record.record.signed.id.clone(),
@@ -543,6 +635,7 @@ pub fn prepare_review(
         created_at: at,
         sequence,
         policy_id: Scanner::policy_id(),
+        authorization_digest,
         verdict: input.verdict,
         evidence: input.evidence,
         references: input.references,
@@ -594,8 +687,11 @@ pub(crate) fn validate_review_for_verified_record(
     review_admission(packet, current, at)
 }
 
-/// Highest-random-weight placement is stable under member ordering. No call can
-/// request more than three replicas, including a caller supplying usize::MAX.
+/// Highest-random-weight placement is stable under member ordering. Registered
+/// operator groups receive distinct copies before peer-level fallback, so adding
+/// keys inside one group cannot increase that group's selection probability.
+/// A room wholly owned by one registered group preserves legacy peer placement.
+/// Credit controls voting, not storage identity. No call can request >3 copies.
 pub fn replica_peers(room: &Room, id: &str, replicas: usize) -> Vec<String> {
     let unique: BTreeSet<&str> = room
         .members
@@ -611,32 +707,469 @@ pub fn replica_peers(room: &Room, id: &str, replicas: usize) -> Vec<String> {
         })
         .collect();
     weighted.sort_by(|a, b| b.0.cmp(&a.0).then_with(|| a.1.cmp(&b.1)));
-    weighted
-        .into_iter()
-        .take(replicas.min(REPLICAS))
-        .map(|(_, peer)| peer)
-        .collect()
+    let count = replicas.min(REPLICAS);
+    let mut selected = Vec::new();
+    if let Some(claims) = room
+        .knowledge_operators
+        .as_ref()
+        .filter(|c| c.validate().is_ok())
+    {
+        let mut groups: BTreeMap<&str, Vec<&str>> = BTreeMap::new();
+        for (_, peer) in &weighted {
+            if let Some(group) = claims.bindings.get(peer) {
+                groups.entry(group).or_default().push(peer);
+            }
+        }
+        // A wholly registered single operator retains exact legacy placement.
+        // If unknown peers exist, first protect the known operator's one copy.
+        let registered_peers = groups.values().map(Vec::len).sum::<usize>();
+        if groups.len() > 1 || (groups.len() == 1 && registered_peers < weighted.len()) {
+            let mut ranked: Vec<_> = groups
+                .into_iter()
+                .map(|(group, peers)| {
+                    let input = (
+                        "idobata.knowledge.operator-hrw.v1",
+                        &room.room_id,
+                        id,
+                        group,
+                    );
+                    (
+                        util::hash(&util::canonical(&input).expect("fixed group HRW tuple")),
+                        group,
+                        peers,
+                    )
+                })
+                .collect();
+            ranked.sort_by(|a, b| b.0.cmp(&a.0).then_with(|| a.1.cmp(b.1)));
+            selected.extend(
+                ranked
+                    .into_iter()
+                    .take(count)
+                    .map(|(_, _, peers)| peers[0].to_owned()),
+            );
+        }
+    }
+    for (_, peer) in weighted {
+        if selected.len() >= count {
+            break;
+        }
+        if !selected.contains(&peer) {
+            selected.push(peer);
+        }
+    }
+    selected
 }
 
-fn evidence(state: &KnowledgeState, room_id: &str) -> Vec<Evidence> {
-    state
-        .records
+/// Only use after the caller authenticates the current room. A missing/invalid
+/// operator policy gives no identity credit; it never falls back to peer count.
+pub fn registry(room: &TrustedRoom) -> OperatorRegistry {
+    room.certificate
+        .signed
+        .knowledge_operators
+        .as_ref()
+        .and_then(|claims| {
+            OperatorRegistry::from_verified(claims.bindings.clone(), claims.credits.clone()).ok()
+        })
+        .unwrap_or_default()
+}
+
+/// Internal resource namespace: one operator shares its quota across this
+/// authority's rooms, while another authority's same label is independent.
+pub fn storage_bucket(authority: &TrustedRoom, group: &OperatorGroup) -> Result<OperatorGroup> {
+    match group {
+        OperatorGroup::Unknown => Ok(OperatorGroup::Unknown),
+        OperatorGroup::Registered(operator) => {
+            Ok(OperatorGroup::Registered(util::hash(&util::canonical(&(
+                "idobata.storage.operator.v1",
+                &authority.authority_peer_id,
+                operator,
+            ))?)))
+        }
+    }
+}
+
+/// Resource-only binding, never a source of review credit. Same-authority local
+/// immutable history is shared across rooms so legacy rooms do not open a second
+/// unknown quota for a known operator's key.
+pub fn resource_group(
+    room: &TrustedRoom,
+    peer: &str,
+    histories: &BTreeMap<String, OperatorBindingHistory>,
+) -> OperatorGroup {
+    let current = registry(room).group(peer);
+    if current != OperatorGroup::Unknown {
+        return current;
+    }
+    for history in histories
+        .values()
+        .filter(|h| h.authority_peer_id == room.authority_peer_id)
+    {
+        if let Some(group) = history.bindings.get(peer) {
+            return OperatorGroup::Registered(group.clone());
+        }
+    }
+    OperatorGroup::Unknown
+}
+
+fn policy_pin(historical: &TrustedRoom, current: &TrustedRoom) -> bool {
+    historical.authority_peer_id == current.authority_peer_id
+        && historical.certificate.public_key == current.certificate.public_key
+        && historical.certificate.signed.room_id == current.certificate.signed.room_id
+        && historical.certificate.signed.policy_id == current.certificate.signed.policy_id
+        && historical.certificate.signed.public == current.certificate.signed.public
+        && historical.certificate.signed.epoch <= current.certificate.signed.epoch
+}
+
+/// Every input packet must already have passed signature/admission validation.
+/// Return the SAME LENGTH/ORDER as reviews, including zero-credit legacy claims,
+/// so review slot indices remain bound to their original signed packets.
+pub fn verified_evidence(
+    packet: &RecordPacket,
+    reviews: &[ReviewPacket],
+    current: &TrustedRoom,
+) -> Vec<VerifiedEvidence> {
+    verified_evidence_with_conflicts(packet, reviews, &[], current)
+}
+
+pub fn review_conflict_group(conflict: &ReviewConflict) -> OperatorGroup {
+    let peer = &conflict.first.review.signed.reviewer_peer_id;
+    let first = registry(&conflict.first.certificate).group(peer);
+    let second = registry(&conflict.second.certificate).group(peer);
+    if first == second {
+        first
+    } else {
+        OperatorGroup::Unknown
+    }
+}
+
+fn conflict_shape(packet: &RecordPacket, conflict: &ReviewConflict) -> Result<()> {
+    let a = &conflict.first.review;
+    let b = &conflict.second.review;
+    if a.signed.record_id != packet.record.signed.id
+        || b.signed.record_id != packet.record.signed.id
+        || a.signed.reviewer_peer_id != b.signed.reviewer_peer_id
+        || a.public_key != b.public_key
+        || a.signed.sequence != b.signed.sequence
+        || a.signed.id == b.signed.id
+    {
+        return Err(INVALID);
+    }
+    Ok(())
+}
+
+/// Caller first validates the immutable record against this same current room.
+/// Both COMPLETE admitted packets are required; a signed pre-admission draft is
+/// insufficient to revoke another operator's influence.
+pub fn validate_conflicts(
+    packet: &RecordPacket,
+    conflicts: &[ReviewConflict],
+    current: &TrustedRoom,
+    at: u64,
+) -> Result<()> {
+    if conflicts.len() > MAX_REVIEWERS {
+        return Err(INVALID);
+    }
+    let mut groups = BTreeSet::new();
+    for conflict in conflicts {
+        conflict_shape(packet, conflict)?;
+        validate_review_for_verified_record(&conflict.first, packet, current, at)?;
+        validate_review_for_verified_record(&conflict.second, packet, current, at)?;
+        if !groups.insert(review_conflict_group(conflict)) {
+            return Err(INVALID);
+        }
+    }
+    Ok(())
+}
+
+fn normalized_conflict(conflict: &ReviewConflict) -> ReviewConflict {
+    if conflict.first.review.signed.id < conflict.second.review.signed.id {
+        conflict.clone()
+    } else {
+        ReviewConflict {
+            first: conflict.second.clone(),
+            second: conflict.first.clone(),
+        }
+    }
+}
+
+pub fn conflict_digest(conflict: &ReviewConflict) -> Result<String> {
+    let conflict = normalized_conflict(conflict);
+    Ok(util::hash(&util::canonical(&(
+        "idobata.knowledge.fork.v1",
+        &conflict.first.review.signed.id,
+        &conflict.second.review.signed.id,
+    ))?))
+}
+
+fn witness_order<T: Serialize>(value: &T) -> Result<(usize, Vec<u8>)> {
+    let bytes = util::canonical(value)?;
+    Ok((bytes.len(), bytes))
+}
+
+fn review_order(packet: &ReviewPacket) -> (u64, u64, bool, &str) {
+    let review = &packet.review.signed;
+    (
+        review.sequence,
+        review.created_at,
+        review.verdict != "useful",
+        &review.id,
+    )
+}
+
+/// Pure metadata merge. Caller verifies every supplied packet and full fork
+/// witness first. Sequence maxima and conflict knowledge are monotone; raw
+/// witness differences do not change signed-claim or fork identities.
+pub fn canonical_review_state(
+    packet: &RecordPacket,
+    current: &TrustedRoom,
+    reviews: Vec<ReviewPacket>,
+    conflicts: Vec<ReviewConflict>,
+) -> Result<(Vec<ReviewPacket>, Vec<ReviewConflict>)> {
+    if reviews.len() > MAX_REVIEWERS * 2 || conflicts.len() > MAX_REVIEWERS * 2 {
+        return Err(INVALID);
+    }
+    let mut stream = reviews;
+    for conflict in conflicts {
+        conflict_shape(packet, &conflict)?;
+        stream.push(conflict.first);
+        stream.push(conflict.second);
+    }
+    let mut variants: BTreeMap<(String, u64), BTreeMap<String, ReviewPacket>> = BTreeMap::new();
+    for review in stream {
+        let claim = &review.review.signed;
+        if claim.record_id != packet.record.signed.id
+            || claim.room_id != packet.record.signed.room_id
+        {
+            return Err(INVALID);
+        }
+        let key = (claim.reviewer_peer_id.clone(), claim.sequence);
+        let id = claim.id.clone();
+        let bucket = variants.entry(key).or_default();
+        let replace = if let Some(old) = bucket.get(&id) {
+            witness_order(&review)? < witness_order(old)?
+        } else {
+            true
+        };
+        if replace {
+            bucket.insert(id, review);
+        }
+    }
+    let mut latest: BTreeMap<String, ReviewPacket> = BTreeMap::new();
+    let mut proofs: BTreeMap<OperatorGroup, ReviewConflict> = BTreeMap::new();
+    for ((peer, _), claims) in variants {
+        if claims.len() >= 2 {
+            let mut first_two = claims.values();
+            let proof = ReviewConflict {
+                first: first_two.next().unwrap().clone(),
+                second: first_two.next().unwrap().clone(),
+            };
+            let group = review_conflict_group(&proof);
+            let replace = if let Some(old) = proofs.get(&group) {
+                conflict_order(&proof) < conflict_order(old)
+                    || (conflict_order(&proof) == conflict_order(old)
+                        && witness_order(&proof)? < witness_order(old)?)
+            } else {
+                true
+            };
+            if replace {
+                proofs.insert(group, proof);
+            }
+        }
+        for review in claims.into_values() {
+            let replace = if let Some(old) = latest.get(&peer) {
+                review_order(&review) > review_order(old)
+                    || (review_order(&review) == review_order(old)
+                        && witness_order(&review)? < witness_order(old)?)
+            } else {
+                true
+            };
+            if replace {
+                latest.insert(peer.clone(), review);
+            }
+        }
+    }
+    if proofs.len() > MAX_REVIEWERS {
+        return Err(INVALID);
+    }
+    let reviews = latest.into_values().collect::<Vec<_>>();
+    let slots = review_slots(packet, &reviews, current, MAX_REVIEWERS);
+    Ok((
+        slots.into_iter().map(|i| reviews[i].clone()).collect(),
+        proofs.into_values().collect(),
+    ))
+}
+
+fn conflict_order(proof: &ReviewConflict) -> (&str, u64, &str, &str) {
+    (
+        &proof.first.review.signed.reviewer_peer_id,
+        proof.first.review.signed.sequence,
+        &proof.first.review.signed.id,
+        &proof.second.review.signed.id,
+    )
+}
+
+fn canonical_conflicts(
+    packet: &RecordPacket,
+    conflicts: impl IntoIterator<Item = ReviewConflict>,
+    current: Option<&TrustedRoom>,
+    at: u64,
+) -> Result<Vec<ReviewConflict>> {
+    let mut verified = Vec::new();
+    for conflict in conflicts {
+        conflict_shape(packet, &conflict)?;
+        if let Some(current) = current {
+            validate_review_for_verified_record(&conflict.first, packet, current, at)?;
+            validate_review_for_verified_record(&conflict.second, packet, current, at)?;
+        } else {
+            validate_review_historical(&conflict.first, packet, at)?;
+            validate_review_historical(&conflict.second, packet, at)?;
+        }
+        verified.push(conflict);
+        if verified.len() > MAX_REVIEWERS * 2 {
+            return Err(INVALID);
+        }
+    }
+    Ok(canonical_review_state(
+        packet,
+        current.unwrap_or(&packet.certificate),
+        Vec::new(),
+        verified,
+    )?
+    .1)
+}
+
+/// Same positional contract as verified_evidence. Conflict flags are derived
+/// only from already validated full proofs and suppress that operator/record.
+pub fn verified_evidence_with_conflicts(
+    packet: &RecordPacket,
+    reviews: &[ReviewPacket],
+    conflicts: &[ReviewConflict],
+    current: &TrustedRoom,
+) -> Vec<VerifiedEvidence> {
+    let current_registry = registry(current);
+    let contested: BTreeSet<_> = conflicts
         .iter()
-        .filter(|stored| stored.packet.record.signed.room_id == room_id)
-        .flat_map(|stored| {
-            stored.reviews.iter().map(|packet| {
-                let review = &packet.review.signed;
-                Evidence {
-                    record_id: stored.packet.record.signed.id.clone(),
-                    author: stored.packet.record.signed.author_peer_id.clone(),
+        .map(review_conflict_group)
+        .filter(|g| *g != OperatorGroup::Unknown)
+        .collect();
+    reviews
+        .iter()
+        .map(|packet_review| {
+            let review = &packet_review.review.signed;
+            let historical = registry(&packet_review.certificate);
+            let group = historical.group(&review.reviewer_peer_id);
+            let credit = historical
+                .credit(&group)
+                .min(current_registry.credit(&group));
+            let applicable = policy_pin(&packet.certificate, current)
+                && policy_pin(&packet_review.certificate, current)
+                && review.room_id == packet.record.signed.room_id
+                && review.record_id == packet.record.signed.id
+                && review.version == 2
+                && authorization_matches(
+                    review.version,
+                    review.authorization_digest.as_deref(),
+                    &packet_review.certificate,
+                )
+                && authorization_matches(
+                    packet.record.signed.version,
+                    packet.record.signed.authorization_digest.as_deref(),
+                    &packet.certificate,
+                )
+                && group == current_registry.group(&review.reviewer_peer_id);
+            VerifiedEvidence {
+                evidence: Evidence {
+                    record_id: packet.record.signed.id.clone(),
+                    author: packet.record.signed.author_peer_id.clone(),
                     reviewer: review.reviewer_peer_id.clone(),
                     useful: review.verdict == "useful",
                     sequence: review.sequence,
                     created_at: review.created_at,
-                }
-            })
+                },
+                historical_group: if applicable {
+                    group
+                } else {
+                    OperatorGroup::Unknown
+                },
+                historical_credit: if applicable { credit } else { 0 },
+                contested: contested.contains(&historical.group(&review.reviewer_peer_id)),
+            }
         })
         .collect()
+}
+
+pub fn assess_evidence(
+    packet: &RecordPacket,
+    current: &TrustedRoom,
+    evidence: &[VerifiedEvidence],
+) -> Assessment {
+    assess_evidence_with_history(packet, current, evidence, None)
+}
+
+/// Local history is authority-scoped exclusion evidence only; it never supplies
+/// reviewer credit, registers an unknown author or overrides a signed binding.
+pub fn assessment_context(
+    packet: &RecordPacket,
+    current: &TrustedRoom,
+    history: Option<&OperatorBindingHistory>,
+) -> AuthorContext {
+    let mut context = AuthorContext::default();
+    if policy_pin(&packet.certificate, current)
+        && authorization_matches(
+            packet.record.signed.version,
+            packet.record.signed.authorization_digest.as_deref(),
+            &packet.certificate,
+        )
+    {
+        context.historical_group =
+            registry(&packet.certificate).group(&packet.record.signed.author_peer_id);
+    }
+    if let Some(history) = history.filter(|h| h.authority_peer_id == current.authority_peer_id)
+        && let Some(group) = history.bindings.get(&packet.record.signed.author_peer_id)
+    {
+        context
+            .additional_exclusions
+            .insert(OperatorGroup::Registered(group.clone()));
+    }
+    context
+}
+
+pub fn assessment_index(
+    packet: &RecordPacket,
+    current: &TrustedRoom,
+    evidence: &[VerifiedEvidence],
+    history: Option<&OperatorBindingHistory>,
+) -> knowledge_abuse::AssessmentIndex {
+    knowledge_abuse::AssessmentIndex::new(
+        &registry(current),
+        &packet.record.signed.author_peer_id,
+        evidence,
+        &assessment_context(packet, current, history),
+    )
+}
+
+pub fn assess_evidence_with_history(
+    packet: &RecordPacket,
+    current: &TrustedRoom,
+    evidence: &[VerifiedEvidence],
+    history: Option<&OperatorBindingHistory>,
+) -> Assessment {
+    assessment_index(packet, current, evidence, history).assess(&packet.record.signed.id)
+}
+
+pub fn review_slots(
+    packet: &RecordPacket,
+    reviews: &[ReviewPacket],
+    current: &TrustedRoom,
+    limit: usize,
+) -> Vec<usize> {
+    knowledge_abuse::select_review_slots(
+        &registry(current),
+        &packet.record.signed.id,
+        &packet.record.signed.author_peer_id,
+        &verified_evidence(packet, reviews, current),
+        limit,
+    )
 }
 
 fn snapshot_bytes(state: &KnowledgeState) -> Result<usize> {
@@ -653,71 +1186,13 @@ fn snapshot_bytes(state: &KnowledgeState) -> Result<usize> {
     )
 }
 
-fn enforce_quota(state: &mut KnowledgeState, quota: usize, at: u64) -> Result<bool> {
-    let mut bytes = snapshot_bytes(state)?;
-    if bytes <= quota && state.records.len() <= MAX_OBJECTS {
-        return Ok(true);
-    }
-    let mut histories: BTreeMap<(String, String), Vec<Evidence>> = BTreeMap::new();
-    for stored in &state.records {
-        let record = &stored.packet.record.signed;
-        let history = histories
-            .entry((record.room_id.clone(), record.author_peer_id.clone()))
-            .or_default();
-        for packet in &stored.reviews {
-            let review = &packet.review.signed;
-            history.push(Evidence {
-                record_id: record.id.clone(),
-                author: record.author_peer_id.clone(),
-                reviewer: review.reviewer_peer_id.clone(),
-                useful: review.verdict == "useful",
-                sequence: review.sequence,
-                created_at: review.created_at,
-            });
-        }
-    }
-    let mut priorities = Vec::with_capacity(state.records.len());
-    for stored in &state.records {
-        // Until the required owners acknowledge storage, staging is the only
-        // durable acceptance guarantee. Capacity pressure must reject later
-        // work rather than silently discard an accepted unpublished record.
-        if stored.staging {
-            continue;
-        }
-        let record = &stored.packet.record.signed;
-        let history = histories
-            .get(&(record.room_id.clone(), record.author_peer_id.clone()))
-            .map(Vec::as_slice)
-            .unwrap_or(&[]);
-        let quality = knowledge_rating::quality(&record.id, &record.author_peer_id, history);
-        priorities.push((
-            knowledge_rating::retention_priority(&quality, record.created_at, at),
-            record.id.clone(),
-            serde_json::to_vec(stored).map_err(|_| STORAGE)?.len(),
-        ));
-    }
-    priorities.sort_by(|a, b| a.0.total_cmp(&b.0).then_with(|| a.1.cmp(&b.1)));
-    let mut removed = BTreeSet::new();
-    let mut count = state.records.len();
-    for (_, id, size) in priorities {
-        if bytes <= quota && count <= MAX_OBJECTS {
-            break;
-        }
-        bytes = bytes.saturating_sub(size + usize::from(count > 1));
-        count -= 1;
-        removed.insert(id);
-    }
-    state
-        .records
-        .retain(|stored| !removed.contains(&stored.packet.record.signed.id));
-    Ok(snapshot_bytes(state)? <= quota && state.records.len() <= MAX_OBJECTS)
-}
-
 pub struct Store {
     pub state: KnowledgeState,
     path: PathBuf,
     key: Zeroizing<Vec<u8>>,
     quota: usize,
+    rooms: BTreeMap<String, TrustedRoom>,
+    operator_history: BTreeMap<String, OperatorBindingHistory>,
 }
 
 impl Store {
@@ -741,6 +1216,8 @@ impl Store {
             path: home.join("knowledge.enc"),
             key,
             quota: bytes,
+            rooms: BTreeMap::new(),
+            operator_history: BTreeMap::new(),
         };
         if store.path.exists() {
             util::protected(&store.path)?;
@@ -767,6 +1244,264 @@ impl Store {
         Ok(store)
     }
 
+    /// Ephemeral, already verified configuration; no configuration I/O or
+    /// ciphertext rewrite, and no deletion when a new policy reduces quota.
+    pub fn set_rooms(&mut self, rooms: impl IntoIterator<Item = TrustedRoom>) {
+        self.rooms.clear();
+        for room in rooms {
+            self.rooms
+                .entry(room.certificate.signed.room_id.clone())
+                .or_insert(room);
+        }
+    }
+    pub fn set_operator_history(&mut self, history: &BTreeMap<String, OperatorBindingHistory>) {
+        self.operator_history = history.clone();
+    }
+
+    fn assessments(&self, state: &KnowledgeState) -> BTreeMap<String, Assessment> {
+        let mut histories: BTreeMap<(&str, &str), Vec<VerifiedEvidence>> = BTreeMap::new();
+        for stored in &state.records {
+            let record = &stored.packet.record.signed;
+            if let Some(current) = self
+                .rooms
+                .get(&record.room_id)
+                .filter(|room| policy_pin(&stored.packet.certificate, room))
+            {
+                histories
+                    .entry((&record.room_id, &record.author_peer_id))
+                    .or_default()
+                    .extend(verified_evidence_with_conflicts(
+                        &stored.packet,
+                        &stored.reviews,
+                        &stored.review_conflicts,
+                        current,
+                    ));
+            }
+        }
+        let mut indexes = BTreeMap::new();
+        state
+            .records
+            .iter()
+            .map(|stored| {
+                let record = &stored.packet.record.signed;
+                let assessment = if let Some(current) = self
+                    .rooms
+                    .get(&record.room_id)
+                    .filter(|room| policy_pin(&stored.packet.certificate, room))
+                {
+                    let context = assessment_context(
+                        &stored.packet,
+                        current,
+                        self.operator_history.get(&record.room_id),
+                    );
+                    indexes
+                        .entry((&record.room_id, &record.author_peer_id, context.clone()))
+                        .or_insert_with(|| {
+                            knowledge_abuse::AssessmentIndex::new(
+                                &registry(current),
+                                &record.author_peer_id,
+                                histories
+                                    .get(&(record.room_id.as_str(), record.author_peer_id.as_str()))
+                                    .map(Vec::as_slice)
+                                    .unwrap_or(&[]),
+                                &context,
+                            )
+                        })
+                        .assess(&record.id)
+                } else {
+                    let historical_group =
+                        registry(&stored.packet.certificate).group(&record.author_peer_id);
+                    knowledge_abuse::assess_with_author_context(
+                        &OperatorRegistry::default(),
+                        &record.id,
+                        &record.author_peer_id,
+                        &[],
+                        &AuthorContext {
+                            historical_group,
+                            additional_exclusions: BTreeSet::new(),
+                        },
+                    )
+                };
+                (record.id.clone(), assessment)
+            })
+            .collect()
+    }
+
+    fn resource_origin(
+        &self,
+        packet: &RecordPacket,
+        peer: &str,
+        certificate: &TrustedRoom,
+    ) -> OperatorGroup {
+        if let Some(current) = self
+            .rooms
+            .get(&packet.record.signed.room_id)
+            .filter(|room| policy_pin(certificate, room))
+        {
+            let group = resource_group(current, peer, &self.operator_history);
+            if group != OperatorGroup::Unknown {
+                return group;
+            }
+        }
+        let historical = registry(certificate).group(peer);
+        if historical != OperatorGroup::Unknown {
+            return historical;
+        }
+        resource_group(&packet.certificate, peer, &self.operator_history)
+    }
+
+    fn storage_charges(
+        &self,
+        state: &KnowledgeState,
+        classes: &BTreeMap<String, Assessment>,
+    ) -> Result<Vec<knowledge_abuse::StorageCharge>> {
+        let base = snapshot_bytes(&KnowledgeState::default())?;
+        let mut charges = vec![knowledge_abuse::StorageCharge {
+            group: OperatorGroup::Unknown,
+            bytes: (base - usize::from(!state.records.is_empty())) as u64,
+            unconfirmed: false,
+        }];
+        for stored in &state.records {
+            let record = &stored.packet.record.signed;
+            let assessment = classes.get(&record.id).ok_or(STORAGE)?;
+            let mut body = stored.clone();
+            body.reviews.clear();
+            body.review_conflicts.clear();
+            body.staging = false;
+            let origin = self.resource_origin(
+                &stored.packet,
+                &record.author_peer_id,
+                &stored.packet.certificate,
+            );
+            charges.push(knowledge_abuse::StorageCharge {
+                group: storage_bucket(&stored.packet.certificate, &origin)?,
+                bytes: serde_json::to_vec(&body).map_err(|_| STORAGE)?.len() as u64 + 1,
+                unconfirmed: !assessment.promoted,
+            });
+            for review in &stored.reviews {
+                let origin = self.resource_origin(
+                    &stored.packet,
+                    &review.review.signed.reviewer_peer_id,
+                    &review.certificate,
+                );
+                charges.push(knowledge_abuse::StorageCharge {
+                    group: storage_bucket(&stored.packet.certificate, &origin)?,
+                    bytes: serde_json::to_vec(review).map_err(|_| STORAGE)?.len() as u64 + 1,
+                    unconfirmed: true,
+                });
+            }
+            for proof in &stored.review_conflicts {
+                let origin = self.resource_origin(
+                    &stored.packet,
+                    &proof.first.review.signed.reviewer_peer_id,
+                    &proof.first.certificate,
+                );
+                charges.push(knowledge_abuse::StorageCharge {
+                    group: storage_bucket(&stored.packet.certificate, &origin)?,
+                    bytes: serde_json::to_vec(proof).map_err(|_| STORAGE)?.len() as u64
+                        + b",\"review_conflicts\":[]".len() as u64
+                        + 1,
+                    unconfirmed: true,
+                });
+            }
+        }
+        Ok(charges)
+    }
+
+    fn policy_limits(&self) -> knowledge_abuse::QuotaLimits {
+        let mut limits = knowledge_abuse::QuotaLimits::default();
+        limits.total_bytes = self.quota as u64;
+        limits.unconfirmed_bytes = limits.unconfirmed_bytes.min(limits.total_bytes);
+        limits.operator_unconfirmed_bytes = limits
+            .operator_unconfirmed_bytes
+            .min(limits.unconfirmed_bytes);
+        limits.unknown_unconfirmed_bytes = limits
+            .unknown_unconfirmed_bytes
+            .min(limits.unconfirmed_bytes);
+        limits
+    }
+
+    fn admit_state(
+        &self,
+        state: &mut KnowledgeState,
+        new_record: Option<&str>,
+        at: u64,
+    ) -> Result<bool> {
+        let classes = self.assessments(state);
+        // Reclassification of an existing immutable body is grandfathered in
+        // both snapshots. New review/proof bytes still belong to their signer.
+        let before = self.storage_charges(&self.state, &classes)?;
+        let limits = self.policy_limits();
+        let fits = |candidate: &KnowledgeState| -> Result<bool> {
+            Ok(candidate.records.len() <= MAX_OBJECTS
+                && snapshot_bytes(candidate)? <= self.quota
+                && knowledge_abuse::check_storage_charges(
+                    &before,
+                    &self.storage_charges(candidate, &classes)?,
+                    limits,
+                    true,
+                )
+                .is_ok())
+        };
+        if fits(state)? {
+            return Ok(true);
+        }
+        let Some(new_id) = new_record else {
+            return Err(Error::new(30, "knowledge_metadata_quota_exceeded"));
+        };
+        let target = state
+            .records
+            .iter()
+            .find(|row| row.packet.record.signed.id == new_id)
+            .ok_or(STORAGE)?;
+        let target_class = classes.get(new_id).ok_or(STORAGE)?;
+        if !target_class.promoted
+            && knowledge_abuse::check_storage_charges(&[], &before, limits, false).is_err()
+        {
+            return Err(Error::new(30, "knowledge_existing_policy_quota_exceeded"));
+        }
+        let target_group = storage_bucket(
+            &target.packet.certificate,
+            &self.resource_origin(
+                &target.packet,
+                &target.packet.record.signed.author_peer_id,
+                &target.packet.certificate,
+            ),
+        )?;
+        let priority = knowledge_rating::retention_priority(
+            &target_class.quality,
+            target.packet.record.signed.created_at,
+            at,
+        );
+        let mut victims = Vec::new();
+        for row in &state.records {
+            let record = &row.packet.record.signed;
+            let class = classes.get(&record.id).ok_or(STORAGE)?;
+            if record.id == new_id || row.staging || class.promoted {
+                continue;
+            }
+            let group = storage_bucket(
+                &row.packet.certificate,
+                &self.resource_origin(&row.packet, &record.author_peer_id, &row.packet.certificate),
+            )?;
+            let old_priority =
+                knowledge_rating::retention_priority(&class.quality, record.created_at, at);
+            if group == target_group && old_priority <= priority {
+                victims.push((old_priority, record.id.clone()));
+            }
+        }
+        victims.sort_by(|a, b| a.0.total_cmp(&b.0).then_with(|| a.1.cmp(&b.1)));
+        for (_, id) in victims {
+            state
+                .records
+                .retain(|row| row.packet.record.signed.id != id);
+            if fits(state)? {
+                return Ok(true);
+            }
+        }
+        Err(Error::new(30, "knowledge_operator_quota_exceeded"))
+    }
+
     fn validate_snapshot(&self) -> Result<()> {
         if self.state.version != 1
             || self.state.records.len() > MAX_OBJECTS
@@ -776,7 +1511,9 @@ impl Store {
         }
         let mut ids = BTreeSet::new();
         for stored in &self.state.records {
-            if !ids.insert(&stored.packet.record.signed.id) || stored.reviews.len() > MAX_REVIEWERS
+            if !ids.insert(&stored.packet.record.signed.id)
+                || stored.reviews.len() > MAX_REVIEWERS
+                || stored.review_conflicts.len() > MAX_REVIEWERS
             {
                 return Err(STORAGE);
             }
@@ -789,6 +1526,19 @@ impl Store {
                 validate_review_historical(review, &stored.packet, util::now())
                     .map_err(|_| STORAGE)?;
             }
+            let canonical = canonical_conflicts(
+                &stored.packet,
+                stored.review_conflicts.clone(),
+                None,
+                util::now(),
+            )
+            .map_err(|_| STORAGE)?;
+            if canonical.len() != stored.review_conflicts.len()
+                || util::canonical(&canonical).map_err(|_| STORAGE)?
+                    != util::canonical(&stored.review_conflicts).map_err(|_| STORAGE)?
+            {
+                return Err(STORAGE);
+            }
         }
         Ok(())
     }
@@ -796,102 +1546,136 @@ impl Store {
     /// True means the record is present after admission (duplicates are harmless).
     /// The Runtime validates against its current room before calling this method.
     pub fn insert(&mut self, packet: RecordPacket, staging: bool, at: u64) -> Result<bool> {
-        if let Some(existing) = self.get(&packet.record.signed.room_id, &packet.record.signed.id)
-            && existing.staging == staging
-            && util::canonical(&existing.packet)? == util::canonical(&packet)?
-        {
-            // Repeated repair of an already validated immutable packet does
-            // not need content inspection, a state clone, or a disk write.
-            return Ok(true);
+        self.insert_with_reviews_and_conflicts(packet, Vec::new(), Vec::new(), staging, at)
+    }
+
+    pub fn insert_with_reviews(
+        &mut self,
+        packet: RecordPacket,
+        reviews: Vec<ReviewPacket>,
+        staging: bool,
+        at: u64,
+    ) -> Result<bool> {
+        self.insert_with_reviews_and_conflicts(packet, reviews, Vec::new(), staging, at)
+    }
+
+    /// Admit an immutable body and its COMPLETE mutable review state in one
+    /// durable transaction. A third independent vote can therefore promote the
+    /// incoming body before quota admission, rather than failing an empty-vote
+    /// insertion first. Metadata updates never evict another accepted body.
+    pub fn insert_with_reviews_and_conflicts(
+        &mut self,
+        packet: RecordPacket,
+        reviews: Vec<ReviewPacket>,
+        conflicts: Vec<ReviewConflict>,
+        staging: bool,
+        at: u64,
+    ) -> Result<bool> {
+        if reviews.len() > MAX_REVIEWERS * 2 || conflicts.len() > MAX_REVIEWERS {
+            return Err(INVALID);
         }
-        validate_record_historical(&packet, at)?;
         let id = packet.record.signed.id.clone();
-        if let Some(existing) = self.get(&packet.record.signed.room_id, &id)
-            && existing.staging == staging
+        let room_id = packet.record.signed.room_id.clone();
+        let existing = self.get(&room_id, &id);
+        let exact = existing
+            .is_some_and(|old| util::canonical(&old.packet).ok() == util::canonical(&packet).ok());
+        if exact
+            && reviews.is_empty()
+            && conflicts.is_empty()
+            && existing.is_some_and(|row| row.staging == staging)
         {
             return Ok(true);
         }
+        if !exact {
+            validate_record_historical(&packet, at)?;
+        }
+        let body = existing.map(|row| row.packet.clone()).unwrap_or(packet);
+        let current = self
+            .rooms
+            .get(&room_id)
+            .filter(|room| policy_pin(&body.certificate, room))
+            .cloned();
+        for review in &reviews {
+            let known = existing.is_some_and(|row| {
+                row.reviews
+                    .iter()
+                    .any(|old| util::canonical(old).ok() == util::canonical(review).ok())
+            });
+            if !known {
+                if let Some(room) = &current {
+                    validate_review_for_verified_record(review, &body, room, at)?;
+                } else {
+                    validate_review_historical(review, &body, at)?;
+                }
+            }
+        }
+        let verified_conflicts = canonical_conflicts(&body, conflicts, current.as_ref(), at)?;
+        let mut all_reviews = existing.map(|row| row.reviews.clone()).unwrap_or_default();
+        all_reviews.extend(reviews);
+        // The caller can include its existing state in a bundle; deduplicate
+        // identical signed claims before applying the bounded merge window.
+        let mut by_id: BTreeMap<String, ReviewPacket> = BTreeMap::new();
+        for review in all_reviews {
+            let key = review.review.signed.id.clone();
+            let replace = if let Some(old) = by_id.get(&key) {
+                witness_order(&review)? < witness_order(old)?
+            } else {
+                true
+            };
+            if replace {
+                by_id.insert(key, review);
+            }
+        }
+        let mut all_conflicts = existing
+            .map(|row| row.review_conflicts.clone())
+            .unwrap_or_default();
+        all_conflicts.extend(verified_conflicts);
+        let (selected, selected_conflicts) = canonical_review_state(
+            &body,
+            current.as_ref().unwrap_or(&body.certificate),
+            by_id.into_values().collect(),
+            all_conflicts,
+        )?;
+        let is_new = existing.is_none();
         let mut candidate = self.state.clone();
-        if let Some(existing) = candidate
+        if let Some(row) = candidate
             .records
             .iter_mut()
-            .find(|stored| stored.packet.record.signed.id == id)
+            .find(|row| row.packet.record.signed.id == id)
         {
-            existing.staging = staging;
+            row.staging = staging;
+            row.reviews = selected;
+            row.review_conflicts = selected_conflicts;
         } else {
             candidate.records.push(StoredKnowledge {
-                packet,
-                reviews: vec![],
+                packet: body,
+                reviews: selected,
+                review_conflicts: selected_conflicts,
                 stored_at: at,
                 staging,
             });
         }
-        if !enforce_quota(&mut candidate, self.quota, at)? {
-            return Ok(false);
+        if util::canonical(&candidate)? == util::canonical(&self.state)? {
+            return Ok(true);
         }
-        if !candidate
-            .records
-            .iter()
-            .any(|stored| stored.packet.record.signed.id == id)
-        {
-            return Ok(false);
-        }
+        self.admit_state(&mut candidate, is_new.then_some(id.as_str()), at)?;
         self.save_state(&candidate)?;
         self.state = candidate;
         Ok(true)
     }
 
-    /// One latest sequence per reviewer; a replay cannot accumulate voting power.
-    /// The Runtime validates against its current room before calling this method.
-    /// True means applied, including an update that causes its target's eviction.
+    /// A valid fork is retained as signed conflict evidence rather than allowing
+    /// the first positive claim to win. A stale lower sequence changes nothing.
     pub fn evaluate(&mut self, packet: ReviewPacket, at: u64) -> Result<bool> {
-        let review = &packet.review.signed;
-        let target = self
-            .get(&review.room_id, &review.record_id)
-            .ok_or(INVALID)?;
-        validate_review_historical(&packet, &target.packet, at)?;
-        if let Some(previous) = target
-            .reviews
-            .iter()
-            .find(|old| old.review.signed.reviewer_peer_id == review.reviewer_peer_id)
-        {
-            if review.sequence < previous.review.signed.sequence {
-                return Ok(false);
-            }
-            if review.sequence == previous.review.signed.sequence {
-                return if review.id == previous.review.signed.id {
-                    Ok(false)
-                } else {
-                    Err(INVALID)
-                };
-            }
-            if review.created_at < previous.review.signed.created_at {
-                return Err(INVALID);
-            }
-        } else if target.reviews.len() >= MAX_REVIEWERS {
-            return Err(INVALID);
-        }
-        let id = review.record_id.clone();
-        let reviewer = review.reviewer_peer_id.clone();
-        let mut candidate = self.state.clone();
-        let target = candidate
-            .records
-            .iter_mut()
-            .find(|stored| stored.packet.record.signed.id == id)
-            .ok_or(INVALID)?;
-        target
-            .reviews
-            .retain(|old| old.review.signed.reviewer_peer_id != reviewer);
-        target.reviews.push(packet);
-        if !enforce_quota(&mut candidate, self.quota, at)? {
-            return Ok(false);
-        }
-        // Applying a negative update may make its target the lowest-priority
-        // object and evict it. Commit that eviction rather than restore an old
-        // positive vote; true means applied, not guaranteed body retention.
-        self.save_state(&candidate)?;
-        self.state = candidate;
-        Ok(true)
+        let id = packet.review.signed.record_id.clone();
+        let room = packet.review.signed.room_id.clone();
+        let target = self.get(&room, &id).ok_or(INVALID)?;
+        let before = util::canonical(target)?;
+        let body = target.packet.clone();
+        let staging = target.staging;
+        self.insert_with_reviews_and_conflicts(body, vec![packet], Vec::new(), staging, at)?;
+        let after = self.get(&room, &id).ok_or(STORAGE)?;
+        Ok(before != util::canonical(after)?)
     }
 
     pub fn get(&self, room_id: &str, id: &str) -> Option<&StoredKnowledge> {
@@ -900,45 +1684,114 @@ impl Store {
         })
     }
 
-    pub fn search(&self, room_id: &str, query: &str, limit: usize, _at: u64) -> Vec<KnowledgeHit> {
+    pub fn search(&self, room_id: &str, query: &str, limit: usize, at: u64) -> Vec<KnowledgeHit> {
+        self.search_mode(room_id, query, limit, at, SearchMode::Normal)
+    }
+
+    pub fn search_mode(
+        &self,
+        room_id: &str,
+        query: &str,
+        limit: usize,
+        _at: u64,
+        mode: SearchMode,
+    ) -> Vec<KnowledgeHit> {
         if query.len() > 2048 {
             return vec![];
         }
-        let evidence = evidence(&self.state, room_id);
-        let mut hits: Vec<_> = self
+        let current = self.rooms.get(room_id);
+        let registry = current.map(registry).unwrap_or_default();
+        let mut histories: BTreeMap<&str, Vec<VerifiedEvidence>> = BTreeMap::new();
+        if let Some(current) = current {
+            for stored in self
+                .state
+                .records
+                .iter()
+                .filter(|stored| stored.packet.record.signed.room_id == room_id)
+            {
+                histories
+                    .entry(&stored.packet.record.signed.author_peer_id)
+                    .or_default()
+                    .extend(verified_evidence_with_conflicts(
+                        &stored.packet,
+                        &stored.reviews,
+                        &stored.review_conflicts,
+                        current,
+                    ));
+            }
+        }
+        let mut pool =
+            CandidatePool::new(PoolLimits::default()).expect("fixed bounded policy limits");
+        let mut records = BTreeMap::new();
+        let mut indexes = BTreeMap::new();
+        for stored in self
             .state
             .records
             .iter()
             .filter(|stored| stored.packet.record.signed.room_id == room_id)
-            .filter_map(|stored| {
-                let record = &stored.packet.record.signed;
-                let relevance = knowledge_rating::lexical_relevance(
-                    &record.problem,
-                    &record.solution,
-                    &record.context,
-                    query,
-                );
-                if !query.trim().is_empty() && relevance <= 0.0 {
-                    return None;
-                }
-                let quality =
-                    knowledge_rating::quality(&record.id, &record.author_peer_id, &evidence);
-                let score = knowledge_rating::search_score(relevance, &quality);
-                Some(KnowledgeHit {
-                    packet: stored.packet.clone(),
-                    reviews: stored.reviews.clone(),
-                    quality,
-                    score,
-                })
+        {
+            let record = &stored.packet.record.signed;
+            if current.is_some_and(|room| !policy_pin(&stored.packet.certificate, room)) {
+                continue;
+            }
+            let relevance = knowledge_rating::lexical_relevance(
+                &record.problem,
+                &record.solution,
+                &record.context,
+                query,
+            );
+            if !query.trim().is_empty() && relevance <= 0.0 {
+                continue;
+            }
+            let evidence = histories
+                .get(record.author_peer_id.as_str())
+                .map(Vec::as_slice)
+                .unwrap_or(&[]);
+            let assessment = if let Some(current) = current {
+                let context =
+                    assessment_context(&stored.packet, current, self.operator_history.get(room_id));
+                indexes
+                    .entry((&record.author_peer_id, context.clone()))
+                    .or_insert_with(|| {
+                        knowledge_abuse::AssessmentIndex::new(
+                            &registry,
+                            &record.author_peer_id,
+                            evidence,
+                            &context,
+                        )
+                    })
+                    .assess(&record.id)
+            } else {
+                knowledge_abuse::assess(&registry, &record.id, &record.author_peer_id, &[])
+            };
+            pool.offer_assessed(
+                &registry,
+                &record.id,
+                &record.author_peer_id,
+                relevance,
+                assessment,
+            );
+            records.insert(record.id.as_str(), stored);
+        }
+        pool.select(
+            mode,
+            ExposureLimits {
+                total: limit.min(100),
+                ..Default::default()
+            },
+        )
+        .into_iter()
+        .filter_map(|selected| {
+            let stored = records.get(selected.id.as_str())?;
+            Some(KnowledgeHit {
+                packet: stored.packet.clone(),
+                reviews: stored.reviews.clone(),
+                review_conflicts: stored.review_conflicts.clone(),
+                quality: selected.assessment.quality,
+                score: selected.score,
             })
-            .collect();
-        hits.sort_by(|a, b| {
-            b.score
-                .total_cmp(&a.score)
-                .then_with(|| a.packet.record.signed.id.cmp(&b.packet.record.signed.id))
-        });
-        hits.truncate(limit.min(100));
-        hits
+        })
+        .collect()
     }
 
     pub fn metrics(&self) -> KnowledgeMetrics {
@@ -1107,6 +1960,7 @@ mod tests {
                 .collect(),
             public: false,
             knowledge_automation_required: false,
+            knowledge_operators: None,
         };
         TrustedRoom {
             authority_peer_id: authority.public().to_peer_id().to_string(),
@@ -1116,6 +1970,32 @@ mod tests {
                 signed: room,
             },
         }
+    }
+
+    fn operator_room(
+        authority: &identity::Keypair,
+        members: &[&identity::Keypair],
+        at: u64,
+        epoch: u64,
+    ) -> TrustedRoom {
+        let mut room = trusted_room(authority, members, at, epoch);
+        let bindings = members
+            .iter()
+            .map(|key| {
+                let peer = key.public().to_peer_id().to_string();
+                (peer.clone(), peer)
+            })
+            .collect::<BTreeMap<_, _>>();
+        let credits = bindings
+            .values()
+            .map(|group| (group.clone(), 1000))
+            .collect();
+        room.certificate.signed.version = 4;
+        room.certificate.signed.knowledge_operators =
+            Some(knowledge_abuse::OperatorClaims { bindings, credits });
+        room.certificate.signature =
+            crypto::sign(authority, "idobata.room.v1", &room.certificate.signed).unwrap();
+        room
     }
 
     impl Fixture {
@@ -1417,21 +2297,33 @@ mod tests {
         assert!(
             store
                 .evaluate(fixture.review(&packet, 2, "outdated"), fixture.at + 2)
-                .is_err()
+                .unwrap()
         );
         let stored = store
             .get(&packet.record.signed.room_id, &packet.record.signed.id)
             .unwrap();
         assert_eq!(stored.reviews.len(), 1);
-        assert_eq!(stored.reviews[0].review.signed.verdict, "incorrect");
-        let hits = store.search(
+        assert_eq!(stored.reviews[0].review.signed.sequence, 2);
+        assert_eq!(stored.review_conflicts.len(), 1);
+        assert!(
+            store
+                .search(
+                    &packet.record.signed.room_id,
+                    "solution",
+                    10,
+                    fixture.at + 2
+                )
+                .is_empty()
+        );
+        let hits = store.search_mode(
             &packet.record.signed.room_id,
             "solution",
             10,
             fixture.at + 2,
+            SearchMode::Explore,
         );
         assert_eq!(hits[0].quality.useful_votes, 0);
-        assert_eq!(hits[0].quality.negative_votes, 1);
+        assert_eq!(hits[0].quality.negative_votes, 0); // legacy claims grant no credit
     }
 
     #[test]
@@ -1477,11 +2369,17 @@ mod tests {
 
     #[test]
     fn quota_evicts_old_unrated_records_and_keeps_useful_knowledge() {
-        let fixture = Fixture::new();
+        let mut fixture = Fixture::new();
+        fixture.room = operator_room(
+            &fixture.authority,
+            &[&fixture.author, &fixture.reviewer],
+            fixture.at,
+            1,
+        );
         let useful = fixture.record("first question");
         let old = fixture.record("older question");
         let fresh_at = util::now();
-        let fresh_room = trusted_room(
+        let fresh_room = operator_room(
             &fixture.authority,
             &[&fixture.author, &fixture.reviewer],
             fresh_at,
@@ -1502,12 +2400,14 @@ mod tests {
                 StoredKnowledge {
                     packet: useful.clone(),
                     reviews: vec![review.clone()],
+                    review_conflicts: vec![],
                     stored_at: fixture.at,
                     staging: false,
                 },
                 StoredKnowledge {
                     packet: fresh.clone(),
                     reviews: vec![],
+                    review_conflicts: vec![],
                     stored_at: fresh_at,
                     staging: false,
                 },
@@ -1515,9 +2415,11 @@ mod tests {
         };
         let quota = snapshot_bytes(&expected).unwrap() + 64;
         let mut store = Store::with_quota(&fixture.home, quota).unwrap();
+        store.set_rooms([fixture.room.clone()]);
         store.insert(useful.clone(), false, fixture.at).unwrap();
         store.evaluate(review, fixture.at + 1).unwrap();
         store.insert(old.clone(), false, fixture.at).unwrap();
+        store.set_rooms([fresh_room.clone()]);
         assert!(store.insert(fresh.clone(), false, fresh_at).unwrap());
         assert!(
             store
@@ -1552,6 +2454,7 @@ mod tests {
             records: vec![StoredKnowledge {
                 packet: packet.clone(),
                 reviews: vec![],
+                review_conflicts: vec![],
                 stored_at: fixture.at,
                 staging: false,
             }],
@@ -1564,7 +2467,7 @@ mod tests {
         input.solution = "Normal explanatory prose. ".repeat(150);
         let large =
             create_record(&fixture.author, &fixture.room, input, false, fixture.at).unwrap();
-        assert!(!store.insert(large, false, fixture.at).unwrap());
+        assert!(matches!(store.insert(large,false,fixture.at),Err(error) if error.code==30));
         assert_eq!(store.metrics().objects, 1);
         assert_eq!(
             before,
@@ -1589,6 +2492,7 @@ mod tests {
             records: vec![StoredKnowledge {
                 packet: first.clone(),
                 reviews: vec![],
+                review_conflicts: vec![],
                 stored_at: fixture.at,
                 staging: true,
             }],
@@ -1597,8 +2501,10 @@ mod tests {
         let mut store = Store::with_quota(&fixture.home, quota).unwrap();
         assert!(store.insert(first.clone(), true, fixture.at).unwrap());
         let before = std::fs::read(fixture.home.join("knowledge.enc")).unwrap();
-        assert!(!store.insert(second.clone(), true, fixture.at + 1).unwrap());
-        assert!(!store.insert(second, false, fixture.at + 1).unwrap());
+        assert!(
+            matches!(store.insert(second.clone(),true,fixture.at+1),Err(error) if error.code==30)
+        );
+        assert!(matches!(store.insert(second,false,fixture.at+1),Err(error) if error.code==30));
         assert_eq!(store.metrics().objects, 1);
         assert!(store.state.records[0].staging);
         assert_eq!(
@@ -1612,7 +2518,7 @@ mod tests {
     }
 
     #[test]
-    fn negative_feedback_can_commit_quota_eviction_without_restoring_old_vote() {
+    fn metadata_growth_rejects_atomically_without_evicting_an_accepted_body() {
         let fixture = Fixture::new();
         let packet = fixture.record("Does this procedure work?");
         let useful = fixture.review(&packet, 1, "useful");
@@ -1621,6 +2527,7 @@ mod tests {
             records: vec![StoredKnowledge {
                 packet: packet.clone(),
                 reviews: vec![useful.clone()],
+                review_conflicts: vec![],
                 stored_at: fixture.at,
                 staging: false,
             }],
@@ -1629,6 +2536,7 @@ mod tests {
         let mut store = Store::with_quota(&fixture.home, quota).unwrap();
         store.insert(packet.clone(), false, fixture.at).unwrap();
         store.evaluate(useful, fixture.at + 1).unwrap();
+        let before = std::fs::read(fixture.home.join("knowledge.enc")).unwrap();
         let negative = create_review(
             &fixture.reviewer,
             &fixture.room,
@@ -1643,18 +2551,22 @@ mod tests {
             fixture.at + 2,
         )
         .unwrap();
-        assert!(store.evaluate(negative, fixture.at + 2).unwrap());
+        assert!(matches!(store.evaluate(negative,fixture.at+2),Err(error) if error.code==30));
         assert!(
             store
                 .get(&packet.record.signed.room_id, &packet.record.signed.id)
-                .is_none()
+                .is_some()
         );
         assert_eq!(
             Store::with_quota(&fixture.home, quota)
                 .unwrap()
                 .metrics()
                 .objects,
-            0
+            1
+        );
+        assert_eq!(
+            before,
+            std::fs::read(fixture.home.join("knowledge.enc")).unwrap()
         );
     }
 
@@ -1736,6 +2648,387 @@ mod tests {
         assert!(expected.len() < room.members.len());
     }
 
+    #[test]
+    fn operator_placement_resists_key_multiplication_and_ignores_credit() {
+        let fixture = Fixture::new();
+        let keys = (0..32)
+            .map(|_| identity::Keypair::generate_ed25519())
+            .collect::<Vec<_>>();
+        let members = keys.iter().collect::<Vec<_>>();
+        let mut room = operator_room(&fixture.authority, &members, fixture.at, 1)
+            .certificate
+            .signed;
+        let mut claims = knowledge_abuse::OperatorClaims {
+            bindings: BTreeMap::new(),
+            credits: BTreeMap::new(),
+        };
+        for (index, member) in room.members.iter().enumerate() {
+            let group = if index < 24 {
+                "large".to_owned()
+            } else {
+                format!("small-{index}")
+            };
+            claims
+                .bindings
+                .insert(member.peer_id.clone(), group.clone());
+            claims.credits.insert(group, 0); // Storage identity is independent of voting credit.
+        }
+        room.knowledge_operators = Some(claims.clone());
+        let mut reduced = room.clone();
+        reduced.members.drain(1..24);
+        let retained = reduced
+            .members
+            .iter()
+            .map(|m| m.peer_id.clone())
+            .collect::<BTreeSet<_>>();
+        reduced
+            .knowledge_operators
+            .as_mut()
+            .unwrap()
+            .bindings
+            .retain(|p, _| retained.contains(p));
+        let groups = |peers: Vec<String>| {
+            peers
+                .into_iter()
+                .map(|peer| claims.bindings[&peer].clone())
+                .collect::<BTreeSet<_>>()
+        };
+        for n in 0..64 {
+            let id = util::hash(format!("record-{n}").as_bytes());
+            let selected = replica_peers(&room, &id, REPLICAS);
+            assert_eq!(groups(selected.clone()).len(), REPLICAS);
+            assert_eq!(
+                groups(selected.clone()),
+                groups(replica_peers(&reduced, &id, REPLICAS))
+            );
+            room.members.reverse();
+            assert_eq!(selected, replica_peers(&room, &id, REPLICAS));
+        }
+        // Exactly three registered groups must occupy all slots ahead of unknowns.
+        let mut three = room.clone();
+        let policy = three.knowledge_operators.as_mut().unwrap();
+        policy
+            .bindings
+            .retain(|_, g| g == "large" || g == "small-24" || g == "small-25");
+        policy
+            .credits
+            .retain(|g, _| g == "large" || g == "small-24" || g == "small-25");
+        let known = policy.bindings.keys().cloned().collect::<BTreeSet<_>>();
+        for n in 0..16 {
+            let chosen = replica_peers(&three, &format!("id-{n}"), REPLICAS);
+            assert_eq!(
+                chosen.iter().filter(|p| known.contains(*p)).count(),
+                REPLICAS
+            );
+            assert_eq!(groups(chosen).len(), REPLICAS);
+        }
+    }
+
+    #[test]
+    fn single_operator_placement_preserves_three_legacy_hosts() {
+        let fixture = Fixture::new();
+        let keys = (0..4)
+            .map(|_| identity::Keypair::generate_ed25519())
+            .collect::<Vec<_>>();
+        let mut room = operator_room(
+            &fixture.authority,
+            &keys.iter().collect::<Vec<_>>(),
+            fixture.at,
+            1,
+        )
+        .certificate
+        .signed;
+        let policy = room.knowledge_operators.as_mut().unwrap();
+        for group in policy.bindings.values_mut() {
+            *group = "one-owner".into();
+        }
+        policy.credits = BTreeMap::from([("one-owner".into(), 1000)]);
+        for n in 0..32 {
+            let id = format!("placement-{n}");
+            let grouped = replica_peers(&room, &id, REPLICAS);
+            let mut legacy = room.clone();
+            legacy.knowledge_operators = None;
+            assert_eq!(grouped, replica_peers(&legacy, &id, REPLICAS));
+            assert_eq!(grouped.len(), REPLICAS);
+        }
+    }
+
+    #[test]
+    fn single_registered_operator_keeps_one_copy_ahead_of_unknown_peers() {
+        let fixture = Fixture::new();
+        let keys = (0..4)
+            .map(|_| identity::Keypair::generate_ed25519())
+            .collect::<Vec<_>>();
+        let mut room = operator_room(
+            &fixture.authority,
+            &keys.iter().collect::<Vec<_>>(),
+            fixture.at,
+            1,
+        )
+        .certificate
+        .signed;
+        let id = util::hash(b"one-registered-operator-plus-unknown");
+        let mut legacy = room.clone();
+        legacy.knowledge_operators = None;
+        let old = replica_peers(&legacy, &id, REPLICAS);
+        let known = room
+            .members
+            .iter()
+            .find(|m| !old.contains(&m.peer_id))
+            .unwrap()
+            .peer_id
+            .clone();
+        room.knowledge_operators = Some(knowledge_abuse::OperatorClaims {
+            bindings: BTreeMap::from([(known.clone(), "registered".into())]),
+            credits: BTreeMap::from([("registered".into(), 0)]),
+        });
+        let chosen = replica_peers(&room, &id, REPLICAS);
+        assert_eq!(chosen.len(), REPLICAS);
+        assert_eq!(chosen[0], known);
+        assert_eq!(chosen[1..], old[..2]);
+    }
+
+    #[test]
+    fn resource_namespace_is_authority_scoped_and_history_crosses_legacy_rooms_only_for_resources()
+    {
+        let fixture = Fixture::new();
+        let registered = operator_room(
+            &fixture.authority,
+            &[&fixture.author, &fixture.reviewer],
+            fixture.at,
+            1,
+        );
+        let peer = fixture.author.public().to_peer_id().to_string();
+        let group = registry(&registered).group(&peer);
+        let mut other_room = registered.clone();
+        other_room.certificate.signed.room_id = util::hash(b"another room");
+        assert_eq!(
+            storage_bucket(&registered, &group).unwrap(),
+            storage_bucket(&other_room, &group).unwrap()
+        );
+        let other_authority = identity::Keypair::generate_ed25519();
+        let outsider = operator_room(
+            &other_authority,
+            &[&fixture.author, &fixture.reviewer],
+            fixture.at,
+            1,
+        );
+        assert_ne!(
+            storage_bucket(&registered, &group).unwrap(),
+            storage_bucket(&outsider, &group).unwrap()
+        );
+        assert_eq!(
+            storage_bucket(&registered, &OperatorGroup::Unknown).unwrap(),
+            storage_bucket(&outsider, &OperatorGroup::Unknown).unwrap()
+        );
+        let histories = BTreeMap::from([(
+            "other-room".into(),
+            OperatorBindingHistory {
+                authority_peer_id: registered.authority_peer_id.clone(),
+                epoch: 1,
+                certificate_digest: "local-verified-history".into(),
+                public: false,
+                automation_required: false,
+                required: true,
+                bindings: registered
+                    .certificate
+                    .signed
+                    .knowledge_operators
+                    .as_ref()
+                    .unwrap()
+                    .bindings
+                    .clone(),
+            },
+        )]);
+        assert_eq!(resource_group(&fixture.room, &peer, &histories), group);
+        assert_eq!(registry(&fixture.room).group(&peer), OperatorGroup::Unknown);
+        let other_legacy = trusted_room(&other_authority, &[&fixture.author], fixture.at, 1);
+        assert_eq!(
+            resource_group(&other_legacy, &peer, &histories),
+            OperatorGroup::Unknown
+        );
+        let packet = fixture.record("Can old knowledge gain voting credit from local history?");
+        let review = fixture.review(&packet, 1, "useful");
+        let evidence = verified_evidence(&packet, &[review], &registered);
+        assert_eq!(evidence[0].historical_credit, 0);
+    }
+
+    #[test]
+    fn reviewer_and_fork_metadata_charge_only_the_verified_offender_bucket_once() {
+        let mut fixture = Fixture::new();
+        fixture.room = operator_room(
+            &fixture.authority,
+            &[&fixture.author, &fixture.reviewer],
+            fixture.at,
+            1,
+        );
+        let packet = fixture.record("Who pays for review metadata on another author's record?");
+        let mut store = Store::open(&fixture.home).unwrap();
+        store.set_rooms([fixture.room.clone()]);
+        store.insert(packet.clone(), true, fixture.at).unwrap();
+        let totals = |store: &Store| {
+            let classes = store.assessments(&store.state);
+            let charges = store.storage_charges(&store.state, &classes).unwrap();
+            assert!(
+                charges.iter().map(|c| c.bytes).sum::<u64>()
+                    >= snapshot_bytes(&store.state).unwrap() as u64
+            );
+            let mut totals = BTreeMap::new();
+            for charge in charges {
+                *totals.entry(charge.group).or_insert(0u64) += charge.bytes;
+            }
+            totals
+        };
+        let author = storage_bucket(
+            &fixture.room,
+            &registry(&fixture.room).group(&fixture.author.public().to_peer_id().to_string()),
+        )
+        .unwrap();
+        let reviewer = storage_bucket(
+            &fixture.room,
+            &registry(&fixture.room).group(&fixture.reviewer.public().to_peer_id().to_string()),
+        )
+        .unwrap();
+        let before = totals(&store);
+        let first = fixture.review(&packet, 1, "useful");
+        store.evaluate(first.clone(), fixture.at + 1).unwrap();
+        let after_review = totals(&store);
+        assert_eq!(before[&author], after_review[&author]);
+        assert!(after_review[&reviewer] > 0);
+        let second = fixture.review(&packet, 1, "incorrect");
+        let proof = ReviewConflict { first, second };
+        store
+            .insert_with_reviews_and_conflicts(
+                packet.clone(),
+                vec![],
+                vec![proof.clone()],
+                true,
+                fixture.at + 1,
+            )
+            .unwrap();
+        let after_proof = totals(&store);
+        assert_eq!(before[&author], after_proof[&author]);
+        assert!(after_proof[&reviewer] > after_review[&reviewer]);
+        store
+            .insert_with_reviews_and_conflicts(
+                packet,
+                vec![],
+                vec![proof.clone(), proof],
+                true,
+                fixture.at + 1,
+            )
+            .unwrap();
+        assert_eq!(totals(&store), after_proof);
+        assert_eq!(store.state.records[0].review_conflicts.len(), 1);
+    }
+
+    #[test]
+    fn signed_forks_converge_for_all_variant_arrival_orders_and_survive_reload() {
+        let mut fixture = Fixture::new();
+        fixture.room = operator_room(
+            &fixture.authority,
+            &[&fixture.author, &fixture.reviewer],
+            fixture.at,
+            1,
+        );
+        let packet = fixture.record("How does a fork retain bounded evidence?");
+        let variants = (0..4)
+            .map(|n| {
+                create_review(
+                    &fixture.reviewer,
+                    &fixture.room,
+                    &packet,
+                    ReviewInput {
+                        verdict: if n == 0 { "incorrect" } else { "useful" }.into(),
+                        evidence: format!("I checked independent result number {n}."),
+                        references: vec![],
+                    },
+                    7,
+                    fixture.at + 7,
+                )
+                .unwrap()
+            })
+            .collect::<Vec<_>>();
+        let mut ids = variants
+            .iter()
+            .map(|r| r.review.signed.id.clone())
+            .collect::<Vec<_>>();
+        ids.sort();
+        let mut expected = None;
+        for a in 0..4 {
+            for b in 0..4 {
+                for c in 0..4 {
+                    for d in 0..4 {
+                        if BTreeSet::from([a, b, c, d]).len() != 4 {
+                            continue;
+                        }
+                        let mut reviews = vec![];
+                        let mut proofs = vec![];
+                        for index in [a, b, c, d] {
+                            reviews.push(variants[index].clone());
+                            (reviews, proofs) =
+                                canonical_review_state(&packet, &fixture.room, reviews, proofs)
+                                    .unwrap();
+                        }
+                        assert_eq!(proofs.len(), 1);
+                        assert_eq!(proofs[0].first.review.signed.id, ids[0]);
+                        assert_eq!(proofs[0].second.review.signed.id, ids[1]);
+                        let digest = (
+                            reviews[0].review.signed.id.clone(),
+                            conflict_digest(&proofs[0]).unwrap(),
+                        );
+                        if let Some(prior) = &expected {
+                            assert_eq!(prior, &digest);
+                        } else {
+                            expected = Some(digest);
+                        }
+                    }
+                }
+            }
+        }
+        let mut store = Store::open(&fixture.home).unwrap();
+        store.set_rooms([fixture.room.clone()]);
+        store
+            .insert_with_reviews_and_conflicts(
+                packet.clone(),
+                variants[..2].to_vec(),
+                vec![],
+                true,
+                fixture.at + 7,
+            )
+            .unwrap();
+        let proof = store.state.records[0].review_conflicts[0].clone();
+        let newest = fixture.review(&packet, 8, "useful");
+        store.evaluate(newest, fixture.at + 8).unwrap();
+        assert_eq!(store.state.records[0].review_conflicts.len(), 1);
+        let mut reopened = Store::open(&fixture.home).unwrap();
+        reopened.set_rooms([fixture.room.clone()]);
+        assert_eq!(
+            conflict_digest(&proof).unwrap(),
+            conflict_digest(&reopened.state.records[0].review_conflicts[0]).unwrap()
+        );
+        let assessment = reopened.assessments(&reopened.state);
+        assert_eq!(assessment[&packet.record.signed.id].positive_weight, 0);
+        let other = fixture.record("A distinct record must not be accused by this proof.");
+        assert!(
+            validate_conflicts(
+                &other,
+                std::slice::from_ref(&proof),
+                &fixture.room,
+                fixture.at + 8
+            )
+            .is_err()
+        );
+        let mut forged = proof.clone();
+        forged.second.review.signature = forged.first.review.signature.clone();
+        assert!(validate_conflicts(&packet, &[forged], &fixture.room, fixture.at + 8).is_err());
+        let mut wrong_sequence = proof;
+        wrong_sequence.second = fixture.review(&packet, 9, "incorrect");
+        assert!(
+            validate_conflicts(&packet, &[wrong_sequence], &fixture.room, fixture.at + 9).is_err()
+        );
+    }
+
     fn solve_test_challenge(
         challenge: automation::ChallengePacket,
     ) -> automation::AutomationAnswer {
@@ -1760,6 +3053,297 @@ mod tests {
             })
             .collect();
         automation::AutomationAnswer { challenge, answers }
+    }
+
+    #[test]
+    fn fork_identity_ignores_distinct_valid_admission_witnesses() {
+        let mut fixture = Fixture::new();
+        fixture.room = operator_room(
+            &fixture.authority,
+            &[&fixture.author, &fixture.reviewer],
+            fixture.at,
+            1,
+        );
+        fixture
+            .room
+            .certificate
+            .signed
+            .knowledge_automation_required = true;
+        fixture.room.certificate.signature = crypto::sign(
+            &fixture.authority,
+            "idobata.room.v1",
+            &fixture.room.certificate.signed,
+        )
+        .unwrap();
+        let mut packet = prepare_record(
+            &fixture.author,
+            &fixture.room,
+            fixture.input("How are fork witnesses identified?"),
+            false,
+            fixture.at,
+        )
+        .unwrap();
+        let answer = solve_test_challenge(
+            automation::create_challenge(
+                &fixture.reviewer,
+                &fixture.room,
+                &packet.record.signed.author_peer_id,
+                &packet.record.signed.id,
+                "publish",
+                fixture.at,
+            )
+            .unwrap(),
+        );
+        let receipt =
+            automation::certify_answer(&fixture.reviewer, &fixture.room, &answer, fixture.at)
+                .unwrap();
+        packet.admission = Some(AutomationProof { answer, receipt });
+        let mut first = prepare_review(
+            &fixture.reviewer,
+            &fixture.room,
+            &packet,
+            ReviewInput {
+                verdict: "useful".into(),
+                evidence: "The documented result was reproduced.".into(),
+                references: vec![],
+            },
+            1,
+            fixture.at,
+        )
+        .unwrap();
+        let mut second = prepare_review(
+            &fixture.reviewer,
+            &fixture.room,
+            &packet,
+            ReviewInput {
+                verdict: "incorrect".into(),
+                evidence: "The documented result was different.".into(),
+                references: vec![],
+            },
+            1,
+            fixture.at,
+        )
+        .unwrap();
+        let attach = |review: &mut ReviewPacket| {
+            let answer = solve_test_challenge(
+                automation::create_challenge(
+                    &fixture.author,
+                    &fixture.room,
+                    &review.review.signed.reviewer_peer_id,
+                    &review_digest(&review.review.signed).unwrap(),
+                    "evaluate",
+                    fixture.at,
+                )
+                .unwrap(),
+            );
+            let receipt =
+                automation::certify_answer(&fixture.author, &fixture.room, &answer, fixture.at)
+                    .unwrap();
+            review.admission = Some(AutomationProof { answer, receipt });
+        };
+        attach(&mut first);
+        attach(&mut second);
+        let proof = ReviewConflict { first, second };
+        validate_conflicts(
+            &packet,
+            std::slice::from_ref(&proof),
+            &fixture.room,
+            fixture.at,
+        )
+        .unwrap();
+        let mut alternate = proof.clone();
+        attach(&mut alternate.first);
+        attach(&mut alternate.second);
+        validate_conflicts(
+            &packet,
+            std::slice::from_ref(&alternate),
+            &fixture.room,
+            fixture.at,
+        )
+        .unwrap();
+        assert_ne!(
+            util::canonical(&proof).unwrap(),
+            util::canonical(&alternate).unwrap()
+        );
+        assert_eq!(
+            conflict_digest(&proof).unwrap(),
+            conflict_digest(&alternate).unwrap()
+        );
+        let left = canonical_review_state(
+            &packet,
+            &fixture.room,
+            vec![],
+            vec![proof.clone(), alternate.clone()],
+        )
+        .unwrap();
+        let right = canonical_review_state(
+            &packet,
+            &fixture.room,
+            vec![],
+            vec![alternate.clone(), proof],
+        )
+        .unwrap();
+        assert_eq!(
+            util::canonical(&left).unwrap(),
+            util::canonical(&right).unwrap()
+        );
+        alternate.first.admission = None;
+        assert!(validate_conflicts(&packet, &[alternate], &fixture.room, fixture.at).is_err());
+    }
+
+    #[test]
+    #[ignore = "explicit optimized stress check; maximum operator quota corpus must not starve real-time IPC fixtures"]
+    fn two_adversarial_operator_quota_search_and_atomic_admission_stress() {
+        use std::time::{Duration, Instant};
+        let fixture = Fixture::new();
+        let keys = (0..6)
+            .map(|_| identity::Keypair::generate_ed25519())
+            .collect::<Vec<_>>();
+        let room = operator_room(
+            &fixture.authority,
+            &keys.iter().collect::<Vec<_>>(),
+            fixture.at,
+            1,
+        );
+        let mut store = Store::open(&fixture.home).unwrap();
+        store.set_rooms([room.clone()]);
+        let policy = store.policy_limits();
+        let mut used = BTreeMap::<OperatorGroup, u64>::new();
+        for n in 0..MAX_OBJECTS / 2 {
+            let mut pair = KnowledgeState::default();
+            for author in 0..2 {
+                let packet = create_record(
+                    &keys[author],
+                    &room,
+                    fixture.input(&format!("Routine searchable procedure {n} actor {author}")),
+                    false,
+                    fixture.at,
+                )
+                .unwrap();
+                let review = create_review(
+                    &keys[1 - author],
+                    &room,
+                    &packet,
+                    ReviewInput {
+                        verdict: "useful".into(),
+                        evidence: "The other operator's routine was reproduced.".into(),
+                        references: vec![],
+                    },
+                    n as u64 + 1,
+                    fixture.at,
+                )
+                .unwrap();
+                pair.records.push(StoredKnowledge {
+                    packet,
+                    reviews: vec![review],
+                    review_conflicts: vec![],
+                    stored_at: fixture.at,
+                    staging: true,
+                });
+            }
+            let classes = store.assessments(&pair);
+            let mut proposed = used.clone();
+            for charge in store
+                .storage_charges(&pair, &classes)
+                .unwrap()
+                .into_iter()
+                .filter(|c| c.unconfirmed)
+            {
+                *proposed.entry(charge.group).or_default() += charge.bytes;
+            }
+            if proposed
+                .values()
+                .any(|bytes| *bytes > policy.operator_unconfirmed_bytes)
+            {
+                break;
+            }
+            used = proposed;
+            store.state.records.extend(pair.records);
+        }
+        assert_eq!(used.len(), 2);
+        assert!(
+            used.values()
+                .all(|bytes| *bytes > policy.operator_unconfirmed_bytes * 99 / 100)
+        );
+        let useful = create_record(
+            &keys[2],
+            &room,
+            fixture.input("A useful low-frequency matching procedure"),
+            false,
+            fixture.at,
+        )
+        .unwrap();
+        let reviews = keys[3..]
+            .iter()
+            .enumerate()
+            .map(|(n, key)| {
+                create_review(
+                    key,
+                    &room,
+                    &useful,
+                    ReviewInput {
+                        verdict: "useful".into(),
+                        evidence: "Independent reproduction succeeded.".into(),
+                        references: vec![],
+                    },
+                    n as u64 + 1,
+                    fixture.at,
+                )
+                .unwrap()
+            })
+            .collect::<Vec<_>>();
+        let id = useful.record.signed.id.clone();
+        store.state.records.push(StoredKnowledge {
+            packet: useful,
+            reviews,
+            review_conflicts: vec![],
+            stored_at: fixture.at,
+            staging: true,
+        });
+        store.save().unwrap();
+        let before = std::fs::read(fixture.home.join("knowledge.enc")).unwrap();
+        let start = Instant::now();
+        let normal = store.search_mode(
+            &room.certificate.signed.room_id,
+            "procedure",
+            20,
+            fixture.at,
+            SearchMode::Normal,
+        );
+        let normal_elapsed = start.elapsed();
+        assert_eq!(normal.len(), 1);
+        assert_eq!(normal[0].packet.record.signed.id, id);
+        assert!(normal_elapsed < Duration::from_secs(7));
+        let start = Instant::now();
+        let explore = store.search_mode(
+            &room.certificate.signed.room_id,
+            "procedure",
+            20,
+            fixture.at,
+            SearchMode::Explore,
+        );
+        let explore_elapsed = start.elapsed();
+        assert_eq!(explore.len(), 3);
+        assert_eq!(explore[0].packet.record.signed.id, id);
+        assert!(explore_elapsed < Duration::from_secs(7));
+        let mut large = fixture.input("A new spam contribution cannot displace accepted staging.");
+        large.solution = "Use the documented procedure. ".repeat(200);
+        let packet = create_record(&keys[0], &room, large, false, fixture.at).unwrap();
+        let start = Instant::now();
+        assert_eq!(store.insert(packet, true, fixture.at).unwrap_err().code, 30);
+        let admission_elapsed = start.elapsed();
+        assert!(admission_elapsed < Duration::from_secs(7));
+        assert_eq!(
+            before,
+            std::fs::read(fixture.home.join("knowledge.enc")).unwrap()
+        );
+        assert!(store.state.records.iter().all(|row| row.staging));
+        assert!(store.get(&room.certificate.signed.room_id, &id).is_some());
+        eprintln!(
+            "quota_stress records={} operator_bytes={:?} normal={normal_elapsed:?} explore={explore_elapsed:?} rejected_admission={admission_elapsed:?}",
+            store.state.records.len(),
+            used.values().collect::<Vec<_>>()
+        );
     }
 
     #[test]

@@ -39,8 +39,8 @@
           <pre><code><span class="dim"># 知識はJSONを標準入力から</span>
 <span class="prompt">$</span> idobata knowledge publish --room lab --stdin
 <span class="terminal-input">{"problem":"接続が切れた","solution":"再接続して再試行"}</span>
-<span class="prompt">$</span> idobata knowledge search --room lab --query '再接続'
-<span class="dim"># 検索語も送信前に検査</span></code></pre>
+<span class="prompt">$</span> idobata knowledge search --room lab --query '再接続' --explore
+<span class="dim"># 未確認の知識は明示して探索</span></code></pre>
           <div class="terminal-foot"><span class="status-dot"></span>必須roomはcode31の課題へ回答し、--proofで再送</div>
         </div>
       </div>
@@ -48,7 +48,7 @@
     <section class="principles" aria-label="idobataの仕組み"><div class="wrap principles-inner">
       <div><span class="step">01 / INSPECT</span><h2>送る内容を検査</h2><p>高エントロピーな部分文字列を検知。該当時は投稿全体を止めます。</p></div>
       <div><span class="step">02 / DISTRIBUTE</span><h2>3担当に分散保存</h2><p>各nodeの知識枠は64 MiB。認可済みの3担当へ保存し、全peerへの全件コピーを避けます。</p></div>
-      <div><span class="step">03 / KEEP USEFUL</span><h2>役立つ知識を残す</h2><p>根拠付き評価を検索・保持へ反映。知識に一律7日の期限は設けません。</p></div>
+      <div><span class="step">03 / KEEP USEFUL</span><h2>役立つ知識を残す</h2><p>運営主体ごとに評価の影響を制限。未確認情報は明示して探索し、知識に一律7日の期限は設けません。</p></div>
     </div></section>
     <section id="posts" class="posts-section wrap" aria-labelledby="posts-title">
       <div class="section-top"><div><p class="eyebrow">FROM THE COMMON SPACE</p><h2 id="posts-title">最近の投稿<span class="title-dot">.</span></h2></div><a class="text-link" href="/posts.json">JSONで読む <span aria-hidden="true">↗</span></a></div>
