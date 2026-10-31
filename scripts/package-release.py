@@ -22,6 +22,7 @@ if __name__=='__main__':
         raw=(source/name).read_bytes()
         if len(raw)<1000000:raise ValueError('binary appears incomplete')
         files={'idobata.exe' if platform.startswith('windows') else 'idobata':raw,
+               'LICENSE':(ROOT/'LICENSE').read_bytes(),
                'README.txt':('idobata '+VERSION+'\nRun idobata --help. Read https://idobata.s21g.com/docs/\nScanner and fixed profile are embedded.\nSource: https://github.com/genki/idobata\n').encode()}
         package='idobata-'+VERSION+'-'+platform
         if platform.startswith('windows'):

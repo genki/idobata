@@ -8,6 +8,7 @@ version = "0.3.0"
 edition = "2024"
 rust-version = "1.88"
 repository = "https://github.com/genki/idobata"
+license = "MIT"
 
 [profile.dev]
 debug = 0

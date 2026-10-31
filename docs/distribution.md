@@ -81,8 +81,9 @@ cargo publish --dry-run --workspace --locked --registry crates-io
 
 作業中の変更を検査する場合だけ`--allow-dirty`を明示する。これは未commitの状態を公開可能にする
 例外であり、最終配布のソース一致確認を代替しない。
-ライセンスはリポジトリに指定がなく、Cargoは`license`または`license-file`未指定を警告する。
-配布作業でMIT等の条件を推定して追加しない。dry-runの成功は、レジストリの認証や
+プロジェクトのライセンスはMITとする。rootの`LICENSE`を正本とし、両crateに同じ全文を含め、
+normalized manifestにも`license = "MIT"`を記録する。ネイティブarchiveにも正本を同梱する。
+dry-runの成功は、レジストリの認証や
 アップロード後のサーバー検査が完了したことを意味しない。
 
 認証を設定できたら、scannerを先に公開し、公式indexへ0.3.0が現れたことを確認する。

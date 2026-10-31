@@ -1,0 +1,100 @@
+{
+  "version": 1,
+  "test": "cargo-mit-package-v03",
+  "status": "passed",
+  "checked_at": "2026-10-31T16:14:19Z",
+  "reference_commit": "ef77d555f3ea46472d9cead081b851aa266cd4ec",
+  "metadata_only_change": true,
+  "rust_wasm_files_unchanged": 32,
+  "rust_wasm_hashes": {
+    "crates/idobata/assets/scanner.wasm": "e765bdca9f335bed3c26c2dee1bce39e9eb652e2af2552945c1818934d88e4fd",
+    "crates/idobata/examples/refresh-tuf.rs": "b8858ea196dca177efbacbd8c7fd4d29431deea6ebd317b47908bdea0e855976",
+    "crates/idobata/src/automation.rs": "803241fd9523e8dbdb9204ac5b4e9548960c115a7a308aed4843cdcd39731658",
+    "crates/idobata/src/benchmark.rs": "e2e6d9f7ad0de1c3fb5f38dcef62b88dc6fc49c581eb2a8d07cb3b2490a06911",
+    "crates/idobata/src/bootstrap.rs": "a1cdcdc750a829b96de5700c7071c94a272d289d92288f5f28114446824239f3",
+    "crates/idobata/src/config.rs": "161879ecdb08790a755b33069af905807215edd53ad81b1ce11347169d4bb439",
+    "crates/idobata/src/crypto.rs": "106a18cb0263bcf75060ff181c0bb597ab2523254fbe10a1357b702bf5233950",
+    "crates/idobata/src/daemon.rs": "60021bc887524952ac3d2d00b1c66cd4d716689e547213a1e992a57b38608479",
+    "crates/idobata/src/discussion.rs": "946b5a7cc8b36ef02a044d5270eb66db1cf112f761eb01bb05911b1645f4fb73",
+    "crates/idobata/src/error.rs": "43bee4bdb5411bcbe54da2baaa1ade598b0d79c17e837c86e44ba5f838947ff1",
+    "crates/idobata/src/ipc.rs": "7dd4f6418ab64e67ef129560ff432a58a37d418e89b56ff32cf6dcf82133efa6",
+    "crates/idobata/src/knowledge.rs": "ec1e860bc526e4b10170f90e4fd1a54a8f982d79a9314065aaae1483f9d76da5",
+    "crates/idobata/src/knowledge_rating.rs": "7abec3985e876881a69a89609416f4c41faa80dd44449b7e6df1cd5c5361df6c",
+    "crates/idobata/src/knowledge_runtime.rs": "08ca89dbb0d4a27aff3ebe8d9dbd73c0f935e1d77c45ed170a457fce2df91a53",
+    "crates/idobata/src/lib.rs": "b439ad152ea375e5629456581532eefebea59d1f4b23d11ca806447bad8f2d8b",
+    "crates/idobata/src/main.rs": "7474da06b8897cf214453252d508d04c833e820404e644480ab17f7cf3c3c902",
+    "crates/idobata/src/network.rs": "8733d0dda2018c33f13f79bfc90bf776742715854db0287bea82bcde0b2f71c8",
+    "crates/idobata/src/publication.rs": "cf50af3010767f3b856c482e77ce05a64f17d81a925befc84b260840a88c8ac8",
+    "crates/idobata/src/releases.rs": "75b1ee9ad84ff2dbc746ab18523d336525457f8431db7adbfcc2576ecac433a3",
+    "crates/idobata/src/scanner.rs": "e31806a25560bb18698a59c7b0cbf13955690e588b0bb6c416cf52c081bd0253",
+    "crates/idobata/src/storage.rs": "dca5891b250605ec99a5e775cd4fa0def31887e1360036952b4a89923e0607b1",
+    "crates/idobata/src/trust.rs": "69182644afdf0f02d92407dec035ece74c76392c773cea84940c74c345c814f9",
+    "crates/idobata/src/types.rs": "1dd3fb14511ff857091deefc2b91afca71ff877291bd2c99a0ff01aeae60cca1",
+    "crates/idobata/src/util.rs": "bea66e30610697b359869240f9bb751e2223513bafa0493aef06e829cebc8ce9",
+    "crates/idobata/src/windows_security.rs": "cb46bc4e7698d220e54d414f16592aafd0722537c0ecb1e5eecc31ba33fcb9bc",
+    "crates/idobata/tests/evolution.rs": "7016d9923371867568378c65ed3f3c7cb4265334b029e919f824de7513265539",
+    "crates/idobata/tests/knowledge_daemon.rs": "7ef0cfd49516c6d5513ee146f19c0cfc17c21826acbd965b06b42e31e9e964fe",
+    "crates/idobata/tests/publication.rs": "7f63f310e0c9c610cbf6692f7f8a667f4c4525dcc1bfd30c15dbeebb13094d69",
+    "crates/idobata/tests/security.rs": "3cd597ea5f6c92601373321e413c972e526d743da13b186747a7431a0410eec9",
+    "crates/scanner/artifacts/scanner.wasm": "e765bdca9f335bed3c26c2dee1bce39e9eb652e2af2552945c1818934d88e4fd",
+    "crates/scanner/examples/calibrate.rs": "97e3d6dc8e486c9d6d5fba7693ae4d5a04ea841ef3634eac4f56d5bc33394562",
+    "crates/scanner/src/lib.rs": "1bd9e47afe13418c6ee065c1eaddd5d18ff213c87741105a48b375b81496024e"
+  },
+  "cargo_lock_unchanged": true,
+  "license": "MIT",
+  "copyright": "2026 Genki Takiuchi",
+  "license_source": "https://spdx.org/licenses/MIT.html",
+  "license_sha256": "196661c71a6939e4e46e9d30555af776f400ad8ebfe7ea0759d0bb1497fc1ae1",
+  "root_and_crate_license_copies_identical": true,
+  "isolated_native_archive_license_checks": 3,
+  "native_release_candidates_rebuilt": false,
+  "unpacked_cargo_dev_builds_verified": true,
+  "actual_production_archives_changed": false,
+  "cargo_package": "passed",
+  "cargo_publish_dry_run": "passed",
+  "missing_license_warning": false,
+  "packages": [
+    {
+      "crate": "idobata-scanner",
+      "filename": "idobata-scanner-0.3.0.crate",
+      "license": "MIT",
+      "license_text_matches_root": true,
+      "file_count": 8,
+      "bytes": 16816,
+      "sha256": "03bd76b0ae1fb4c5d14a5b3be721138fdb7752122a72a5e2c6307ac256597832"
+    },
+    {
+      "crate": "idobata",
+      "filename": "idobata-0.3.0.crate",
+      "license": "MIT",
+      "license_text_matches_root": true,
+      "file_count": 35,
+      "bytes": 277896,
+      "sha256": "0bcf7a8c49f2f057258500e0acd76bc97426714e65aaf165f849574c75ba2784"
+    }
+  ],
+  "logs": [
+    {
+      "file": "target/cargo-mit-verification/package.log",
+      "sha256": "5170323f86618f88cea09b08f2ee6203666b3bc32a967b62bccce8bc23da17b9",
+      "bytes": 831
+    },
+    {
+      "file": "target/cargo-mit-verification/package-final.log",
+      "sha256": "1d8d1336136fbed943773dfd065ae1fcb058da3c01c7dd0533344e859b526fe2",
+      "bytes": 831
+    },
+    {
+      "file": "target/cargo-mit-verification/publish-dry-run.log",
+      "sha256": "151b0a9b2ff8d7138326c7837f85c26770b73b106db00baf48917e4459d6fdfe",
+      "bytes": 1081
+    }
+  ],
+  "workspace_sibling_registry_checksum_valid": true,
+  "registry_state_at_preflight": {
+    "idobata-scanner_0_3_0_available": false,
+    "idobata_0_3_0_available": false
+  },
+  "registry_dependency_publication_pending": true,
+  "actual_upload": false
+}

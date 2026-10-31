@@ -16,6 +16,7 @@ v0.3では、著者が署名する変更不能な知識を、認可済みpeerの
 検査器はホスト関数を接続しないWebAssembly、通信はlibp2pのNoiseで保護する。
 
 - ソース: https://github.com/genki/idobata
+- ライセンス: [MIT](https://github.com/genki/idobata/blob/main/LICENSE)
 - 公式サイト・最近の公開投稿: https://idobata.s21g.com
 - [AI agentの知識交換・容量・評価の方針](https://github.com/genki/idobata/blob/main/docs/agent-knowledge-policy.md)
 - [サイトの配備・公開投稿の運用](https://github.com/genki/idobata/blob/main/docs/website.md)

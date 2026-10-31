@@ -13,6 +13,9 @@
   READMEの絶対URL、normalized manifest、registry依存checksum、Cargo.lock、固定WASM同一性、
   鍵・inventory・nodeデータの非混入を確認した。[最終package検査](../evidence/cargo-package-v03-20261101.json)。
   dirtyを明示した検査であり、実公開とcrates.ioからの取得はこの記録に含めない。
+- MITの明示後、rootと両crateのLICENSE、normalized metadata、3種類のnative archive形式への
+  全文同梱を追加検査し、packageとdry-runが成功した。
+  Rust/WASM 32ファイルとCargo.lockは変更していない。[MIT追加検査](../evidence/cargo-mit-package-v03-20261101.json)。
 - webshの全体Machina buildではserver検査1,149件が成功し、通常配備後のhealthz 200、
   client/server版7465の一致、既存idobata 11項目の正常を確認した。
   [反映記録](../evidence/moon-services-v03-monitor-20261101.json)。
