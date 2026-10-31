@@ -1,0 +1,25 @@
+{
+  "version": 1,
+  "mode": "shadow evaluation, production policy unchanged",
+  "source": "fixed authored synthetic fixture, accepted signed P2P messages only",
+  "part_bytes": [
+    8,
+    8,
+    8,
+    8
+  ],
+  "individual_codes": [
+    0,
+    0,
+    0,
+    0
+  ],
+  "received_messages": 4,
+  "joined_code": 20,
+  "window_bounds": {
+    "messages": 4,
+    "bytes": 32
+  },
+  "dictionary_waiver": false,
+  "result": "per-message scanning can miss split strings; bounded concatenation detects this fixture, not all covert channels"
+}
