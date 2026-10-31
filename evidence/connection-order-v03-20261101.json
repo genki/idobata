@@ -1,0 +1,58 @@
+{
+  "version": 1,
+  "test": "connection-admission-order-regression",
+  "status": "passed",
+  "checked_at": "2026-10-31T16:43:58.675171Z",
+  "source": {
+    "archive_sha256": "2c20e8621680b1316138c314ae12c0bf30281bd99a993c8cbe2fc6b714732087",
+    "file_count": 43,
+    "all_manifest_files_match_current_source": true
+  },
+  "historical_reference": {
+    "source_archive_sha256": "168289401c4fa0689e296da8f6e5de0c0133d2c13c015ea5cd44d4ebf0d0d715",
+    "default_workspace_tests": {
+      "passed": 100,
+      "failed": 0,
+      "ignored_optimized_stress": 1
+    },
+    "applies_to_current_modified_source": false
+  },
+  "connection_limits_timeouts_protocols_unchanged": true,
+  "old_order": {
+    "fields": [
+      "messages",
+      "knowledge",
+      "allowed",
+      "limits"
+    ],
+    "passed": 3,
+    "failed": 2
+  },
+  "fixed_order": {
+    "fields": [
+      "allowed",
+      "limits",
+      "messages",
+      "knowledge"
+    ],
+    "passed": 5,
+    "failed": 0,
+    "elapsed_test_seconds": 0.05,
+    "regression_directions": [
+      "inbound",
+      "outbound"
+    ]
+  },
+  "current_default_workspace_tests": {
+    "passed": 105,
+    "failed": 0,
+    "ignored_optimized_stress": 1
+  },
+  "production_mutated": false,
+  "source_log_hashes": {
+    "before_sha256": "80d31a8536d790eacac9f20392588d4dc7928b6d811ac31358a62e2bdf6e31e7",
+    "after_sha256": "c1d73cfaf741b958efab117145590ce185e0fcf363ab865c2707231740125462",
+    "final_checks_sha256": "90ae609e2f4657ce8ca64a37e30eb96f9743aaec2c5be037778de62434301c20"
+  },
+  "raw_diagnostics_included": false
+}

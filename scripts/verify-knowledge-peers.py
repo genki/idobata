@@ -24,6 +24,7 @@ import shlex
 import subprocess
 import struct
 import sys
+import tempfile
 import time
 from types import SimpleNamespace
 
@@ -47,6 +48,11 @@ AUTOMATION_PACKET_BYTES = 16 * 1024
 
 class VerificationFailure(RuntimeError):
     """A static, body-free failure label that may safely enter the report."""
+
+    def __init__(self, label, *, node_index=None, phase=None):
+        super().__init__(label)
+        self.node_index = node_index
+        self.phase = phase
 
 
 def check(condition, label):
@@ -84,6 +90,20 @@ def fixture_node_config(config, index, port):
         check(isinstance(config['ssh'], str), 'invalid_fixture_ssh_alias')
         value['ssh'] = config['ssh']
     return value
+
+
+def fixture_file_path(home, path, *, windows=False):
+    """Uploads may address one ordinary file directly inside this fixture home."""
+    check(isinstance(path, str), 'invalid_fixture_upload_path')
+    normalized = path.replace('\\', '/')
+    prefix = home.replace('\\', '/').rstrip('/') + '/'
+    compared = normalized.lower() if windows else normalized
+    expected = prefix.lower() if windows else prefix
+    check(compared.startswith(expected), 'fixture_upload_outside_home')
+    leaf = normalized[len(prefix):]
+    check(re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9._-]{0,127}', leaf) is not None
+          and leaf not in ['.', '..'], 'invalid_fixture_upload_filename')
+    return prefix + leaf
 
 
 def public_task_cases(seed):
@@ -298,10 +318,43 @@ def solver_self_test():
                                         'identity': 'private-metadata-sentinel'}, 0, 39130)
         check('home' not in selected and 'identity' not in selected,
               'production_metadata_retained_in_fixture_config')
+    upload_home = 'C:/Users/fixture/AppData/Local/Temp/idobata-fixture/node-test'
+    for path in [upload_home + '/../escape.json', upload_home + '/nested/file.json',
+                 upload_home + '/answer.json:stream', upload_home + '/answer\n.json',
+                 upload_home + '-other/answer.json', 'C:/ProgramData/answer.json']:
+        try:
+            fixture_file_path(upload_home, path, windows=True)
+        except VerificationFailure:
+            continue
+        raise VerificationFailure('unsafe_fixture_upload_path_accepted')
+    from unittest import mock
+    upload_source = []
+    upload_node = SimpleNamespace(win=True, host='test-fixture-host', home=upload_home)
+    upload_bytes = b'safe-fixture-data' * 150
+
+    def mock_sftp(argv, **options):
+        check(argv[:2] == ['scp', '-q'] and options.get('stdin') == subprocess.DEVNULL,
+              'fixture_upload_not_binary_sftp')
+        check(argv[-1] == 'test-fixture-host:' + upload_home + '/answer.json'
+              and sum(len(item) for item in argv) < 1024,
+              'fixture_upload_payload_embedded_in_command')
+        path = Path(argv[-2])
+        upload_source.append(path)
+        check(path.stat().st_mode & 0o777 == 0o600 and path.read_bytes() == upload_bytes,
+              'fixture_upload_tempfile_not_private_or_exact')
+        return SimpleNamespace(returncode=0)
+
+    with mock.patch.object(subprocess, 'run', side_effect=mock_sftp):
+        FixtureNode.put(upload_node, upload_home + '/answer.json', upload_bytes)
+    check(len(upload_source) == 1 and not upload_source[0].exists(),
+          'fixture_upload_tempfile_not_removed')
     return {'golden_answer_count': len(solved['answers']),
             'rejected_invalid_challenge_count': len(invalid),
             'mock_challenge_proof_roundtrip_count': mutation_roundtrips,
-            'rejected_unsafe_fixture_root_count': 4}
+            'rejected_unsafe_fixture_root_count': 4,
+            'rejected_unsafe_upload_path_count': 6,
+            'mock_private_sftp_upload_count': 1,
+            'replication_diagnostic_cases': replication_summary_self_test()}
 
 
 class FixtureNode(HELPERS.Node):
@@ -310,21 +363,65 @@ class FixtureNode(HELPERS.Node):
     def __init__(self, config, logs, run_id):
         super().__init__(config, logs, run_id)
         os.chmod(logs / (self.name + '.log'), 0o600)
+        self.private_logs = logs
+        self.fixture_index = int(self.name.removeprefix('node-'))
+        self.phase = 'cli'
         self.last_mutation = 0.0
         self.automation_counts = {'publish': 0, 'evaluate': 0}
+
+    def private_diagnostic(self, result):
+        # stdout/stderr may contain a rejected body. Never include them in JSON.
+        stamp = str(time.time_ns())
+        for stream in ['stdout', 'stderr']:
+            raw = getattr(result, stream, None)
+            if raw:
+                path = self.private_logs / (self.name + '-' + stamp + '.' + stream + '.log')
+                descriptor = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+                with os.fdopen(descriptor, 'wb') as destination:
+                    destination.write(raw if isinstance(raw, bytes) else raw.encode())
 
     def run(self, args, data=None, codes=(0,), timeout=35):
         if isinstance(data, str):
             data = data.encode()
         result = subprocess.run(self.argv(args), input=data, capture_output=True,
                                 timeout=timeout)
-        check(result.returncode in codes, 'unexpected_cli_exit')
+        if result.returncode not in codes:
+            self.private_diagnostic(result)
+            raise VerificationFailure('unexpected_cli_exit', node_index=self.fixture_index,
+                                      phase=self.phase)
         try:
             value = json.loads(result.stdout.decode('utf-8-sig'))
         except (ValueError, UnicodeError):
-            raise RuntimeError('invalid_cli_json') from None
+            self.private_diagnostic(result)
+            raise VerificationFailure('invalid_cli_json', node_index=self.fixture_index,
+                                      phase=self.phase) from None
         check(isinstance(value, dict), 'invalid_cli_json_object')
         return value
+
+    def put(self, path, contents):
+        path = fixture_file_path(self.home, path, windows=self.win)
+        if not self.win:
+            return super().put(path, contents)
+        check(bool(self.host), 'windows_fixture_requires_ssh')
+        raw = contents.encode() if isinstance(contents, str) else contents
+        check(isinstance(raw, bytes), 'invalid_fixture_upload_contents')
+        # Windows cmd.exe rejects a large PowerShell EncodedCommand before the
+        # payload is decoded. OpenSSH scp uses its binary SFTP transport instead.
+        descriptor, local_path = tempfile.mkstemp(prefix='idobata-fixture-upload-')
+        try:
+            os.fchmod(descriptor, 0o600)
+            with os.fdopen(descriptor, 'wb') as destination:
+                destination.write(raw)
+            result = subprocess.run(
+                ['scp', '-q', '-o', 'BatchMode=yes', '-o', 'ConnectTimeout=12',
+                 local_path, self.host + ':' + path],
+                stdin=subprocess.DEVNULL, capture_output=True, timeout=45)
+            if result.returncode != 0:
+                self.private_diagnostic(result)
+                raise VerificationFailure('fixture_sftp_upload_failed',
+                                          node_index=self.fixture_index, phase=self.phase)
+        finally:
+            Path(local_path).unlink(missing_ok=True)
 
     def mutation_request(self, args, data, codes):
         delay = self.last_mutation + MUTATION_INTERVAL - time.monotonic()
@@ -334,25 +431,50 @@ class FixtureNode(HELPERS.Node):
         return self.run(args, json.dumps(data, ensure_ascii=False), codes=codes)
 
     def mutate(self, args, data):
+        try:
+            return FixtureNode._mutate(self, args, data)
+        except Exception as error:
+            if isinstance(error, VerificationFailure):
+                error.node_index = getattr(self, 'fixture_index', None)
+                error.phase = getattr(self, 'phase', 'mutation')
+                raise
+            raise VerificationFailure('fixture_mutation_subprocess_failure'
+                                      if isinstance(error, subprocess.SubprocessError)
+                                      else 'fixture_mutation_internal_failure',
+                                      node_index=getattr(self, 'fixture_index', None),
+                                      phase=getattr(self, 'phase', 'mutation')) from None
+        finally:
+            self.phase = 'cli'
+
+    def _mutate(self, args, data):
         purpose = args[1]
         check(purpose in self.automation_counts, 'unsupported_fixture_mutation')
         # Both the initial request and proof resubmission consume a rate token.
         # Space every CLI mutation by 6.1 seconds, rather than only each pair.
+        self.phase = 'challenge'
         challenge = self.mutation_request(args, data, codes=(31,))
+        self.phase = 'solve_public_tasks'
         answer = solve_automation_challenge(
             challenge, subject=self.peer_id, room_id=self.room_id,
             authority=self.authority, members=self.member_keys, purpose=purpose)
         if purpose == 'publish':
+            self.phase = 'pending_storage_status'
             pending_id = answer['challenge']['challenge']['signed']['action_digest']
             local = status(self)
             check(all(item['id'] != pending_id for item in local['records']),
                   'challenge_stored_record_before_certification')
         proof_path = self.home + '/automation-answer-' + str(sum(self.automation_counts.values())) + '.json'
+        self.phase = 'put_answer'
         self.put(proof_path, json.dumps(answer, ensure_ascii=False, separators=(',', ':')))
         try:
+            self.phase = 'proof_resubmit'
             result = self.mutation_request(args + ['--proof', proof_path], data, codes=(0,))
         finally:
+            pending_phase = self.phase
+            self.phase = 'answer_cleanup'
             self.remove_fixture_file(proof_path)
+            self.phase = pending_phase
+        self.phase = 'accepted_result'
         check(result.get('status') == 'accepted'
               and result.get('assurance') == 'automation_tested',
               'accepted_action_missing_automation_receipt')
@@ -531,13 +653,133 @@ def replica_complete(snapshots, fixtures, peer_ids):
     return True
 
 
+def replication_summary(snapshots, fixtures, peer_ids, observations):
+    """Only fixture indices, counts and static classifications may be public."""
+    inventory = record_inventory(snapshots)
+    histogram = {str(count): 0 for count in range(5)}
+    records = []
+    for fixture_index, fixture in enumerate(fixtures):
+        copies = inventory.get(fixture['id'], [])
+        histogram[str(len(copies))] = histogram.get(str(len(copies)), 0) + 1
+        assignments = [set(row.get('assigned_keepers', [])) for _, row in copies]
+        consistent = bool(assignments) and all(value == assignments[0]
+                                              for value in assignments)
+        assigned_matches = (consistent and len(assignments[0]) == 3
+                            and assignments[0] == {peer_ids[index] for index, _ in copies})
+        records.append({
+            'record_index': fixture_index + 1,
+            'copy_count': len(copies),
+            'staging_count': sum(row.get('staging') is True for _, row in copies),
+            'assigned_matches': assigned_matches,
+            'copies': [{'node_index': index + 1,
+                        'staging': row.get('staging') is True,
+                        'keeper_role': row.get('local_role') == 'keeper',
+                        'replica_ack_count': len(row.get('replica_acks', [])),
+                        'replication_complete': row.get('replication_complete') is True}
+                       for index, row in copies],
+        })
+    node_rows = []
+    clocks = []
+    for index, (snapshot, observation) in enumerate(zip(snapshots, observations)):
+        info = observation.get('info', {})
+        knowledge = info.get('knowledge', {})
+        row = {'node_index': index + 1, 'objects': len(snapshot['records']),
+               'staging_count': sum(record.get('staging') is True
+                                    for record in snapshot['records']),
+               'info_available': bool(info)}
+        for field in ['connected_peers', 'outbound_attempts', 'outbound_failures',
+                      'inbound_requests', 'uptime_seconds']:
+            if type(info.get(field)) is int:
+                row[field] = info[field]
+        for field in ['pending_replications', 'pending_repairs', 'pending_inventory_pages',
+                      'pending_automation', 'expired_background_requests']:
+            if type(knowledge.get(field)) is int:
+                row[field] = knowledge[field]
+        if type(observation.get('unix_time')) is int:
+            clocks.append(observation['unix_time'])
+        node_rows.append(row)
+    return {'distinct_records': len(inventory),
+            'total_copies': sum(len(copies) for copies in inventory.values()),
+            'copy_count_histogram': histogram,
+            'unexpected_record_count': len(set(inventory) - {row['id'] for row in fixtures}),
+            'records': records, 'nodes': node_rows,
+            'transport_counter_scope': 'legacy_messages_only',
+            'clock_observed_host_count': len(clocks),
+            'clock_spread_seconds': max(clocks) - min(clocks) if clocks else None}
+
+
+def replication_summary_self_test():
+    peers = ['private-peer-' + str(index) for index in range(4)]
+    fixture = {'id': 'f' * 64}
+    snapshots = [{'records': []} for _ in peers]
+    row = {'id': fixture['id'], 'assigned_keepers': peers[:3],
+           'replica_acks': peers[:1], 'local_role': 'keeper', 'staging': True,
+           'replication_complete': False, 'unused': 'PRIVATE-BODY-SENTINEL'}
+    for snapshot in snapshots[:2]:
+        snapshot['records'].append(copy.deepcopy(row))
+    observations = [{'info': {'connected_peers': 3, 'knowledge': {'pending_repairs': 2}},
+                     'unix_time': 100 + index} for index in range(4)]
+    missing = replication_summary(snapshots, [fixture], peers, observations)
+    check(missing['copy_count_histogram']['2'] == 1
+          and missing['records'][0]['assigned_matches'] is False,
+          'diagnostic_missing_copy_classification')
+    snapshots[2]['records'].append(copy.deepcopy(row))
+    staged = replication_summary(snapshots, [fixture], peers, observations)
+    check(staged['records'][0]['copy_count'] == 3
+          and staged['records'][0]['assigned_matches'] is True
+          and staged['records'][0]['staging_count'] == 3
+          and staged['records'][0]['copies'][0]['replica_ack_count'] == 1,
+          'diagnostic_staging_classification')
+    snapshots[3]['records'].append(copy.deepcopy(row))
+    extra = replication_summary(snapshots, [fixture], peers, observations)
+    check(extra['copy_count_histogram']['4'] == 1
+          and extra['records'][0]['assigned_matches'] is False
+          and extra['clock_spread_seconds'] == 3,
+          'diagnostic_extra_copy_classification')
+    public = json.dumps(extra)
+    check(fixture['id'] not in public and all(peer not in public for peer in peers)
+          and 'PRIVATE-BODY-SENTINEL' not in public,
+          'diagnostic_private_metadata_leak')
+    return 3
+
+
+def diagnose_replication(nodes, fixtures, peer_ids, snapshots):
+    def observe(node):
+        value = {}
+        try:
+            value['info'] = node.run(['info'], timeout=15)
+        except (RuntimeError, subprocess.SubprocessError):
+            value['info_error'] = 'unavailable'
+        try:
+            result = (node.powershell('[DateTimeOffset]::UtcNow.ToUnixTimeSeconds()', timeout=15)
+                      if node.win else node.shell('date +%s', timeout=15))
+            if result.returncode == 0:
+                value['unix_time'] = int(result.stdout.decode('utf-8-sig').strip())
+        except (ValueError, UnicodeError, RuntimeError, subprocess.SubprocessError):
+            value['clock_error'] = 'unavailable'
+        return value
+
+    observations = parallel(observe, nodes)
+    # IDs, peer IDs and complete metadata stay private; no record bodies are queried.
+    private = {'snapshots': snapshots, 'observations': observations,
+               'peer_ids': peer_ids,
+               'record_ids': [fixture['id'] for fixture in fixtures]}
+    atomic_report(nodes[0].private_logs / ('replication-' + str(time.time_ns()) + '.json'),
+                  private)
+    return replication_summary(snapshots, fixtures, peer_ids, observations)
+
+
 def wait_replicas(nodes, fixtures, peer_ids):
     deadline = time.monotonic() + WAIT_SECONDS
     while True:
         snapshots = parallel(status, nodes)
         if replica_complete(snapshots, fixtures, peer_ids):
             return snapshots
-        check(time.monotonic() < deadline, 'replication_deadline')
+        if time.monotonic() >= deadline:
+            failure = VerificationFailure('replication_deadline')
+            failure.replication_diagnostics = diagnose_replication(
+                nodes, fixtures, peer_ids, snapshots)
+            raise failure
         time.sleep(1)
 
 
@@ -718,12 +960,17 @@ def main():
         ready_counts = wait_peer_readiness(nodes)
         record('authenticated_ready_host_count', len(ready_counts))
         for node in nodes:
-            rooms = node.run(['info']).get('rooms', [])
+            information = node.run(['info'])
+            expirations = information.get('knowledge', {}).get('expired_background_requests')
+            check(type(expirations) is int and expirations >= 0,
+                  'candidate_missing_background_timeout_capability')
+            rooms = information.get('rooms', [])
             check(any(room.get('name') == ROOM
                       and room.get('authorized') is True
                       and room.get('knowledge_automation_required') is True for room in rooms),
                   'daemon_room_did_not_require_automation')
         record('automation_required_room_host_count', len(nodes))
+        record('background_timeout_capability_host_count', len(nodes))
 
         stage = 'blocked_inputs'
         for node in nodes:
@@ -909,6 +1156,12 @@ def main():
         report['failure_type'] = type(error).__name__
         if isinstance(error, VerificationFailure):
             report['failure_code'] = str(error)
+            if hasattr(error, 'replication_diagnostics'):
+                report['replication_diagnostics'] = error.replication_diagnostics
+            if error.node_index is not None:
+                report['failure_node_index'] = error.node_index
+            if error.phase is not None:
+                report['failure_phase'] = error.phase
         print(json.dumps({'status': 'failed', 'stage': stage,
                           'failure_type': type(error).__name__}), flush=True)
     finally:

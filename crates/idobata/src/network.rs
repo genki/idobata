@@ -118,10 +118,12 @@ impl request_response::Codec for KnowledgeCodec {
 }
 #[derive(NetworkBehaviour)]
 pub struct Behaviour {
-    pub messages: request_response::Behaviour<Codec>,
-    pub knowledge: request_response::Behaviour<KnowledgeCodec>,
+    // Derived admission callbacks run in field order. Request-response preloads
+    // connection state before later siblings can reject it, so reject first.
     pub allowed: allow_block_list::Behaviour<allow_block_list::AllowedPeers>,
     pub limits: connection_limits::Behaviour,
+    pub messages: request_response::Behaviour<Codec>,
+    pub knowledge: request_response::Behaviour<KnowledgeCodec>,
 }
 pub async fn build(key: identity::Keypair, c: &Config) -> Result<Swarm<Behaviour>> {
     let messages = request_response::Behaviour::with_codec(
@@ -237,6 +239,158 @@ mod tests {
     use super::*;
     use futures::{executor::block_on, io::Cursor};
     use libp2p::request_response::Codec as _;
+    use libp2p::{
+        core::{ConnectedPoint, Endpoint, transport::PortUse},
+        swarm::{
+            ConnectionId, DialError, FromSwarm, ListenError, ToSwarm,
+            behaviour::{ConnectionClosed, ConnectionEstablished, DialFailure, ListenFailure},
+        },
+    };
+    use std::task::{Context, Poll};
+
+    fn connection_fixture() -> Behaviour {
+        Behaviour {
+            messages: request_response::Behaviour::with_codec(
+                Codec,
+                [(
+                    StreamProtocol::new("/idobata/message/2"),
+                    ProtocolSupport::Full,
+                )],
+                request_response::Config::default(),
+            ),
+            knowledge: request_response::Behaviour::with_codec(
+                KnowledgeCodec,
+                [(
+                    StreamProtocol::new("/idobata/knowledge/1"),
+                    ProtocolSupport::Full,
+                )],
+                request_response::Config::default(),
+            ),
+            allowed: Default::default(),
+            limits: connection_limits::Behaviour::new(
+                connection_limits::ConnectionLimits::default()
+                    .with_max_established_per_peer(Some(1)),
+            ),
+        }
+    }
+
+    /// Follow the same callback sequence as Swarm for a rejected Noise connection.
+    fn reject_connection(behaviour: &mut Behaviour, peer: PeerId, outbound: bool, id: usize) {
+        let local = "/ip4/127.0.0.1/tcp/1".parse().unwrap();
+        let remote = "/ip4/127.0.0.1/tcp/2".parse().unwrap();
+        let connection_id = ConnectionId::new_unchecked(id);
+        if outbound {
+            let cause = behaviour
+                .handle_established_outbound_connection(
+                    connection_id,
+                    peer,
+                    &remote,
+                    Endpoint::Dialer,
+                    PortUse::New,
+                )
+                .err()
+                .expect("connection must be rejected");
+            let error = DialError::Denied { cause };
+            behaviour.on_swarm_event(FromSwarm::DialFailure(DialFailure {
+                peer_id: Some(peer),
+                connection_id,
+                error: &error,
+            }));
+        } else {
+            let cause = behaviour
+                .handle_established_inbound_connection(connection_id, peer, &local, &remote)
+                .err()
+                .expect("connection must be rejected");
+            let error = ListenError::Denied { cause };
+            behaviour.on_swarm_event(FromSwarm::ListenFailure(ListenFailure {
+                peer_id: Some(peer),
+                connection_id,
+                local_addr: &local,
+                send_back_addr: &remote,
+                error: &error,
+            }));
+        }
+    }
+
+    fn assert_next_requests_redial(behaviour: &mut Behaviour, peer: PeerId) {
+        behaviour.messages.send_request(&peer, b"legacy".to_vec());
+        behaviour
+            .knowledge
+            .send_request(&peer, b"knowledge".to_vec());
+        let mut cx = Context::from_waker(futures::task::noop_waker_ref());
+        assert!(matches!(
+            behaviour.messages.poll(&mut cx),
+            Poll::Ready(ToSwarm::Dial { .. })
+        ));
+        assert!(matches!(
+            behaviour.knowledge.poll(&mut cx),
+            Poll::Ready(ToSwarm::Dial { .. })
+        ));
+    }
+
+    #[test]
+    fn rejected_connections_do_not_register_request_response_peers() {
+        for outbound in [false, true] {
+            let mut behaviour = connection_fixture();
+            let peer = identity::Keypair::generate_ed25519().public().to_peer_id();
+            reject_connection(&mut behaviour, peer, outbound, 1);
+            assert_eq!(
+                (
+                    behaviour.messages.is_connected(&peer),
+                    behaviour.knowledge.is_connected(&peer),
+                ),
+                (false, false),
+                "a rejected connection must not survive in either protocol"
+            );
+            behaviour.allowed.allow_peer(peer);
+            assert_next_requests_redial(&mut behaviour, peer);
+        }
+    }
+
+    #[test]
+    fn duplicate_connection_rejection_preserves_disconnect_and_redial() {
+        for outbound in [false, true] {
+            let mut behaviour = connection_fixture();
+            let peer = identity::Keypair::generate_ed25519().public().to_peer_id();
+            behaviour.allowed.allow_peer(peer);
+            let local = "/ip4/127.0.0.1/tcp/1".parse().unwrap();
+            let remote = "/ip4/127.0.0.1/tcp/2".parse().unwrap();
+            let connection_id = ConnectionId::new_unchecked(1);
+            let handler = behaviour
+                .handle_established_inbound_connection(connection_id, peer, &local, &remote)
+                .unwrap();
+            let endpoint = ConnectedPoint::Listener {
+                local_addr: local,
+                send_back_addr: remote,
+            };
+            behaviour.on_swarm_event(FromSwarm::ConnectionEstablished(ConnectionEstablished {
+                peer_id: peer,
+                connection_id,
+                endpoint: &endpoint,
+                failed_addresses: &[],
+                other_established: 0,
+            }));
+            reject_connection(&mut behaviour, peer, outbound, 2);
+            // Swarm never establishes the rejected duplicate, so it closes only
+            // the real first connection. No protocol may retain a phantom ID.
+            drop(handler);
+            behaviour.on_swarm_event(FromSwarm::ConnectionClosed(ConnectionClosed {
+                peer_id: peer,
+                connection_id,
+                endpoint: &endpoint,
+                cause: None,
+                remaining_established: 0,
+            }));
+            assert_eq!(
+                (
+                    behaviour.messages.is_connected(&peer),
+                    behaviour.knowledge.is_connected(&peer),
+                ),
+                (false, false)
+            );
+            assert_next_requests_redial(&mut behaviour, peer);
+        }
+    }
 
     fn frame(bytes: &[u8]) -> Cursor<Vec<u8>> {
         let mut frame = (bytes.len() as u32).to_be_bytes().to_vec();

@@ -8,6 +8,7 @@
 *.key
 *.pem
 *.log
+/evidence/private-*
 .DS_Store
 __pycache__/
 *.pyc

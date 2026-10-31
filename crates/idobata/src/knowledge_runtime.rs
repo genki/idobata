@@ -34,6 +34,7 @@ const MAX_QUERIES: usize = 16;
 const CACHE_BYTES: usize = 4 * 1024 * 1024;
 const CACHE_ENTRIES: usize = 16;
 const POLL_BATCH: usize = 2;
+const BACKGROUND_REQUEST_TIMEOUT: Duration = Duration::from_secs(30);
 const ROUTES: usize = knowledge::MAX_OBJECTS * knowledge::REPLICAS;
 const RECEIPT_DOMAIN: &str = "idobata.knowledge.storage.v1";
 
@@ -300,6 +301,8 @@ pub struct Runtime {
     gates: BTreeMap<u64, GatePending>,
     next_gate: u64,
     pending: BTreeMap<OutboundRequestId, Work>,
+    background_deadlines: BTreeMap<OutboundRequestId, Instant>,
+    expired_background_requests: u64,
     queries: BTreeMap<u64, Query>,
     next_query: u64,
     acks: BTreeMap<(String, String), (String, u64, u64)>,
@@ -404,6 +407,8 @@ impl Runtime {
             gates: BTreeMap::new(),
             next_gate: 0,
             pending: BTreeMap::new(),
+            background_deadlines: BTreeMap::new(),
+            expired_background_requests: 0,
             queries: BTreeMap::new(),
             next_query: 0,
             acks: BTreeMap::new(),
@@ -556,7 +561,7 @@ impl Runtime {
         );
     }
     pub fn metrics(&self) -> Value {
-        json!({"storage": self.store.metrics(), "pending_replications": self.pending.values().filter(|v| matches!(v, Work::Store { .. })).count(), "pending_repairs": self.repairs.len() + self.pending.values().filter(|work| matches!(work, Work::Repair { .. })).count(), "pending_inventory_pages": self.inventory_pages.len() + self.pending.values().filter(|work| matches!(work, Work::Inventory { .. })).count(), "staging_records": self.store.state.records.iter().filter(|s| s.staging).count(), "active_queries": self.queries.len(), "pending_automation": self.gates.len(), "query_bytes": self.queries.values().map(query_bytes).sum::<usize>(), "cache_bytes": self.cache.values().map(|c| c.bytes).sum::<usize>(), "replication_factor": knowledge::REPLICAS, "receipt_claims_are_availability_proofs": false})
+        json!({"storage": self.store.metrics(), "pending_replications": self.pending.values().filter(|v| matches!(v, Work::Store { .. })).count(), "pending_repairs": self.repairs.len() + self.pending.values().filter(|work| matches!(work, Work::Repair { .. })).count(), "pending_inventory_pages": self.inventory_pages.len() + self.pending.values().filter(|work| matches!(work, Work::Inventory { .. })).count(), "expired_background_requests": self.expired_background_requests, "staging_records": self.store.state.records.iter().filter(|s| s.staging).count(), "active_queries": self.queries.len(), "pending_automation": self.gates.len(), "query_bytes": self.queries.values().map(query_bytes).sum::<usize>(), "cache_bytes": self.cache.values().map(|c| c.bytes).sum::<usize>(), "replication_factor": knowledge::REPLICAS, "receipt_claims_are_availability_proofs": false})
     }
     /// This is only this keeper's recent public subset, never a whole-room feed.
     pub fn public_entries(&self, room: &TrustedRoom) -> Vec<crate::publication::PublicEntry> {
@@ -1339,6 +1344,7 @@ impl Runtime {
                     },
                 ..
             } => {
+                self.background_deadlines.remove(&request_id);
                 if let Some(work) = self.pending.remove(&request_id) {
                     let reply = (response.len() <= MAX_WIRE)
                         .then(|| serde_json::from_slice::<WireReply>(&response).ok())
@@ -1347,6 +1353,7 @@ impl Runtime {
                 }
             }
             request_response::Event::OutboundFailure { request_id, .. } => {
+                self.background_deadlines.remove(&request_id);
                 if let Some(work) = self.pending.remove(&request_id) {
                     let peer = match &work {
                         Work::Query(_, peer)
@@ -1899,8 +1906,53 @@ impl Runtime {
             return false;
         }
         let id = swarm.behaviour_mut().knowledge.send_request(&peer, bytes);
+        if matches!(
+            work,
+            Work::Store { .. } | Work::Inventory { .. } | Work::Repair { .. }
+        ) {
+            self.background_deadlines
+                .insert(id, Instant::now() + BACKGROUND_REQUEST_TIMEOUT);
+        }
         self.pending.insert(id, work);
         true
+    }
+    fn expire_background(&mut self, now: Instant) {
+        let expired = self
+            .background_deadlines
+            .iter()
+            .filter(|(_, deadline)| **deadline <= now)
+            .map(|(id, _)| *id)
+            .collect::<Vec<_>>();
+        for id in expired {
+            self.background_deadlines.remove(&id);
+            let Some(work) = self.pending.remove(&id) else {
+                continue;
+            };
+            match work {
+                // The record and its staging protection stay durable. The
+                // existing route retry becomes eligible once its slot is free.
+                Work::Store { .. } => {}
+                Work::Inventory { peer, room, after } => {
+                    let page = (peer, room, after);
+                    if self.inventory_pages.len() < 32 && !self.inventory_pages.contains(&page) {
+                        self.inventory_pages.push_back(page);
+                    }
+                }
+                Work::Repair { peer, room, id } => {
+                    if self.store.get(&room, &id).is_none()
+                        && self.repairs.len() < 256
+                        && !self.repairs.iter().any(|(_, r, i)| r == &room && i == &id)
+                    {
+                        self.repairs.push_back((peer, room, id));
+                    }
+                }
+                foreground => {
+                    self.pending.insert(id, foreground);
+                    continue;
+                }
+            }
+            self.expired_background_requests = self.expired_background_requests.saturating_add(1);
+        }
     }
     fn prune_metadata(&mut self, config: &Config) {
         self.cache.retain(|_, cached| cached.until > Instant::now());
@@ -2055,6 +2107,7 @@ impl Runtime {
         }
     }
     pub fn poll(&mut self, swarm: &mut Swarm<network::Behaviour>) {
+        self.expire_background(Instant::now());
         let expired = self
             .gates
             .iter()
@@ -3644,5 +3697,283 @@ mod tests {
         assert_eq!(runtime.poll_record_validations, 1);
         assert!(runtime.pending.is_empty());
         assert!(runtime.store.state.records[0].staging);
+    }
+
+    #[tokio::test]
+    async fn background_timeout_keeps_staging_and_ignores_late_receipts() {
+        let fixture = Fixture::new(3);
+        let mut runtime = fixture.runtime();
+        let packet =
+            fixture.record("How is accepted data protected from a missing transport event?");
+        let room = packet.record.signed.room_id.clone();
+        let id = packet.record.signed.id.clone();
+        let peer = fixture.keys[1].public().to_peer_id();
+        runtime
+            .store
+            .insert(packet.clone(), true, util::now())
+            .unwrap();
+        let durable = std::fs::read(fixture.home.join("knowledge.enc")).unwrap();
+        let mut swarm = network::build(
+            fixture.keys[0].clone(),
+            &config::load(&fixture.home).unwrap(),
+        )
+        .await
+        .unwrap();
+        assert!(runtime.send(
+            &mut swarm,
+            peer,
+            &WireRequest::Store {
+                room_id: room.clone(),
+                packet: Box::new(packet.clone()),
+                reviews: vec![],
+            },
+            Work::Store {
+                peer,
+                room,
+                id,
+                digest: transfer_digest(&packet, &[]).unwrap(),
+                epoch: 1,
+                sent_at: util::now(),
+            }
+        ));
+        let request_id = *runtime.pending.keys().next().unwrap();
+        let deadline = runtime.background_deadlines[&request_id];
+        runtime.expire_background(deadline - Duration::from_nanos(1));
+        assert_eq!(runtime.pending.len(), 1);
+        assert_eq!(runtime.expired_background_requests, 0);
+        runtime.expire_background(deadline);
+        assert!(runtime.pending.is_empty());
+        assert!(runtime.background_deadlines.is_empty());
+        assert_eq!(runtime.expired_background_requests, 1);
+        assert!(runtime.store.state.records[0].staging);
+        assert_eq!(
+            std::fs::read(fixture.home.join("knowledge.enc")).unwrap(),
+            durable
+        );
+        runtime.event(
+            request_response::Event::Message {
+                peer,
+                connection_id: libp2p::swarm::ConnectionId::new_unchecked(1),
+                message: Message::Response {
+                    request_id,
+                    response: serde_json::to_vec(&WireReply::Stored {
+                        receipt: fixture.receipt(1, &packet, &[]),
+                    })
+                    .unwrap(),
+                },
+            },
+            &mut swarm,
+        );
+        assert!(runtime.acks.is_empty());
+        assert!(runtime.store.state.records[0].staging);
+        assert_eq!(runtime.metrics()["expired_background_requests"], 1);
+    }
+
+    #[tokio::test]
+    async fn background_timeouts_release_all_work_kinds_and_bound_retry_queues() {
+        let fixture = Fixture::new(3);
+        let mut runtime = fixture.runtime();
+        let mut swarm = network::build(
+            fixture.keys[0].clone(),
+            &config::load(&fixture.home).unwrap(),
+        )
+        .await
+        .unwrap();
+        let packet = fixture.record("How are missing background events retried?");
+        let peer = fixture.keys[1].public().to_peer_id();
+        let room = packet.record.signed.room_id.clone();
+        let missing_id = util::hash(b"missing repair object");
+        assert!(runtime.send(
+            &mut swarm,
+            peer,
+            &WireRequest::Store {
+                room_id: room.clone(),
+                packet: Box::new(packet.clone()),
+                reviews: vec![],
+            },
+            Work::Store {
+                peer,
+                room: room.clone(),
+                id: packet.record.signed.id.clone(),
+                digest: transfer_digest(&packet, &[]).unwrap(),
+                epoch: 1,
+                sent_at: util::now()
+            }
+        ));
+        assert!(runtime.send(
+            &mut swarm,
+            peer,
+            &WireRequest::Inventory {
+                room_id: room.clone(),
+                after: None,
+            },
+            Work::Inventory {
+                peer,
+                room: room.clone(),
+                after: None
+            }
+        ));
+        assert!(runtime.send(
+            &mut swarm,
+            peer,
+            &WireRequest::Get {
+                room_id: room.clone(),
+                id: missing_id.clone(),
+            },
+            Work::Repair {
+                peer,
+                room: room.clone(),
+                id: missing_id.clone()
+            }
+        ));
+        assert!(runtime.send(
+            &mut swarm,
+            peer,
+            &WireRequest::Search {
+                room_id: room.clone(),
+                query: "procedure".into(),
+                limit: 1,
+            },
+            Work::Query(1, peer)
+        ));
+        assert!(runtime.send(
+            &mut swarm,
+            peer,
+            &WireRequest::Challenge {
+                room_id: room.clone(),
+                action_digest: missing_id.clone(),
+                purpose: "publish".into(),
+            },
+            Work::GateChallenge(1, peer)
+        ));
+        assert_eq!(runtime.background_deadlines.len(), 3);
+        runtime
+            .inventory_pages
+            .push_back((peer, room.clone(), None));
+        runtime
+            .repairs
+            .push_back((peer, room.clone(), missing_id.clone()));
+        runtime.expire_background(Instant::now() + BACKGROUND_REQUEST_TIMEOUT);
+        assert_eq!(runtime.expired_background_requests, 3);
+        assert_eq!(runtime.pending.len(), 2);
+        assert!(runtime.background_deadlines.is_empty());
+        assert_eq!(runtime.inventory_pages.len(), 1);
+        assert_eq!(runtime.repairs.len(), 1);
+        assert!(
+            runtime
+                .pending
+                .values()
+                .all(|work| matches!(work, Work::Query(..) | Work::GateChallenge(..)))
+        );
+
+        runtime.inventory_pages = (0..32)
+            .map(|index| {
+                (
+                    peer,
+                    room.clone(),
+                    Some(util::hash(format!("page {index}").as_bytes())),
+                )
+            })
+            .collect();
+        runtime.repairs = (0..256)
+            .map(|index| {
+                (
+                    peer,
+                    room.clone(),
+                    util::hash(format!("repair {index}").as_bytes()),
+                )
+            })
+            .collect();
+        assert!(runtime.send(
+            &mut swarm,
+            peer,
+            &WireRequest::Inventory {
+                room_id: room.clone(),
+                after: None,
+            },
+            Work::Inventory {
+                peer,
+                room: room.clone(),
+                after: None
+            }
+        ));
+        assert!(runtime.send(
+            &mut swarm,
+            peer,
+            &WireRequest::Get {
+                room_id: room.clone(),
+                id: missing_id.clone(),
+            },
+            Work::Repair {
+                peer,
+                room,
+                id: missing_id
+            }
+        ));
+        runtime.expired_background_requests = u64::MAX;
+        runtime.expire_background(Instant::now() + BACKGROUND_REQUEST_TIMEOUT);
+        assert_eq!(runtime.inventory_pages.len(), 32);
+        assert_eq!(runtime.repairs.len(), 256);
+        assert_eq!(runtime.pending.len(), 2);
+        assert!(runtime.background_deadlines.is_empty());
+        assert_eq!(runtime.expired_background_requests, u64::MAX);
+    }
+
+    #[tokio::test]
+    async fn background_responses_and_failures_remove_deadlines_without_expiring() {
+        let fixture = Fixture::new(3);
+        let mut runtime = fixture.runtime();
+        let mut swarm = network::build(
+            fixture.keys[0].clone(),
+            &config::load(&fixture.home).unwrap(),
+        )
+        .await
+        .unwrap();
+        let peer = fixture.keys[1].public().to_peer_id();
+        let room = fixture.room.certificate.signed.room_id.clone();
+        for failure in [false, true] {
+            assert!(runtime.send(
+                &mut swarm,
+                peer,
+                &WireRequest::Inventory {
+                    room_id: room.clone(),
+                    after: None,
+                },
+                Work::Inventory {
+                    peer,
+                    room: room.clone(),
+                    after: None
+                }
+            ));
+            let request_id = *runtime.pending.keys().next().unwrap();
+            let connection_id = libp2p::swarm::ConnectionId::new_unchecked(1);
+            let event = if failure {
+                request_response::Event::OutboundFailure {
+                    peer,
+                    connection_id,
+                    request_id,
+                    error: request_response::OutboundFailure::Timeout,
+                }
+            } else {
+                request_response::Event::Message {
+                    peer,
+                    connection_id,
+                    message: Message::Response {
+                        request_id,
+                        response: serde_json::to_vec(&WireReply::Inventory {
+                            ids: vec![],
+                            next: None,
+                        })
+                        .unwrap(),
+                    },
+                }
+            };
+            runtime.event(event, &mut swarm);
+            assert!(runtime.pending.is_empty());
+            assert!(runtime.background_deadlines.is_empty());
+        }
+        runtime.expire_background(Instant::now() + BACKGROUND_REQUEST_TIMEOUT);
+        assert_eq!(runtime.expired_background_requests, 0);
+        assert!(runtime.inventory_pages.is_empty());
     }
 }

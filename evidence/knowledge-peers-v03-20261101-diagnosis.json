@@ -1,0 +1,22 @@
+{
+  "version": 1,
+  "classification": "nonkeeper_staging_handoff_stalled",
+  "observations": 2,
+  "minimum_observed_uptime_interval_seconds": 140,
+  "unchanged_record_copy_staging_ack_states": 8,
+  "final_distinct_records": 8,
+  "final_copy_histogram": {
+    "3": 6,
+    "4": 2
+  },
+  "final_pending_store": [
+    0,
+    1,
+    4,
+    5
+  ],
+  "legacy_transport_counters_do_not_measure_knowledge": true,
+  "production_services_changed": false,
+  "cleanup_error_count": 0,
+  "private_fixture_keys_removed": true
+}
