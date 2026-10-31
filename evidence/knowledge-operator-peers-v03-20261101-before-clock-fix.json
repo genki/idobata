@@ -1,0 +1,93 @@
+{
+  "version": 3,
+  "test": "real-host-one-operator-knowledge-e2e",
+  "started_at": "2026-10-31T18:42:07Z",
+  "status": "failed",
+  "checks": {
+    "independent_automation_solver": {
+      "golden_answer_count": 24,
+      "rejected_invalid_challenge_count": 10,
+      "mock_challenge_proof_roundtrip_count": 2,
+      "rejected_unsafe_fixture_root_count": 4,
+      "rejected_unsafe_upload_path_count": 6,
+      "mock_private_sftp_upload_count": 1,
+      "replication_diagnostic_cases": 3,
+      "case_a_guard_checks": {
+        "rejected_inventory_or_vote_shapes": 8,
+        "placement_guard_cases": 2,
+        "cli_counter_cases": 4,
+        "public_native_hash_cases": 1,
+        "sftp_failure_cleanup_cases": 2
+      }
+    },
+    "isolated_fixture_host_count": 4,
+    "expected_native_binary_hash_count": 4,
+    "verified_native_artifacts": [
+      {
+        "node_index": 1,
+        "platform": "linux",
+        "sha256": "1d1872c14137698930ac28d959cd43c2d5793c1a39e187bd1d0d9e67af27c976"
+      },
+      {
+        "node_index": 2,
+        "platform": "macos",
+        "sha256": "37ef6a4607fe22b21b16e1a12b52633e22aceb4e30fc0db8c81410b6ab2bef67"
+      },
+      {
+        "node_index": 3,
+        "platform": "windows",
+        "sha256": "2a9bbe5d1f72afe79cc1a5798139dd8e62056d76325649965b396720dd696144"
+      },
+      {
+        "node_index": 4,
+        "platform": "macos",
+        "sha256": "37ef6a4607fe22b21b16e1a12b52633e22aceb4e30fc0db8c81410b6ab2bef67"
+      }
+    ],
+    "matching_native_sdk_count": 4,
+    "local_fixture_identity_count": 4,
+    "identical_public_policy_and_wasm": true,
+    "fixed_authorized_roster_size": 4,
+    "operator_trust_assumption": {
+      "physical_host_count": 4,
+      "actual_operator_count": 1,
+      "registered_operator_count": 1,
+      "independence_is_authority_attested": true,
+      "synthetic_independent_operators_on_real_hosts": false
+    },
+    "ready_daemon_count": 4,
+    "authenticated_ready_host_count": 4,
+    "automation_required_room_host_count": 4,
+    "background_timeout_capability_host_count": 4,
+    "operator_policy_capability_host_count": 4,
+    "blocked_publish_and_search_count": 8,
+    "native_binary_unchanged_after_fixture": {
+      "verified_host_count": 4,
+      "expected_host_count": 4
+    }
+  },
+  "retention_time_travel_tested": false,
+  "production_services_changed": false,
+  "automation_assurance_is_ai_identity": false,
+  "source_archive_sha256": "11e80bc8d6bb2151a5b69defc9698ea51866cd202e1c9157892fcc065fc7326b",
+  "source_provenance": "manager_build_evidence_label_not_cli_attestation",
+  "failed_stage": "publish",
+  "failure_type": "VerificationFailure",
+  "failure_code": "unexpected_cli_exit",
+  "failure_node_index": 2,
+  "failure_phase": "challenge",
+  "native_artifact_postcheck_errors": [],
+  "actual_knowledge_cli_invocations": {
+    "publish": 19,
+    "evaluate": 0,
+    "search": 4,
+    "get": 0,
+    "peers": 0,
+    "status": 15
+  },
+  "cleanup_error_count": 0,
+  "cleanup_errors": [],
+  "private_fixture_keys_removed": true,
+  "fixture_data_directory_removed_count": 4,
+  "finished_at": "2026-10-31T18:43:14Z"
+}

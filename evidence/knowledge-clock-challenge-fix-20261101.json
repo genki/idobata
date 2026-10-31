@@ -90,5 +90,15 @@
     "issuer_replay_rejected": true
   },
   "production_services_keys_rooms_or_clocks_changed": false,
-  "requires_combined_checks_and_new_native_candidates": true
+  "requires_combined_checks_and_new_native_candidates": true,
+  "final_source_archive_sha256": "8b32dd63bfd112adecfa0c82a0234068c609c51edc5eef86eb46d9bfb064b6bb",
+  "combined_validation": {
+    "normal_tests_passed": 178,
+    "failed": 0,
+    "explicit_optimized_checks_passed": 2,
+    "strict_workspace_alltargets_clippy": "passed",
+    "fmt": "passed",
+    "reported_by": "combined_validation_owner",
+    "core_compiled_tree_sha256": "4cf185f2c0ff9d1653ff5609b11b7aeacf8fb040d2340bbf3dd3b65a50f3e77d"
+  }
 }

@@ -1,0 +1,23 @@
+{
+  "version": 1,
+  "test": "operator-clock-final-sdk-package",
+  "status": "passed",
+  "source_commit": "55ce5280b02eae39a31b1920218105739f17c193",
+  "vcs_dirty": false,
+  "source_archive_sha256": "8b32dd63bfd112adecfa0c82a0234068c609c51edc5eef86eb46d9bfb064b6bb",
+  "files": 38,
+  "rust_files_exactly_match_native_source": 31,
+  "sha256": "36c1df2a1698e870445b65cde2f85674c2b815d8cfa81e6b4c7dd820d312756c",
+  "bytes": 330866,
+  "license": "MIT",
+  "license_full_text_matches": true,
+  "readme_matches": true,
+  "wasm_matches": true,
+  "private_data_allowlist_passed": true,
+  "scanner_registry_checksum": "1f70d29f055a307476be41b8a42f2d2471dd721ec905fa6a297e4f398b1edc1e",
+  "package_build_verified": true,
+  "published": false,
+  "dry_run_passed": true,
+  "dry_run_log_sha256": "b6b2dafeceff4a4772deded7887a29097fdce16ff1665547d17ce5d81e6a3f79",
+  "package_log_sha256": "859927b9a316b741ee6bb28b35c2343c416ca0ba45a332d723abed2f69efeeb6"
+}

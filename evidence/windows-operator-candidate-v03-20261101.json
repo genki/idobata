@@ -1,0 +1,73 @@
+{
+  "version": 1,
+  "host": "windows_peer",
+  "scope": "operator-policy native candidate; no production mutation",
+  "source_archive_sha256": "11e80bc8d6bb2151a5b69defc9698ea51866cd202e1c9157892fcc065fc7326b",
+  "compiled_source_tree_sha256": "2207cffac06fa37fafb00861a7d7d60bd6df8085f76fb13036f777034574a73e",
+  "verified_source_files": 47,
+  "source_mtimes_refreshed": true,
+  "actual_sdk_compile_observed": true,
+  "rustc": "rustc 1.96.0 (ac68faa20 2026-05-25)",
+  "target": "x86_64-pc-windows-gnullvm",
+  "toolchain_details": [
+    "rustc 1.96.0 (ac68faa20 2026-05-25)",
+    "binary: rustc",
+    "commit-hash: ac68faa20c58cbccd01ee7208bf3b6e93a7d7f96",
+    "commit-date: 2026-05-25",
+    "host: x86_64-pc-windows-gnullvm",
+    "release: 1.96.0",
+    "LLVM version: 22.1.2"
+  ],
+  "build_seconds": 230.286,
+  "artifact": {
+    "sha256": "2a9bbe5d1f72afe79cc1a5798139dd8e62056d76325649965b396720dd696144",
+    "bytes": 9440768,
+    "version": "idobata 0.3.0",
+    "remote_local_sha_equal": true
+  },
+  "smoke": {
+    "operator_policy_invite_cli_present": true,
+    "version": "idobata 0.3.0",
+    "default_doctor_exit": 0,
+    "production_installed": false,
+    "explicit_missing_home_exit": 22,
+    "production_service_restarted": false,
+    "operator_explore_cli_present": true,
+    "new_keys_created": false,
+    "blocked_scan_exit": 20,
+    "status": "passed",
+    "isolated_fixture_created": false,
+    "existing_daemon_version": "0.3.0",
+    "default_doctor_status": "healthy",
+    "plain_scan_exit": 0,
+    "scanner_wasm_sha256": "e765bdca9f335bed3c26c2dee1bce39e9eb652e2af2552945c1818934d88e4fd",
+    "policy_id": "c82f9fed20148ff5dba8718396cc4eaeb995ad56e6f9800c203783b289901952"
+  },
+  "upgrade_plan": {
+    "mode": "prepared_only",
+    "script_sha256": "cc1550feb57e09b463eab699183ef9bed007ea61f79ae335949f99e24f74f95b",
+    "current_sdk_sha256": "943c86339ed544a163a0b29d01fefee636663c18f4a10a6c5dd1b07f7cd23877",
+    "candidate_sdk_sha256": "2a9bbe5d1f72afe79cc1a5798139dd8e62056d76325649965b396720dd696144",
+    "parser_errors": 0,
+    "mutable_guard_fixture": {
+      "parser_errors": 0,
+      "synthetic_fixture_removed": true,
+      "missing_state_file_rejected": true,
+      "keys_created": false,
+      "new_state_file_rejected": true,
+      "unchanged_accepted": true,
+      "content_change_rejected": true,
+      "production_changed": false
+    },
+    "nullstring_replace_preserved": true,
+    "rollback_requires_mutable_state_unchanged_after_new_sdk_started": true,
+    "keys_config_task_dacl_launcher_locator_not_modified": true
+  },
+  "log_sha256": {
+    "build_stderr": "4c86e077cddd4caf06a2a68d536e02eb56c0121cc3ffa8e72c8b0eec833cd99e",
+    "build_session": "767017cc1d97cf1618da1285b9b509f66ca114d8eb73b577c19a5a99a7fa9c1d"
+  },
+  "production_installed": false,
+  "production_services_restarted": false,
+  "new_keys_generated": false
+}

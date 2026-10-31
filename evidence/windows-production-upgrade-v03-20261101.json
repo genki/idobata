@@ -1,0 +1,32 @@
+{
+  "host": "windows_peer",
+  "sdk_sha256": "943c86339ed544a163a0b29d01fefee636663c18f4a10a6c5dd1b07f7cd23877",
+  "checks": {
+    "single_dedicated_daemon": true,
+    "locator_unchanged": true,
+    "normal_path_info_version_matches": true,
+    "room_automation_policy_unchanged": true,
+    "room_authorization_healthy": true,
+    "service_sid_unchanged": true,
+    "home_dacl_unchanged": true,
+    "protected_stage_consumed": true,
+    "prior_attempt_rollback_verified": true,
+    "install_dacl_unchanged": true,
+    "normal_path_doctor_healthy": true,
+    "installed_sdk_sha_matches": true,
+    "new_runtime_metric_present": true,
+    "task_definition_unchanged": true,
+    "storage_key_metadata_and_dacl_unchanged": true,
+    "backup_sdk_matches": true,
+    "identity_key_metadata_and_dacl_unchanged": true,
+    "protected_journal_verified": true,
+    "scheduled_task_running": true,
+    "client_sid_unchanged": true,
+    "launcher_unchanged": true,
+    "normal_path_launcher_matches": true,
+    "sdk_dacl_unchanged": true,
+    "config_unchanged": true,
+    "same_volume_space_path_forward_and_rollback_fixture_passed": true,
+    "private_key_bytes_and_hashes_not_disclosed": true
+  }
+}

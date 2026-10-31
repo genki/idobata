@@ -1,0 +1,33 @@
+{
+  "version": 1,
+  "test": "clock-final-linux-native-build",
+  "status": "passed",
+  "checked_at": "2026-10-31T19:07:40.901197+00:00",
+  "source_archive_sha256": "8b32dd63bfd112adecfa0c82a0234068c609c51edc5eef86eb46d9bfb064b6bb",
+  "source_files": 47,
+  "compiled_source_tree_sha256": "4cf185f2c0ff9d1653ff5609b11b7aeacf8fb040d2340bbf3dd3b65a50f3e77d",
+  "source_matches_before_and_after_build": true,
+  "source_mtimes_refreshed": true,
+  "actual_compile_observed": true,
+  "build_log_sha256": "f2511d4ef156e55bf1a5af937e5e1ac05d115877636e0c1282277d1c1b9d9041",
+  "cargo": "cargo 1.96.0 (30a34c682 2026-05-25)",
+  "rustc": "rustc 1.96.0 (ac68faa20 2026-05-25)",
+  "binary": {
+    "sha256": "529ee8ca4fa287afb4ff23b0b8f9c40951df8b1312619c3bc1a921ebbef9a312",
+    "bytes": 12011408,
+    "version": "0.3.0"
+  },
+  "profile_document_sha256": "3ca5e1645686c34c2ec61b346b2022a685f6ef413cfb46ec46418f8073a615ea",
+  "policy_id": "c82f9fed20148ff5dba8718396cc4eaeb995ad56e6f9800c203783b289901952",
+  "wasm_sha256": "e765bdca9f335bed3c26c2dee1bce39e9eb652e2af2552945c1818934d88e4fd",
+  "cli_smoke": {
+    "version": true,
+    "profile": true,
+    "ordinary_japanese_scan_exit": 0,
+    "synthetic_entropy_scan_exit": 20,
+    "operator_and_automation_flags": true,
+    "home_not_created": true
+  },
+  "production_changed": false,
+  "daemon_started": false
+}

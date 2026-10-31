@@ -17,7 +17,11 @@ operator単位の信用・露出・容量制限と競合証拠の実装は完了
 [最終検査](../evidence/knowledge-clock-final-core-verification-20261101.json)と
 [固定ソース](../evidence/knowledge-clock-final-native-source-20261101.json)を、旧baselineの記録と分けて残す。
 現在の4ホストのSDKは以下のbaselineで、roomの自動処理テスト必須化とoperator認可は未切替。
-新しい実4ホスト検証・本番切替・公開packageは別の完了条件として記録する。
+[新しい実4ホスト検証](../evidence/knowledge-operator-peers-v03-20261101.json)は32項目合格した。
+8件が3コピーずつ、計24コピーへ収束し、著者の一時コピー引渡し4件、12回の自動処理証明、
+日本語検索32照合、4台の再起動後保持、非保持ノードと著者停止時の取得を確認した。
+同一operatorの4評価でも独立支持は0、通常検索は0件、未確認の探索は主体当たり1件だった。
+cleanupエラー0、fixture 4領域と鍵は削除した。本番切替・実公開は別の完了条件とする。
 4ホストは同じ運営主体なので、相互評価の成功を独立した外部支持とは扱わない。
 
 # v0.3 baselineの検証（結託対策の追加前）

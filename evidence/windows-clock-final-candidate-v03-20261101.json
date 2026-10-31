@@ -1,0 +1,79 @@
+{
+  "version": 1,
+  "host": "windows_peer",
+  "scope": "Clock-corrected operator-policy native candidate and read-only upgrade preparation",
+  "source_archive_sha256": "8b32dd63bfd112adecfa0c82a0234068c609c51edc5eef86eb46d9bfb064b6bb",
+  "compiled_source_tree_sha256": "4cf185f2c0ff9d1653ff5609b11b7aeacf8fb040d2340bbf3dd3b65a50f3e77d",
+  "verified_source_files": 47,
+  "source_mtimes_refreshed": true,
+  "actual_sdk_compile_observed": true,
+  "rustc": "rustc 1.96.0 (ac68faa20 2026-05-25)",
+  "toolchain_details": [
+    "rustc 1.96.0 (ac68faa20 2026-05-25)",
+    "binary: rustc",
+    "commit-hash: ac68faa20c58cbccd01ee7208bf3b6e93a7d7f96",
+    "commit-date: 2026-05-25",
+    "host: x86_64-pc-windows-gnullvm",
+    "release: 1.96.0",
+    "LLVM version: 22.1.2"
+  ],
+  "target": "x86_64-pc-windows-gnullvm",
+  "build_seconds": 233.079,
+  "artifact": {
+    "sha256": "77d0b8a3d8099f176137eb98c7e36a5cc2a3c7ad95354f96dbe7a474221fd187",
+    "bytes": 9444352,
+    "version": "idobata 0.3.0",
+    "remote_local_sha_equal": true,
+    "differs_from_before_clockfix": true
+  },
+  "smoke": {
+    "operator_policy_invite_cli_present": true,
+    "version": "idobata 0.3.0",
+    "default_doctor_exit": 0,
+    "production_installed": false,
+    "explicit_missing_home_exit": 22,
+    "production_service_restarted": false,
+    "operator_explore_cli_present": true,
+    "new_keys_created": false,
+    "blocked_scan_exit": 20,
+    "status": "passed",
+    "isolated_fixture_created": false,
+    "existing_daemon_version": "0.3.0",
+    "default_doctor_status": "healthy",
+    "plain_scan_exit": 0,
+    "scanner_wasm_sha256": "e765bdca9f335bed3c26c2dee1bce39e9eb652e2af2552945c1818934d88e4fd",
+    "policy_id": "c82f9fed20148ff5dba8718396cc4eaeb995ad56e6f9800c203783b289901952"
+  },
+  "upgrade_plan": {
+    "mode": "prepared_only",
+    "script_sha256": "5b4c4108fb1588056ed5db22134c188490dabaf7a0e4ba78d6b08b75c46210c4",
+    "current_sdk_sha256": "943c86339ed544a163a0b29d01fefee636663c18f4a10a6c5dd1b07f7cd23877",
+    "candidate_sdk_sha256": "77d0b8a3d8099f176137eb98c7e36a5cc2a3c7ad95354f96dbe7a474221fd187",
+    "parser_errors": 0,
+    "mutable_guard_fixture": {
+      "parser_errors": 0,
+      "synthetic_fixture_removed": true,
+      "missing_state_file_rejected": true,
+      "keys_created": false,
+      "new_state_file_rejected": true,
+      "unchanged_accepted": true,
+      "content_change_rejected": true,
+      "production_changed": false
+    },
+    "nullstring_replace_preserved": true,
+    "rollback_requires_stopped_mutable_state_unchanged_after_new_sdk_started": true,
+    "keys_config_task_dacl_launcher_locator_not_modified": true
+  },
+  "log_sha256": {
+    "build_session": "accc95d4be8cbc9a674b43ebeb2dc667990953b289327d7490a3a78950badeec",
+    "build_stderr": "ce989b68d11ad29ff323e7e15d25ae9bd855e19405e7da5ba60013e9d9772a00"
+  },
+  "before_clockfix_history": {
+    "candidate_sha256": "2a9bbe5d1f72afe79cc1a5798139dd8e62056d76325649965b396720dd696144",
+    "evidence": "windows-operator-candidate-v03-20261101.json",
+    "preserved": true
+  },
+  "production_installed": false,
+  "production_services_restarted": false,
+  "new_keys_generated": false
+}

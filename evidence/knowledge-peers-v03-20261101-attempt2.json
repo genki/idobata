@@ -1,0 +1,38 @@
+{
+  "version": 2,
+  "test": "real-host-knowledge-e2e",
+  "started_at": "2026-10-31T16:22:36Z",
+  "status": "failed",
+  "checks": {
+    "independent_automation_solver": {
+      "golden_answer_count": 24,
+      "rejected_invalid_challenge_count": 10,
+      "mock_challenge_proof_roundtrip_count": 2,
+      "rejected_unsafe_fixture_root_count": 4,
+      "rejected_unsafe_upload_path_count": 6,
+      "mock_private_sftp_upload_count": 1
+    },
+    "isolated_fixture_host_count": 4,
+    "matching_native_sdk_count": 4,
+    "local_fixture_identity_count": 4,
+    "identical_public_policy_and_wasm": true,
+    "fixed_authorized_roster_size": 4,
+    "ready_daemon_count": 4,
+    "authenticated_ready_host_count": 4,
+    "automation_required_room_host_count": 4,
+    "blocked_publish_and_search_count": 8,
+    "published_record_count": 8,
+    "certified_publish_count": 8
+  },
+  "retention_time_travel_tested": false,
+  "production_services_changed": false,
+  "automation_assurance_is_ai_identity": false,
+  "failed_stage": "three_replica_handoff",
+  "failure_type": "VerificationFailure",
+  "failure_code": "replication_deadline",
+  "cleanup_error_count": 0,
+  "cleanup_errors": [],
+  "private_fixture_keys_removed": true,
+  "fixture_data_directory_removed_count": 4,
+  "finished_at": "2026-10-31T16:26:40Z"
+}

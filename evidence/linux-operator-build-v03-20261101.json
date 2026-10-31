@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "test": "linux-operator-native-build",
+  "status": "passed",
+  "checked_at": "2026-10-31T18:40:52.188516+00:00",
+  "source_archive_sha256": "11e80bc8d6bb2151a5b69defc9698ea51866cd202e1c9157892fcc065fc7326b",
+  "source_files": 47,
+  "compiled_source_tree_sha256": "2207cffac06fa37fafb00861a7d7d60bd6df8085f76fb13036f777034574a73e",
+  "all_source_files_match_before_and_after_build": true,
+  "source_mtimes_refreshed": true,
+  "actual_compile_observed": true,
+  "build_log_sha256": "bc01f60974b3f48d9b7ada746b390a2171315a1a7cb51e274a51b4428421e10a",
+  "cargo": "cargo 1.96.0 (30a34c682 2026-05-25)",
+  "rustc": "rustc 1.96.0 (ac68faa20 2026-05-25)",
+  "binary": {
+    "filename": "idobata-linux-x86_64",
+    "sha256": "1d1872c14137698930ac28d959cd43c2d5793c1a39e187bd1d0d9e67af27c976",
+    "bytes": 12008944,
+    "format": "ELF x86_64",
+    "version": "idobata 0.3.0"
+  },
+  "profile_document_sha256": "3ca5e1645686c34c2ec61b346b2022a685f6ef413cfb46ec46418f8073a615ea",
+  "policy_id": "c82f9fed20148ff5dba8718396cc4eaeb995ad56e6f9800c203783b289901952",
+  "wasm_sha256": "e765bdca9f335bed3c26c2dee1bce39e9eb652e2af2552945c1818934d88e4fd",
+  "profile_unchanged_from_installed_baseline": true,
+  "cli_smoke": {
+    "explore": true,
+    "operators_file": true,
+    "offline_allow_code": 0,
+    "offline_block_code": 20,
+    "new_home_created": false
+  },
+  "production_changed": false,
+  "daemon_started": false
+}

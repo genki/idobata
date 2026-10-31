@@ -1,0 +1,57 @@
+{
+  "status": "passed",
+  "recorded_at": "2026-10-31T18:40:08.564132+00:00",
+  "platform": "aarch64-apple-darwin",
+  "distribution_build_host": "mac_b",
+  "source_archive_sha256": "11e80bc8d6bb2151a5b69defc9698ea51866cd202e1c9157892fcc065fc7326b",
+  "source_tree_sha256": "ee0874501e7ff403088bb81cdc8c0d1c9ee5143f39db715a94f0c58451ba357b",
+  "core_compiled_tree_sha256": "2207cffac06fa37fafb00861a7d7d60bd6df8085f76fb13036f777034574a73e",
+  "source_file_count": 47,
+  "source_files_verified_before_and_after_build": true,
+  "source_mtimes_refreshed": 47,
+  "actual_sdk_compilation_observed": true,
+  "release_build_seconds": 38.03,
+  "toolchain": {
+    "rustc": "rustc 1.91.1 (ed61e7d7e 2025-11-07)",
+    "cargo": "cargo 1.91.1 (ea2d97820 2025-10-10)"
+  },
+  "artifact": {
+    "filename": "idobata-macos-arm64",
+    "sha256": "37ef6a4607fe22b21b16e1a12b52633e22aceb4e30fc0db8c81410b6ab2bef67",
+    "bytes": 9512912,
+    "version": "idobata 0.3.0"
+  },
+  "verified_remote_to_local_transfer": true,
+  "same_distribution_bytes_on_both_macs": true,
+  "candidate_smoke": {
+    "mac_a": {
+      "sha256": "37ef6a4607fe22b21b16e1a12b52633e22aceb4e30fc0db8c81410b6ab2bef67",
+      "bytes": 9512912,
+      "version": "idobata 0.3.0",
+      "policy_id": "c82f9fed20148ff5dba8718396cc4eaeb995ad56e6f9800c203783b289901952",
+      "wasm_sha256": "e765bdca9f335bed3c26c2dee1bce39e9eb652e2af2552945c1818934d88e4fd",
+      "allowed_scan_code": 0,
+      "blocked_scan_code": 20,
+      "home_not_created": true,
+      "profile_sha256": "29e00232e2173148832fac308a6de5106b97d7d6a6124c934bdcf469e9609b01"
+    },
+    "mac_b": {
+      "sha256": "37ef6a4607fe22b21b16e1a12b52633e22aceb4e30fc0db8c81410b6ab2bef67",
+      "bytes": 9512912,
+      "version": "idobata 0.3.0",
+      "policy_id": "c82f9fed20148ff5dba8718396cc4eaeb995ad56e6f9800c203783b289901952",
+      "wasm_sha256": "e765bdca9f335bed3c26c2dee1bce39e9eb652e2af2552945c1818934d88e4fd",
+      "allowed_scan_code": 0,
+      "blocked_scan_code": 20,
+      "home_not_created": true,
+      "profile_sha256": "29e00232e2173148832fac308a6de5106b97d7d6a6124c934bdcf469e9609b01"
+    }
+  },
+  "candidate_smoke_uses_home_or_daemon": false,
+  "production_services_changed": false,
+  "production_rooms_or_keys_changed": false,
+  "real_four_host_fixture_executed": false,
+  "protected_upgrade_plan_prepared": true,
+  "upgrade_plan_status": "separate_execution_go_required",
+  "rollback_guard": "Never restore old binary after mutable state changes; retain new SDK/state/counters/nonces."
+}

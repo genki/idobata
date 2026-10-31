@@ -1,0 +1,132 @@
+{
+  "version": 3,
+  "test": "real-host-one-operator-knowledge-e2e",
+  "started_at": "2026-10-31T19:14:33Z",
+  "status": "passed",
+  "checks": {
+    "independent_automation_solver": {
+      "golden_answer_count": 24,
+      "rejected_invalid_challenge_count": 10,
+      "mock_challenge_proof_roundtrip_count": 2,
+      "rejected_unsafe_fixture_root_count": 4,
+      "rejected_unsafe_upload_path_count": 6,
+      "mock_private_sftp_upload_count": 1,
+      "replication_diagnostic_cases": 3,
+      "case_a_guard_checks": {
+        "rejected_inventory_or_vote_shapes": 8,
+        "placement_guard_cases": 2,
+        "cli_counter_cases": 4,
+        "public_native_hash_cases": 1,
+        "sftp_failure_cleanup_cases": 2
+      }
+    },
+    "isolated_fixture_host_count": 4,
+    "expected_native_binary_hash_count": 4,
+    "verified_native_artifacts": [
+      {
+        "node_index": 1,
+        "platform": "linux",
+        "sha256": "529ee8ca4fa287afb4ff23b0b8f9c40951df8b1312619c3bc1a921ebbef9a312"
+      },
+      {
+        "node_index": 2,
+        "platform": "macos",
+        "sha256": "03a979d349f913eadb043532847a089833f3ea5bc822aae4e3f90c5dd0694275"
+      },
+      {
+        "node_index": 3,
+        "platform": "windows",
+        "sha256": "77d0b8a3d8099f176137eb98c7e36a5cc2a3c7ad95354f96dbe7a474221fd187"
+      },
+      {
+        "node_index": 4,
+        "platform": "macos",
+        "sha256": "03a979d349f913eadb043532847a089833f3ea5bc822aae4e3f90c5dd0694275"
+      }
+    ],
+    "matching_native_sdk_count": 4,
+    "local_fixture_identity_count": 4,
+    "identical_public_policy_and_wasm": true,
+    "fixed_authorized_roster_size": 4,
+    "operator_trust_assumption": {
+      "physical_host_count": 4,
+      "actual_operator_count": 1,
+      "registered_operator_count": 1,
+      "independence_is_authority_attested": true,
+      "synthetic_independent_operators_on_real_hosts": false
+    },
+    "ready_daemon_count": 4,
+    "authenticated_ready_host_count": 4,
+    "automation_required_room_host_count": 4,
+    "background_timeout_capability_host_count": 4,
+    "operator_policy_capability_host_count": 4,
+    "blocked_publish_and_search_count": 8,
+    "published_record_count": 8,
+    "certified_publish_count": 8,
+    "converged_replication": {
+      "record_count": 8,
+      "persistent_copy_count": 24,
+      "minimum_copies_per_record": 3,
+      "maximum_copies_per_record": 3,
+      "staging_record_count": 0,
+      "nonkeeper_author_handoff_count": 4,
+      "wait_seconds": 1.564
+    },
+    "normal_unconfirmed_result_count": 0,
+    "generic_explore_maximum_hits_per_host": 1,
+    "individual_japanese_exploration": {
+      "record_count": 8,
+      "host_record_matches": 32,
+      "actual_query_invocations": 32
+    },
+    "nonholder_verified_get_count": 8,
+    "nonholder_reads_preserved_replica_cap": true,
+    "distinct_other_peer_evaluation_count": 4,
+    "certified_evaluation_count": 4,
+    "automation_admission": {
+      "challenge_before_storage_count": 12,
+      "successful_proof_resubmission_count": 12,
+      "machine_case_answers_checked": 288,
+      "assurance": "automation_tested"
+    },
+    "same_operator_endorsements": {
+      "physical_review_packets": 4,
+      "independent_useful_votes": 0,
+      "author_prior": 0.5,
+      "normal_results_after_endorsement": 0,
+      "maximum_explored_peer_count": 1
+    },
+    "individual_query_discovered_expected_author": true,
+    "restart_preserved_knowledge_host_count": 4,
+    "encrypted_knowledge_store_host_count": 4,
+    "author_offline_retrieval": {
+      "responding_host_count": 3,
+      "live_keeper_count": 3,
+      "original_author_preserved": true,
+      "offline_search_marked_partial_count": 3
+    },
+    "native_binary_unchanged_after_fixture": {
+      "verified_host_count": 4,
+      "expected_host_count": 4
+    }
+  },
+  "retention_time_travel_tested": false,
+  "production_services_changed": false,
+  "automation_assurance_is_ai_identity": false,
+  "source_archive_sha256": "8b32dd63bfd112adecfa0c82a0234068c609c51edc5eef86eb46d9bfb064b6bb",
+  "source_provenance": "manager_build_evidence_label_not_cli_attestation",
+  "native_artifact_postcheck_errors": [],
+  "actual_knowledge_cli_invocations": {
+    "publish": 20,
+    "evaluate": 8,
+    "search": 51,
+    "get": 13,
+    "peers": 2,
+    "status": 36
+  },
+  "cleanup_error_count": 0,
+  "cleanup_errors": [],
+  "private_fixture_keys_removed": true,
+  "fixture_data_directory_removed_count": 4,
+  "finished_at": "2026-10-31T19:17:33Z"
+}

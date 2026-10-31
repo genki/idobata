@@ -1,0 +1,92 @@
+{
+  "version": 1,
+  "test": "cargo-final-admission-real-registry-v03",
+  "status": "passed",
+  "checked_at": "2026-10-31T16:48:25.625799Z",
+  "source_commit": "c7313621391cda21fe5cb419ef6b43a9508f0f96",
+  "native_source_archive_sha256": "2c20e8621680b1316138c314ae12c0bf30281bd99a993c8cbe2fc6b714732087",
+  "native_source_files_unchanged": 43,
+  "scanner": {
+    "version": "0.3.0",
+    "official_checksum": "1f70d29f055a307476be41b8a42f2d2471dd721ec905fa6a297e4f398b1edc1e",
+    "license": "MIT",
+    "source_commit": "1fd8bd698ab408ce4d201934d3a348b9e56a9ab1",
+    "official_index": "https://index.crates.io/id/ob/idobata-scanner",
+    "official_download": "https://static.crates.io/crates/idobata-scanner/idobata-scanner-0.3.0.crate"
+  },
+  "sdk": {
+    "name": "idobata",
+    "version": "0.3.0",
+    "file_count": 35,
+    "bytes": 280526,
+    "sha256": "980558e7a268c4d88e8113c4f786acaec78f2776e456b7891da08ed69b888ca2",
+    "license": "MIT",
+    "license_text_matches_root": true,
+    "cargo_vcs_commit": "c7313621391cda21fe5cb419ef6b43a9508f0f96",
+    "cargo_vcs_dirty": true,
+    "rust_files_match_frozen_source": 28,
+    "registry_dependency_checksum": "1f70d29f055a307476be41b8a42f2d2471dd721ec905fa6a297e4f398b1edc1e",
+    "normalized_dependency_has_no_path": true,
+    "readme_sha256": "115bd48899e21f398c540b302442958f8e9e8edc64aca0292ae4f9f363f72d8b",
+    "readme_image_and_links_absolute": true,
+    "readme_temporary_release_status_removed": true,
+    "required_limitations_preserved": true,
+    "embedded_detector_wasm_sha256": "e765bdca9f335bed3c26c2dee1bce39e9eb652e2af2552945c1818934d88e4fd",
+    "contents_match_allowlist": true
+  },
+  "commands": [
+    {
+      "step": "sdk-package",
+      "argv": [
+        "cargo",
+        "package",
+        "-p",
+        "idobata",
+        "--locked",
+        "--allow-dirty",
+        "--target-dir",
+        "target/crates-io-check",
+        "-j",
+        "2"
+      ],
+      "exit_code": 0,
+      "duration_seconds": 33.45
+    },
+    {
+      "step": "sdk-publish-dry-run",
+      "argv": [
+        "cargo",
+        "publish",
+        "--dry-run",
+        "-p",
+        "idobata",
+        "--locked",
+        "--allow-dirty",
+        "--registry",
+        "crates-io",
+        "--target-dir",
+        "target/crates-io-check",
+        "-j",
+        "2"
+      ],
+      "exit_code": 0,
+      "duration_seconds": 6.42
+    }
+  ],
+  "logs": [
+    {
+      "label": "sdk-package",
+      "bytes": 387,
+      "sha256": "fa9e7bc82c86f7b49ce497f74de5a689f4bed2e57255f1e63aeec306f43d63c5"
+    },
+    {
+      "label": "sdk-publish-dry-run",
+      "bytes": 522,
+      "sha256": "3969581b66ab33e411e204d47110a5cf3fa901611cf14e102afb0a1555b3b416"
+    }
+  ],
+  "prior_sdk_artifact_not_adopted": "d24db8969696b1ddcf7f9cc809d5772df5d18afab749799a1f4283580f1bf67a",
+  "sdk_actually_published": false,
+  "real_four_host_verification_completed_by_this_check": false,
+  "native_candidates_rebuilt_by_this_check": false
+}

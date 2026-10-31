@@ -1,0 +1,75 @@
+{
+  "status": "passed",
+  "recorded_at": "2026-10-31T19:13:10.044877+00:00",
+  "platform": "aarch64-apple-darwin",
+  "distribution_build_host": "mac_b",
+  "source_archive_sha256": "8b32dd63bfd112adecfa0c82a0234068c609c51edc5eef86eb46d9bfb064b6bb",
+  "source_tree_sha256": "8036e6e8c4ac23719f4324a94d39bd4a46bf3332285fab092167db2752e78538",
+  "core_compiled_tree_sha256": "4cf185f2c0ff9d1653ff5609b11b7aeacf8fb040d2340bbf3dd3b65a50f3e77d",
+  "source_file_count": 47,
+  "source_files_verified_before_and_after_build": true,
+  "source_mtimes_refreshed": 47,
+  "actual_sdk_compilation_observed": true,
+  "release_build_seconds": 28.94,
+  "toolchain": {
+    "rustc": "rustc 1.91.1 (ed61e7d7e 2025-11-07)",
+    "cargo": "cargo 1.91.1 (ea2d97820 2025-10-10)"
+  },
+  "artifact": {
+    "filename": "idobata-macos-arm64",
+    "sha256": "03a979d349f913eadb043532847a089833f3ea5bc822aae4e3f90c5dd0694275",
+    "bytes": 9513024,
+    "version": "idobata 0.3.0"
+  },
+  "before_clock_fix_candidate_sha256": "37ef6a4607fe22b21b16e1a12b52633e22aceb4e30fc0db8c81410b6ab2bef67",
+  "different_from_before_clock_fix_candidate": true,
+  "verified_remote_to_local_transfer": true,
+  "same_distribution_bytes_on_both_macs": true,
+  "candidate_smoke": {
+    "mac_a": {
+      "sha256": "03a979d349f913eadb043532847a089833f3ea5bc822aae4e3f90c5dd0694275",
+      "bytes": 9513024,
+      "version": "idobata 0.3.0",
+      "policy_id": "c82f9fed20148ff5dba8718396cc4eaeb995ad56e6f9800c203783b289901952",
+      "wasm_sha256": "e765bdca9f335bed3c26c2dee1bce39e9eb652e2af2552945c1818934d88e4fd",
+      "allowed_scan_code": 0,
+      "blocked_scan_code": 20,
+      "home_not_created": true,
+      "profile_sha256": "29e00232e2173148832fac308a6de5106b97d7d6a6124c934bdcf469e9609b01"
+    },
+    "mac_b": {
+      "sha256": "03a979d349f913eadb043532847a089833f3ea5bc822aae4e3f90c5dd0694275",
+      "bytes": 9513024,
+      "version": "idobata 0.3.0",
+      "policy_id": "c82f9fed20148ff5dba8718396cc4eaeb995ad56e6f9800c203783b289901952",
+      "wasm_sha256": "e765bdca9f335bed3c26c2dee1bce39e9eb652e2af2552945c1818934d88e4fd",
+      "allowed_scan_code": 0,
+      "blocked_scan_code": 20,
+      "home_not_created": true,
+      "profile_sha256": "29e00232e2173148832fac308a6de5106b97d7d6a6124c934bdcf469e9609b01"
+    }
+  },
+  "candidate_smoke_uses_home_or_daemon": false,
+  "production_services_changed": false,
+  "production_rooms_or_keys_changed": false,
+  "real_four_host_fixture_executed": false,
+  "protected_upgrade_plan_prepared": true,
+  "upgrade_plan_status": "separate_execution_go_required",
+  "read_only_production_plans": {
+    "mac_a": "passed",
+    "mac_b": "passed",
+    "config_lock_exists_on_either": false,
+    "upgrade_will_create_service_uid_gid_0600_lock": true,
+    "keys_opened_hashed_or_copied": false
+  },
+  "upgrade_helper_synthetic_tests_passed": 10,
+  "rollback_guard": "Old binary restoration requires stopped coherent mutable bytes/protection unchanged; never restore mutable state or nonce counters.",
+  "upgrade_helper_sha256": "1500dbfc05bc241555d20e6c01b838a53af941a4c9f89c8b08ee1d1216648361",
+  "independent_upgrade_helper_review": "own-inode attribute-failure cleanup fixed; three regressions passed",
+  "ordinary_path_baseline_both_macs": {
+    "resolved_expected_launcher": true,
+    "doctor": "healthy",
+    "version": "0.3.0",
+    "production_mutation": false
+  }
+}
