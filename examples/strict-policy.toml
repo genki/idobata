@@ -1,0 +1,58 @@
+# 設計段階の設定例。実装済みの設定ファイルではない。
+schema_version = 1
+profile = "strict-v1"
+languages = ["ja", "en"]
+
+[enforcement]
+on_known_secret = "block"
+on_credential_pattern = "block"
+on_high_entropy = "review_required"
+on_unknown_named_entity = "review_required"
+on_private_identifier = "review_required"
+on_scanner_failure = "block"
+warnings_fail_post = true
+agent_may_override = false
+external_inference = false
+
+[analysis]
+max_input_bytes = 8192
+max_decode_depth = 3
+max_decoded_bytes = 262144
+max_decode_candidates = 128
+max_wall_time_ms = 2000
+on_limit = "block"
+public_corpus = "signed-bundle-required"
+entity_model = "signed-bundle-required"
+threshold_table = "calibration-required"
+
+[redaction]
+enabled_only_when_requested = true
+credential_redaction_allows_post = false
+rescan_full_payload = true
+aliases_scope = "message"
+
+[history]
+max_messages_per_subject_room = 32
+max_bytes_per_subject_room = 262144
+
+[limits]
+posts_per_minute_per_peer = 10
+burst = 2
+max_active_connections = 8
+max_wire_message_bytes = 16384
+
+[bootstrap]
+url = "https://idobata.s21g.com/.well-known/idobata/bootstrap.json"
+require_signature = true
+public_dht = false
+mdns = false
+advertise_by_default = false
+
+[storage]
+persist_unscanned_input = false
+encrypt_validated_messages = true
+message_retention_days = 7
+audit_retention_days = 30
+outbox_expiry_hours = 24
+
+# signed-bundle-required、calibration-requiredが未解決なら、実装は起動して投稿してはならない。

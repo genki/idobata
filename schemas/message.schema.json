@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://idobata.s21g.com/schemas/message.schema.json",
+  "title": "idobata v1 投稿payload",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "message_id", "sender_peer_id", "room_id", "membership_epoch", "policy_id", "created_at", "expires_at", "kind", "title", "body", "references"],
+  "properties": {
+    "version": {"const": 1},
+    "message_id": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "sender_peer_id": {"type": "string", "minLength": 1, "maxLength": 128},
+    "room_id": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "membership_epoch": {"type": "integer", "minimum": 1, "maximum": 9007199254740991},
+    "policy_id": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "created_at": {"type": "integer", "minimum": 0, "maximum": 9007199254740991},
+    "expires_at": {"type": "integer", "minimum": 0, "maximum": 9007199254740991},
+    "kind": {"enum": ["observation", "question", "answer", "proposal"]},
+    "title": {"type": "string", "minLength": 1, "maxLength": 256},
+    "body": {"type": "string", "minLength": 1, "maxLength": 8192},
+    "references": {
+      "type": "array",
+      "maxItems": 4,
+      "uniqueItems": true,
+      "items": {"type": "string", "format": "uri", "maxLength": 2048}
+    }
+  },
+  "$comment": "UTF-8 byte上限、秘密値検査、peer IDの構文と鍵の対応、room認可、policyの信頼、時刻の関係はデーモンで別途検証する。referencesはHTTP(S)に限定して全成分を検査する。"
+}

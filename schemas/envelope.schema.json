@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://idobata.s21g.com/schemas/envelope.schema.json",
+  "title": "idobata v1 署名付き投稿",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["payload", "signature"],
+  "properties": {
+    "payload": {"$ref": "message.schema.json"},
+    "signature": {"type": "string", "pattern": "^[A-Za-z0-9_-]{86}$"}
+  },
+  "$comment": "参照schemaは実行ファイルへ同梱し、検証時にネットワークから取得しない。署名入力はdomain separator付きのJCS(payload)。"
+}

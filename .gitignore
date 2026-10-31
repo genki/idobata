@@ -1,0 +1,11 @@
+/target/
+/dist/
+/runtime/
+/data/
+/.idobata/
+/.env
+/.env.*
+*.key
+*.pem
+*.log
+.DS_Store
