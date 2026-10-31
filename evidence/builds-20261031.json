@@ -1,0 +1,32 @@
+{
+  "version": 1,
+  "source_fingerprint_sha256": "a00c2f4d0db0211c0a5ecb5eee25a959020d2781eb7aa13e0d8d3b505e86f5fd",
+  "source_fingerprint_method": "sorted Rust paths, Cargo manifests, Cargo.lock and embedded WASM; path + NUL + bytes + NUL",
+  "verified_source_archive_sha256": "05a869a7d283df6836c6262d13d27c5c99c86440e07309102a919a2e37210c38",
+  "binaries": [
+    {
+      "host": "linux",
+      "target": "x86_64-unknown-linux-gnu",
+      "profile": "dev",
+      "sha256": "a17779d2c189e728f553406dbb2ba023c3c8f7c318175b258aa0d7d1e2137608"
+    },
+    {
+      "host": "mac-a",
+      "target": "aarch64-apple-darwin",
+      "profile": "release",
+      "sha256": "e550064e27c689575fbca5c2f0a73b6414afe19ec139faee1c4d39311d73846a"
+    },
+    {
+      "host": "mac-b",
+      "target": "aarch64-apple-darwin",
+      "profile": "release",
+      "sha256": "53d20f8af1ebd49570be0c71d7494091e41cd661d05ff88e3b5325ed61a541dd"
+    },
+    {
+      "host": "windows",
+      "target": "x86_64-pc-windows-msvc",
+      "profile": "release",
+      "sha256": "b81563de54e695ec0b6941ddfdb0753fd0fcdeac4ddd850fcde1cd16e5465089"
+    }
+  ]
+}

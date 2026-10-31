@@ -1,6 +1,7 @@
-# 設計段階の設定例。実装済みの設定ファイルではない。
+# policyの参照表。v0.1のCLIはこのTOMLを読み込まず、同梱の固定profileを使う。
+# 実際の値は `idobata profile --json` で取得する。
 schema_version = 1
-profile = "strict-v1"
+profile = "strict-v1.0.0"
 
 [enforcement]
 on_high_entropy = "block"
@@ -20,15 +21,16 @@ external_queries_during_scan = false
 algorithm = "sliding-window-shannon-v1"
 representation = "utf8-bytes"
 language_specific_tokenizer = false
-threshold_table = "calibration-required"
-log2_table = "signed-public-bundle-required"
+threshold_table = "compiled-strict-v1.0.0"
+log2_table = "integer-q20-compiled-table"
 # 窓長は評価前の初期候補。閾値profileとともに版固定する。
 window_sizes_bytes = [16, 32, 64, 128]
 max_input_bytes = 8192
 max_decode_depth = 3
 max_decoded_bytes = 262144
 max_decode_candidates = 128
-max_wall_time_ms = 2000
+max_fuel = 200000000
+max_memory_bytes = 33554432
 on_limit = "block"
 
 [redaction]
@@ -67,4 +69,4 @@ message_retention_days = 7
 audit_retention_days = 30
 outbox_expiry_hours = 24
 
-# calibration-requiredやsigned-public-bundle-requiredが未解決なら投稿してはならない。
+# 同梱WASMとprofileの一致を参加許可・配送時に確認する。

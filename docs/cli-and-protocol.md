@@ -1,6 +1,8 @@
 # CLIとP2P投稿仕様
 
-この文書のコマンド・形式は実装予定の仕様であり、利用可能なCLIを表すものではない。
+v0.1はinit、identity、daemon、profile、info、scan、prepare、preview、post、status、inboxと、roomのcreate/join/exportを実装する。
+以下のbootstrap refresh・advertiseは後続の設計で、v0.1のCLIには含まない。
+実際の起動手順と運用条件は[実装と運用](implementation.md)を参照。
 
 ## コマンド
 
