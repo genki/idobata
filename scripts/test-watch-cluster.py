@@ -25,6 +25,48 @@ def knowledge():
 
 
 class WatchClusterTests(unittest.TestCase):
+    def test_new_canary_keeps_previous_receipts_while_waiting(self):
+        previous = {'request_id': 'old-private-id', 'created_at': 100,
+                    'complete': True, 'delivered_count': 3, 'recipient_count': 3}
+        calls = []
+
+        def invoke(_node, args, _data=None):
+            calls.append(args[0])
+            return ({'request_id': 'new-private-id'} if args[0] == 'post'
+                    else {'delivered_count': 0, 'recipient_count': 3})
+
+        result = WATCH.advance_canary([{}], previous, 3701, invoke)
+        self.assertEqual(result['phase'], 'checking')
+        self.assertEqual(result['deadline_at'], 3746)
+        self.assertEqual(result['last_complete']['created_at'], 100)
+        self.assertNotIn('private-id', json.dumps(result['last_complete']))
+        self.assertEqual(calls, ['post', 'status'])
+        self.assertTrue(previous['complete'])
+
+    def test_pending_canary_deadline_is_not_reset_by_status_failure(self):
+        current = {'request_id': 'private-id', 'created_at': 100,
+                   'deadline_at': 145, 'complete': False, 'phase': 'checking'}
+
+        def failed(*_args):
+            raise RuntimeError('fixture_status_unavailable')
+
+        pending = WATCH.advance_canary([{}], current, 130, failed)
+        self.assertEqual(pending['phase'], 'checking')
+        self.assertTrue(pending['check_failed'])
+        expired = WATCH.advance_canary([{}], pending, 146, failed)
+        self.assertEqual(expired['phase'], 'failed')
+        self.assertEqual(expired['deadline_at'], 145)
+
+    def test_pending_canary_becomes_complete_only_after_all_three_receipts(self):
+        current = {'request_id': 'private-id', 'created_at': 100,
+                   'deadline_at': 145, 'complete': False, 'phase': 'checking'}
+        result = WATCH.advance_canary([{}], current, 130,
+                                     lambda *_: {'delivered_count': 3, 'recipient_count': 3})
+        self.assertEqual(result['phase'], 'complete')
+        self.assertTrue(result['complete'])
+        self.assertEqual(result['last_complete']['created_at'], 100)
+        self.assertNotIn('request_id', result['last_complete'])
+
     def test_knowledge_contains_only_allowlisted_counts(self):
         value = knowledge()
         value['record_id'] = 'private-record-sentinel'

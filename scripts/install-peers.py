@@ -96,6 +96,7 @@ Type=simple
 User=idobata
 Group={group}
 RuntimeDirectory=idobata
+RuntimeDirectoryPreserve=restart
 RuntimeDirectoryMode=0750
 ExecStart={binary} --home {home} daemon
 Restart=on-failure

@@ -89,6 +89,11 @@ idobata側で別のGate認証を追加しない。接続するpeerの認証はNo
 ## 公開処理・TUF権限
 
 公開処理: `idobata-publisher.timer`、30秒ごと、OS user `idobata`。
+localな署名付きfeedの更新・検証は毎回行うが、公開ConfigMapは投稿・withdraw・公開trust/profileが
+変わった場合か、配信中の署名期限の残りが300秒以下になった場合だけ更新する。TTLは600秒。
+bootstrapは自身の内容・期限を別に確認し、内容不変のたびにConfigMapを更新しない。
+公開WSS経路がNGまたは古い場合の広告削除は、後段のfeed処理が失敗しても先に実行する。
+公開statusには未配信のlocal revisionではなく、再取得・再検証したConfigMapの版と期限を記録する。
 TUF更新: `idobata-release.timer`、6時間ごと、別のOS user `idobata-release`。
 各ServiceAccountは`default/configmap/idobata-feed`のget/patchだけを持つ。
 通常の管理者context・moonのkubeconfigを自動処理へ流用しない。
@@ -101,6 +106,16 @@ TUF更新側にはsnapshot/timestampの2鍵しか渡さず、root/targetsはroot
 
 `idobata-watch.service`は30秒ごとに4台のdoctorを取得し、1時間ごとに非公開canaryで
 全3宛先の署名付き受領を確認する。本文をログや監視APIへ出さない。
+次回canaryの開始時には前回の3受領を保持し、新規確認中の最大45秒だけ別の状態として表示する。
+前回の証拠が無い・古い場合や、新しい確認が45秒を超えた場合は正常扱いしない。
+Linux主daemonには`RuntimeDirectoryPreserve=restart`のdrop-inを適用し、再起動だけで
+公開経路の検査結果が消えないようにする。停止・OS再起動や既存の鮮度期限の扱いは変えない。
+
+公開feedは複数backendへのConfigMap反映差で旧版が返ることがある。
+監視は旧版の内外署名と期限を診断し、checkpointを巻き戻さず、追加2接続まで再取得する。
+既に検証した最新版が署名・期限とも有効な場合だけ、最大120秒の配信反映待ちとして保持できる。
+この保持で旧版を採用したり、署名期限を延長したりしない。同revisionの別本文・署名不正・
+期限切れ・継続する巻戻しはNGとする。
 Moon Servicesは次をまとめて検知・表示・通知する。
 
 - サイトrevision、feedの署名・構造・期限・巻戻し

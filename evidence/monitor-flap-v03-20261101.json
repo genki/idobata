@@ -1,0 +1,402 @@
+{
+  "version": 1,
+  "test": "idobata-monitor-flap-fix",
+  "status": "passed",
+  "diagnosis": {
+    "feed_monitor_id": "idobata-feed",
+    "feed_ng_windows_utc": [
+      {
+        "down": "2026-10-31T16:17:00.549Z",
+        "up": "2026-10-31T16:18:00.699Z"
+      },
+      {
+        "down": "2026-10-31T16:49:52.884Z",
+        "up": "2026-10-31T16:51:01.634Z"
+      },
+      {
+        "down": "2026-10-31T17:02:01.334Z",
+        "up": "2026-10-31T17:03:01.089Z"
+      }
+    ],
+    "parallel_http_responses": 8,
+    "older_revision_rejected_responses": 2,
+    "http_observed_revisions": [
+      679,
+      680
+    ],
+    "checkpoint_revision": 680,
+    "backend_count": 2,
+    "mounted_revisions": [
+      680,
+      679
+    ],
+    "simultaneous_configmap_revision": 681,
+    "backend_ready_count": 2,
+    "backend_restart_count": 0,
+    "operational_missing_status": {
+      "monitor_id": "idobata-public-route",
+      "main_restart_utc": "2026-10-31T16:53:38Z",
+      "route_regenerated_utc": "2026-10-31T16:55:24.975Z",
+      "conclusion": "consistent_with_runtime_directory_removal",
+      "causality_basis": "service_configuration_and_timeline",
+      "probe_legacy_version": "0.2.0",
+      "probe_to_main_03_signed_wss_receipt_success": true,
+      "old_probe_version_not_required_to_explain_missing_metadata": true
+    }
+  },
+  "security_properties": {
+    "older_response_never_adopted": true,
+    "checkpoint_never_decreased": true,
+    "same_revision_different_bytes_rejected": true,
+    "old_response_inner_and_outer_signatures_checked": true,
+    "invalid_signature_not_hidden_by_cache": true,
+    "expired_signed_payload_not_hidden_by_cache": true,
+    "cache_grace_seconds": 120,
+    "cache_signed_expiry_not_extended": true,
+    "additional_http_connections_limit": 2,
+    "canary_pending_seconds": 45,
+    "canary_requires_fresh_previous_three_receipts": true,
+    "existing_status_freshness_limits_unchanged": true
+  },
+  "focused_tests": {
+    "websh_tests_passed": 15,
+    "websh_tests_failed": 0,
+    "collector_tests_passed": 10,
+    "collector_tests_failed": 0,
+    "publisher_tests_passed": 24,
+    "publisher_tests_failed": 0,
+    "eslint_passed": true,
+    "python_compile_passed": true,
+    "independent_reviewer_checks": [
+      {
+        "name": "verified_cache_expires_inside_120s_grace",
+        "status": "passed",
+        "clock_advance_seconds": 11,
+        "cached_payload_initial_age_seconds": 590,
+        "reason": "manifest_expired"
+      },
+      {
+        "name": "healthy_cache_does_not_mask_invalid_signature",
+        "status": "passed",
+        "reason": "signature_invalid",
+        "retries": 0
+      }
+    ],
+    "independent_checks_source_modified": false
+  },
+  "build": {
+    "job_id": "8dc9024a4be846a4ab8918d59d38b747",
+    "archive_sha256": "1577c2544523fe7882d652395728d5e086a111a852c36c399ad524f9a3f3e7d8",
+    "archive_bytes": 179920677,
+    "archive_member_count": 332,
+    "revision": 7466,
+    "server_bundle_sha256": "d22620c9dc342c7b8d2ef77a7a8a0ff5055f302e5b10d119eb508cd56ab1a739",
+    "feature_markers_present": true,
+    "server_tests_passed": 1156,
+    "server_tests_failed": 0
+  },
+  "deployment": {
+    "normal_deploy": true,
+    "server_revision": 7466,
+    "client_revision": 7466,
+    "public_revision": 7466,
+    "legacy_client_revision": 7466,
+    "health_status": 200,
+    "served_html_matches_verified_client": true,
+    "entry_assets": {
+      "served_entry_asset_count": 2,
+      "all_match_verified_archive": true,
+      "assets": [
+        {
+          "sha256": "1eba66554aa2bcf59305e69f7fceda22c78a37dc09f77c7946931442c24ae1b3",
+          "bytes": 530798
+        },
+        {
+          "sha256": "36d60b93b87c18396d92f8257ec6eab3b8d2dc4b873dc5be00b17ba00e9ff008",
+          "bytes": 1675604
+        }
+      ]
+    },
+    "websh_owned_commit": "8e9c535791d2a7c22368b991c6c95d0fe0059ef7",
+    "owned_commit_pushed": true
+  },
+  "linux_runtime_fix": {
+    "status": "passed",
+    "runtime_directory_preserve": "restart",
+    "route_metadata_survived_restart": true,
+    "watch_series": "v02",
+    "history_samples_advanced": true,
+    "v03_window_created": false,
+    "preserved": {
+      "identity_key": true,
+      "storage_key": true,
+      "config": true,
+      "watch_unit_content": true,
+      "history_started_at": true
+    },
+    "watcher_sha256": "c49f979c7dffc4511c98a48b4604f4cfa5d48489d355789988497898dc2b267c",
+    "canary_deadline_starts_after_peer_observation": true
+  },
+  "publisher_live_verification": {
+    "status": "passed",
+    "publisher_sha256": "fe89858b3687d5e8d474fa3d817fa206d8a9a335aea173b6db41e93f96f9d6f2",
+    "served_status_matches_configmap": true,
+    "served_revision": 706,
+    "served_expires_at": 1793467726,
+    "initial_feed_updated": true,
+    "initial_bootstrap_updated": true,
+    "unchanged_live_invocations": [
+      {
+        "published": true,
+        "feed_updated": false,
+        "bootstrap_updated": false,
+        "configmap_version_unchanged": true,
+        "data_bytes_unchanged": true
+      },
+      {
+        "published": true,
+        "feed_updated": false,
+        "bootstrap_updated": false,
+        "configmap_version_unchanged": true,
+        "data_bytes_unchanged": true
+      }
+    ],
+    "timer_active": true
+  },
+  "source_files": [
+    {
+      "file": "scripts/publish-feed.py",
+      "sha256": "fe89858b3687d5e8d474fa3d817fa206d8a9a335aea173b6db41e93f96f9d6f2"
+    },
+    {
+      "file": "scripts/test-publish-feed.py",
+      "sha256": "8eea59497c82fb209698df09031410d475fe0c3f751b57838cf9478f2d1d5b7b"
+    },
+    {
+      "file": "scripts/watch-cluster.py",
+      "sha256": "c49f979c7dffc4511c98a48b4604f4cfa5d48489d355789988497898dc2b267c"
+    },
+    {
+      "file": "scripts/test-watch-cluster.py",
+      "sha256": "ac603718b06e88d2e86f4ff06e9dfccbebd11342c8d84598a15eae8435f85248"
+    },
+    {
+      "file": "scripts/install-peers.py",
+      "sha256": "f4c4fe35c0215047994d62256a98b0987e9dff02aae9718118c67ec500c5bbc7"
+    }
+  ],
+  "foreign_worktree_preservation": {
+    "original_dirty_entries": 84,
+    "foreign_source_files_byte_unchanged": 83,
+    "only_expected_generated_revision_changed": true,
+    "websh_committed_owned_files": 2
+  },
+  "room_policy_changed": false,
+  "v03_observation_window_started": false,
+  "manual_completion_notice_sent": false,
+  "limitations": {
+    "long_term_stability_claimed": false,
+    "live_hourly_canary_rollover_observed": false,
+    "live_invalid_signature_injection_performed": false,
+    "production_qa_posts_added": false
+  },
+  "checked_at": "2026-10-31T17:28:58.321577Z",
+  "observation": {
+    "test": "idobata-monitor-post-deployment",
+    "started_at": "2026-10-31T17:22:58.283852Z",
+    "started_at_unix_ms": 1793467378284,
+    "samples": [
+      {
+        "at": "2026-10-31T17:22:58.323725Z",
+        "observation_at": "2026-10-31T17:22:53.413Z",
+        "entry_count": 11,
+        "up": 11,
+        "down": 0,
+        "down_ids": [],
+        "feed_revision": 706,
+        "feed_retries": 0,
+        "feed_verified_cache": false,
+        "publisher_feed_updated": false,
+        "publisher_bootstrap_updated": false,
+        "publisher_served_revision": 706
+      },
+      {
+        "at": "2026-10-31T17:23:28.288761Z",
+        "observation_at": "2026-10-31T17:23:22.464Z",
+        "entry_count": 11,
+        "up": 11,
+        "down": 0,
+        "down_ids": [],
+        "feed_revision": 706,
+        "feed_retries": 0,
+        "feed_verified_cache": false,
+        "publisher_feed_updated": false,
+        "publisher_bootstrap_updated": false,
+        "publisher_served_revision": 706
+      },
+      {
+        "at": "2026-10-31T17:23:58.287972Z",
+        "observation_at": "2026-10-31T17:23:53.709Z",
+        "entry_count": 11,
+        "up": 11,
+        "down": 0,
+        "down_ids": [],
+        "feed_revision": 706,
+        "feed_retries": 0,
+        "feed_verified_cache": false,
+        "publisher_feed_updated": false,
+        "publisher_bootstrap_updated": false,
+        "publisher_served_revision": 706
+      },
+      {
+        "at": "2026-10-31T17:24:28.287494Z",
+        "observation_at": "2026-10-31T17:24:22.296Z",
+        "entry_count": 11,
+        "up": 11,
+        "down": 0,
+        "down_ids": [],
+        "feed_revision": 706,
+        "feed_retries": 0,
+        "feed_verified_cache": false,
+        "publisher_feed_updated": true,
+        "publisher_bootstrap_updated": true,
+        "publisher_served_revision": 718
+      },
+      {
+        "at": "2026-10-31T17:24:58.287804Z",
+        "observation_at": "2026-10-31T17:24:53.648Z",
+        "entry_count": 11,
+        "up": 11,
+        "down": 0,
+        "down_ids": [],
+        "feed_revision": 718,
+        "feed_retries": 0,
+        "feed_verified_cache": false,
+        "publisher_feed_updated": false,
+        "publisher_bootstrap_updated": false,
+        "publisher_served_revision": 718
+      },
+      {
+        "at": "2026-10-31T17:25:28.287194Z",
+        "observation_at": "2026-10-31T17:25:23.189Z",
+        "entry_count": 11,
+        "up": 11,
+        "down": 0,
+        "down_ids": [],
+        "feed_revision": 718,
+        "feed_retries": 0,
+        "feed_verified_cache": false,
+        "publisher_feed_updated": false,
+        "publisher_bootstrap_updated": false,
+        "publisher_served_revision": 718
+      },
+      {
+        "at": "2026-10-31T17:25:58.295093Z",
+        "observation_at": "2026-10-31T17:25:53.050Z",
+        "entry_count": 11,
+        "up": 11,
+        "down": 0,
+        "down_ids": [],
+        "feed_revision": 718,
+        "feed_retries": 0,
+        "feed_verified_cache": false,
+        "publisher_feed_updated": false,
+        "publisher_bootstrap_updated": false,
+        "publisher_served_revision": 718
+      },
+      {
+        "at": "2026-10-31T17:26:28.287553Z",
+        "observation_at": "2026-10-31T17:26:24.642Z",
+        "entry_count": 11,
+        "up": 11,
+        "down": 0,
+        "down_ids": [],
+        "feed_revision": 718,
+        "feed_retries": 0,
+        "feed_verified_cache": false,
+        "publisher_feed_updated": false,
+        "publisher_bootstrap_updated": false,
+        "publisher_served_revision": 718
+      },
+      {
+        "at": "2026-10-31T17:26:58.287798Z",
+        "observation_at": "2026-10-31T17:26:52.907Z",
+        "entry_count": 11,
+        "up": 11,
+        "down": 0,
+        "down_ids": [],
+        "feed_revision": 718,
+        "feed_retries": 0,
+        "feed_verified_cache": false,
+        "publisher_feed_updated": false,
+        "publisher_bootstrap_updated": false,
+        "publisher_served_revision": 718
+      },
+      {
+        "at": "2026-10-31T17:27:28.287742Z",
+        "observation_at": "2026-10-31T17:27:23.587Z",
+        "entry_count": 11,
+        "up": 11,
+        "down": 0,
+        "down_ids": [],
+        "feed_revision": 718,
+        "feed_retries": 0,
+        "feed_verified_cache": false,
+        "publisher_feed_updated": false,
+        "publisher_bootstrap_updated": false,
+        "publisher_served_revision": 718
+      },
+      {
+        "at": "2026-10-31T17:27:58.288307Z",
+        "observation_at": "2026-10-31T17:27:52.483Z",
+        "entry_count": 11,
+        "up": 11,
+        "down": 0,
+        "down_ids": [],
+        "feed_revision": 718,
+        "feed_retries": 0,
+        "feed_verified_cache": false,
+        "publisher_feed_updated": false,
+        "publisher_bootstrap_updated": false,
+        "publisher_served_revision": 718
+      },
+      {
+        "at": "2026-10-31T17:28:28.287186Z",
+        "observation_at": "2026-10-31T17:28:22.558Z",
+        "entry_count": 11,
+        "up": 11,
+        "down": 0,
+        "down_ids": [],
+        "feed_revision": 718,
+        "feed_retries": 0,
+        "feed_verified_cache": false,
+        "publisher_feed_updated": false,
+        "publisher_bootstrap_updated": false,
+        "publisher_served_revision": 718
+      },
+      {
+        "at": "2026-10-31T17:28:58.293931Z",
+        "observation_at": "2026-10-31T17:28:55.699Z",
+        "entry_count": 11,
+        "up": 11,
+        "down": 0,
+        "down_ids": [],
+        "feed_revision": 718,
+        "feed_retries": 0,
+        "feed_verified_cache": false,
+        "publisher_feed_updated": false,
+        "publisher_bootstrap_updated": false,
+        "publisher_served_revision": 718
+      }
+    ],
+    "fetch_errors": 0,
+    "target_seconds": 360,
+    "elapsed_seconds": 360.01,
+    "finished_at": "2026-10-31T17:28:58.321577Z",
+    "independent_sample_count": 13,
+    "entry_down_observation_count": 0,
+    "new_idobata_ng_notifications": 0,
+    "notification_events": [],
+    "status": "passed"
+  }
+}

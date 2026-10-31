@@ -106,6 +106,46 @@ def save(path,value):
     temporary.chmod(0o600);temporary.replace(path)
 
 
+def advance_canary(nodes, previous, now, invoke=call):
+    """前回の受領証拠を保持し、新しい配送の45秒の確認待ちを区別する。"""
+    canary = dict(previous)
+    if not canary or now - canary.get('created_at', 0) > 3600:
+        last_complete = canary.get('last_complete')
+        if (canary.get('complete') is True and canary.get('delivered_count') == 3
+                and canary.get('recipient_count') == 3):
+            last_complete = {key: canary[key] for key in
+                             ['created_at', 'delivered_count', 'recipient_count']}
+        canary = {'created_at': now, 'deadline_at': now + 45,
+                  'complete': False, 'phase': 'checking', 'check_failed': False}
+        if isinstance(last_complete, dict):
+            # request IDや本文を過去証拠の公開集計へ入れない。
+            canary['last_complete'] = {key: last_complete[key] for key in
+                                      ['created_at', 'delivered_count', 'recipient_count']
+                                      if key in last_complete}
+    try:
+        if 'request_id' not in canary:
+            message = {'kind': 'observation', 'title': '定期疎通確認',
+                       'body': '常設ノード間の配送を定期確認しています。', 'references': []}
+            result = invoke(nodes[0], ['post', '--room', 'engineering', '--stdin',
+                                      '--input', 'json', '--wait', 'accepted'],
+                            json.dumps(message, ensure_ascii=False))
+            canary['request_id'] = result['request_id']
+        result = invoke(nodes[0], ['status', '--message', canary['request_id']])
+        canary.update(delivered_count=result['delivered_count'],
+                      recipient_count=result['recipient_count'], check_failed=False)
+        canary['complete'] = result['delivered_count'] == result['recipient_count'] == 3
+        if canary['complete']:
+            canary.update(phase='complete', last_success=now)
+            canary['last_complete'] = {key: canary[key] for key in
+                                      ['created_at', 'delivered_count', 'recipient_count']}
+        else:
+            canary['phase'] = 'checking' if now < canary.get('deadline_at', 0) else 'failed'
+    except (OSError, ValueError, KeyError, subprocess.SubprocessError, RuntimeError):
+        canary['check_failed'] = True
+        canary['phase'] = 'checking' if now < canary.get('deadline_at', 0) else 'failed'
+    return canary
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--series', choices=['v02', 'v03'], default='v02',
@@ -143,18 +183,7 @@ def main():
             if key in old_uptimes and node['uptime_seconds']<old_uptimes[key]:restarts[key]=restarts.get(key,0)+1
             old_uptimes[key]=node['uptime_seconds']
         # 非公開roomの定型canaryで、全宛先の受領を時間を分けて確認する。
-        try:
-            if not canary or now-canary.get('created_at',0)>3600:
-                message={'kind':'observation','title':'定期疎通確認','body':'常設ノード間の配送を定期確認しています。','references':[]}
-                result=call(nodes[0],['post','--room','engineering','--stdin','--input','json','--wait','accepted'],json.dumps(message,ensure_ascii=False))
-                canary={'request_id':result['request_id'],'created_at':now,'complete':False}
-            result=call(nodes[0],['status','--message',canary['request_id']])
-            canary.update(complete=result['delivered_count']==result['recipient_count'],
-                          delivered_count=result['delivered_count'],recipient_count=result['recipient_count'],
-                          check_failed=False)
-            if canary['complete']:canary['last_success']=now
-        except (OSError,ValueError,KeyError,subprocess.SubprocessError,RuntimeError):
-            canary['check_failed']=True
+        canary = advance_canary(nodes, canary, time.time())
         elapsed=now-start
         stability={'version':2,'series':args.series,'started_at':start,'checked_at':now,'elapsed_seconds':elapsed,
                    'required_seconds':72*3600,'samples':samples,'failed_samples':failed_samples,
