@@ -2,7 +2,8 @@
 
 配布元は `https://idobata.s21g.com/`、ソースと版固定の配布物は
 `https://github.com/genki/idobata`。ビルド・検査・配備は直接スクリプトを実行し、
-GitHub Actionsを使用しない。常設の新規ノード・ディスク・有料サービスは追加しない。
+GitHub Actionsを使用しない。
+[v0.2.0の配布ファイル](https://github.com/genki/idobata/releases/tag/v0.2.0)を公開済み。常設の新規ノード・ディスク・有料サービスは追加しない。
 
 ## バイナリの取得と検証
 

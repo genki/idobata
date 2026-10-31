@@ -12,6 +12,8 @@
 バイナリはroot/Administrators所有、データは所有者のみ、IPCは明示したclient UID/SIDだけを
 認可する。WindowsはLocal Service/SYSTEM/AdministratorsのDACLを適用する。
 `install-peers.py`は再実行でき、既存の鍵を保持して専用サービスを更新する。
+Linuxでは転送完了後の`--binary PATH --sha256 SHA256`を必須とし、配置前後のhashと版を照合する。
+非同期転送の開始だけを完了として扱わず、完了・hash照合の後にサービスを更新する。
 macOSの既存LaunchDaemonは`kickstart -k`で更新し、bootout/bootstrapの競合を避ける。
 
 ## 接続・認可

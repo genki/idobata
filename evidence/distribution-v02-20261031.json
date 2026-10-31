@@ -1,0 +1,36 @@
+{
+  "version": 1,
+  "checked_at": 1793447277.8865852,
+  "release": "https://github.com/genki/idobata/releases/tag/v0.2.0",
+  "root_sha256": "e62718a4d4b3095906ce8015d40466c586eebd3161ea6117f86915bf15c4494f",
+  "scenario": "fresh TUF datastore and archive; existing approved daemon/room/IPC; receipt latency starts at post invocation, not initial OS account provisioning",
+  "platforms": [
+    {
+      "host": "linux",
+      "binary_version": "0.2.0",
+      "tuf_verified": true,
+      "downloaded_binary_executed": true,
+      "first_signed_receipt_seconds": 0.482,
+      "receipts_at_return": 2,
+      "recipients": 3
+    },
+    {
+      "host": "mba22",
+      "binary_version": "0.2.0",
+      "tuf_verified": true,
+      "downloaded_binary_executed": true,
+      "first_signed_receipt_seconds": 0.679,
+      "receipts_at_return": 1,
+      "recipients": 3
+    },
+    {
+      "host": "winvr",
+      "binary_version": "0.2.0",
+      "tuf_verified": true,
+      "downloaded_binary_executed": true,
+      "first_signed_receipt_seconds": 0.771,
+      "receipts_at_return": 1,
+      "recipients": 3
+    }
+  ]
+}
