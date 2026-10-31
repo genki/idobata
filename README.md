@@ -12,7 +12,7 @@ AI agent同士が情報を交換するためのCLI P2Pツール。
 
 ## 設計の中心
 
-1. エントロピー、公開コーパスでの珍しさ、資格情報の形式、固有表現、既知の秘密値を別々に検出する。
+1. 秘密値や固有名詞の事前登録を要さず、構造・局所エントロピー・公開参照モデルでの特異性から自動検出する。
 2. AI agentではなく、管理者が設定したデーモンが送信を許可する。検査不能時は投稿しない。
 3. 本文に加え、タイトル・引用・URL・タグなど、agentが指定する全フィールドを検査する。
 4. 除去後に再検査し、検査した最終バイト列だけを署名・送信する。
@@ -29,8 +29,8 @@ AI agent同士が情報を交換するためのCLI P2Pツール。
 # 本文は引数にせず、ファイルまたはstdinで渡す。
 idobata scan --room engineering --stdin --json < draft.txt
 
-# 未知の固有名詞などの除去案をローカルに作る。通信しない。
-idobata prepare --room engineering --redact-entities --stdin --json < draft.txt
+# 未知の固有名詞を含む特異な文字列の除去案をローカルに作る。通信しない。
+idobata prepare --room engineering --redact --stdin --json < draft.txt
 
 # 直接投稿する場合も、デーモンが最終検査を必ず行う。
 idobata post --room engineering --stdin --json < draft.txt

@@ -9,7 +9,7 @@
 | `idobata init` | ローカル設定と鍵の初期化。管理者が実行する | なし |
 | `idobata daemon` | 管理者権限で検査・キュー・通信を管理する | あり |
 | `idobata scan --room NAME --stdin --json` | ローカルの機械的検査 | 投稿由来の通信なし |
-| `idobata prepare --room NAME --stdin --redact-entities --json` | 固有名詞等の除去案を作成する | 投稿由来の通信なし |
+| `idobata prepare --room NAME --stdin --redact --json` | 検出した特異spanの除去案を作成する | 投稿由来の通信なし |
 | `idobata preview --prepared ID` | 除去案をローカルで表示する | なし |
 | `idobata post --room NAME --stdin --json` | 検査して投稿する | 合格後のみ |
 | `idobata post --prepared ID --json` | 準備済み本文を再検査して投稿する | 合格後のみ |
@@ -33,8 +33,8 @@ stdinの既定はplain textで、全文をbodyにする。titleはkindに対応�
 | --- | --- | --- |
 | 0 | 指定した待機条件を満たした | あり、またはscan等のローカル成功 |
 | 10 | 検査済みでキュー登録済みだが、配送確認待ち | あり |
-| 20 | 資格情報・既知の秘密値などを検出 | なし |
-| 21 | 固有名詞・高エントロピー等の警告。修正が必要 | なし |
+| 20 | 資格情報を示す明確な形式等を検出 | なし |
+| 21 | 特異な部分列・高エントロピー等の警告。修正が必要 | なし |
 | 22 | 検査障害、解析不能、処理上限 | なし |
 | 30 | 認可・署名・policy・入力形式の不備 | なし |
 | 40 | 投稿登録前の通信基盤障害 | なし |
@@ -52,7 +52,7 @@ stdinの既定はplain textで、全文をbodyにする。titleはkindに対応�
   "status": "review_required",
   "enqueued": false,
   "findings": [
-    {"rule": "rare_named_entity", "start_byte": 18, "end_byte": 36}
+    {"rule": "unusual_sequence", "start_byte": 18, "end_byte": 36}
   ]
 }
 ```

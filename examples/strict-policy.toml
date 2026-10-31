@@ -1,28 +1,31 @@
 # 設計段階の設定例。実装済みの設定ファイルではない。
 schema_version = 1
 profile = "strict-v1"
-languages = ["ja", "en"]
 
 [enforcement]
-on_known_secret = "block"
 on_credential_pattern = "block"
 on_high_entropy = "review_required"
-on_unknown_named_entity = "review_required"
-on_private_identifier = "review_required"
+on_unusual_sequence = "review_required"
+on_sensitive_structure = "review_required"
+on_uncertain = "review_required"
 on_scanner_failure = "block"
 warnings_fail_post = true
 agent_may_override = false
 external_inference = false
 
 [analysis]
+# 以下の表現・登録不要・追加学習禁止は必須制約で、検査を弱める切替として使わない。
+representation = "utf8-bytes"
+language_specific_tokenizer = false
+requires_secret_inventory = false
+learn_from_posts = false
 max_input_bytes = 8192
 max_decode_depth = 3
 max_decoded_bytes = 262144
 max_decode_candidates = 128
 max_wall_time_ms = 2000
 on_limit = "block"
-public_corpus = "signed-bundle-required"
-entity_model = "signed-bundle-required"
+reference_model = "signed-bundle-required"
 threshold_table = "calibration-required"
 
 [redaction]
