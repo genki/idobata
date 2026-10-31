@@ -1,0 +1,75 @@
+{
+  "version": 1,
+  "test": "resumed-one-hour-stability-checkpoint",
+  "status": "passed",
+  "checked_at": 1793479418.8423736,
+  "series": "v03",
+  "started_at": 1793475161.8238487,
+  "elapsed_seconds": 4231.728354215622,
+  "samples": 133,
+  "failed_samples": 0,
+  "service_restarts": 0,
+  "max_observation_gap_seconds": 35.39118003845215,
+  "history_start_unchanged": true,
+  "scheduled_hourly_canary_after_first_hour": {
+    "created_at": 1793478784.9942412,
+    "complete": true,
+    "delivered_count": 3,
+    "recipient_count": 3
+  },
+  "alert_log_bytes_unchanged_since_release_observation": true,
+  "new_ng_notifications_since_release_observation": 0,
+  "public_feed": {
+    "signature_verified": true,
+    "revision": 1086,
+    "expires_at": 1793479945
+  },
+  "public_site_revision_matches": true,
+  "tuf_roles": {
+    "root": {
+      "version": 1,
+      "expires_at": 1824982332.0,
+      "matches_previously_verified_signed_metadata": true
+    },
+    "targets": {
+      "version": 200,
+      "expires_at": 1801250632.0,
+      "matches_previously_verified_signed_metadata": true
+    },
+    "snapshot": {
+      "version": 201,
+      "expires_at": 1794079437.749229,
+      "matches_previously_verified_signed_metadata": true
+    },
+    "timestamp": {
+      "version": 201,
+      "expires_at": 1793561037.760394,
+      "matches_previously_verified_signed_metadata": true
+    }
+  },
+  "timers": {
+    "idobata-publisher.timer": {
+      "active": true,
+      "next_at": 1793479442.511243
+    },
+    "idobata-public-route.timer": {
+      "active": true,
+      "next_at": 1793479473.049042
+    },
+    "idobata-release.timer": {
+      "active": true,
+      "next_at": 1793496239.492831
+    },
+    "idobata-renew.timer": {
+      "active": true,
+      "next_at": 1793496762.522953
+    }
+  },
+  "publisher_next_before_feed_expiry": true,
+  "tuf_refresh_next_before_timestamp_expiry": true,
+  "public_targets": 6,
+  "seventy_two_hours_complete": false,
+  "os_reboot_or_sleep_tested": false,
+  "production_configuration_or_keys_changed": false,
+  "posts_generated_by_this_check": false
+}
