@@ -1,0 +1,958 @@
+#!/usr/bin/env python3
+"""Opt-in, isolated four-host verification of the agent knowledge workflow.
+
+Uses the inventory format and Node fixture helper from verify-peers.py. Binary
+paths must already select the new SDK; this script never installs a binary or
+changes production services. Inventory ports are deliberately replaced with
+39130..39133. Only the fixture's daemons, tunnels and data are removed.
+
+The report contains counts and outcomes, never record bodies, queries, peer IDs,
+addresses, certificates, synthetic token values or private exception messages.
+Private daemon logs remain in a mode-0700 directory beside the output file.
+"""
+
+import argparse
+import copy
+from concurrent.futures import ThreadPoolExecutor
+import hashlib
+import importlib.util
+import json
+import os
+from pathlib import Path
+import re
+import shlex
+import subprocess
+import struct
+import sys
+import time
+from types import SimpleNamespace
+
+
+HELPER_PATH = Path(__file__).with_name('verify-peers.py')
+SPEC = importlib.util.spec_from_file_location('idobata_peer_fixture', HELPER_PATH)
+HELPERS = importlib.util.module_from_spec(SPEC)
+SPEC.loader.exec_module(HELPERS)
+
+ROOM = 'knowledge'
+QUERY = '知識検証'
+FIXTURE_PORTS = range(39130, 39134)
+MUTATION_INTERVAL = 6.1
+WAIT_SECONDS = 180
+ID_PATTERN = re.compile(r'^[0-9a-f]{64}$')
+AUTOMATION_ALGORITHM = 'sha256-u16le-sort-rotate-fold-v1'
+AUTOMATION_CASES = 24
+AUTOMATION_VALUES = 16
+AUTOMATION_PACKET_BYTES = 16 * 1024
+
+
+class VerificationFailure(RuntimeError):
+    """A static, body-free failure label that may safely enter the report."""
+
+
+def check(condition, label):
+    if not condition:
+        raise VerificationFailure(label)
+
+
+def parallel(function, values):
+    with ThreadPoolExecutor(max_workers=4) as executor:
+        return list(executor.map(function, values))
+
+
+def fixture_node_config(config, index, port):
+    """本番homeを候補inventoryから引き継がず、一時領域の子だけを使う。"""
+    check(isinstance(config, dict), 'invalid_inventory_node')
+    platform = config.get('platform')
+    root = config.get('root')
+    binary = config.get('binary')
+    check(platform in ['linux', 'macos', 'windows'] and isinstance(root, str)
+          and isinstance(binary, str) and binary, 'invalid_fixture_inventory_fields')
+    root = root.replace('\\', '/').rstrip('/')
+    check(not any(part in ['.', '..'] for part in root.split('/'))
+          and not any(ord(character) < 32 for character in root),
+          'invalid_fixture_root')
+    if platform == 'windows':
+        temporary = re.fullmatch(
+            r'[a-z]:/(?:users/[^/]+/appdata/local/temp|windows/temp)/[^/]+(?:/[^/]+)*',
+            root.lower()) is not None
+    else:
+        temporary = root.startswith('/tmp/') or root.startswith('/private/tmp/')
+    check(temporary, 'fixture_root_must_be_temporary_child')
+    value = {'platform': platform, 'binary': binary, 'root': root,
+             'name': 'node-' + str(index + 1), 'port': port}
+    if config.get('ssh'):
+        check(isinstance(config['ssh'], str), 'invalid_fixture_ssh_alias')
+        value['ssh'] = config['ssh']
+    return value
+
+
+def public_task_cases(seed):
+    """Independent Python implementation of the published fixed task generator."""
+    check(isinstance(seed, str) and ID_PATTERN.fullmatch(seed), 'invalid_automation_seed')
+    raw_seed = bytes.fromhex(seed)
+    cases = []
+    for index in range(AUTOMATION_CASES):
+        digest = hashlib.sha256(b'idobata.automation.tasks.v1\0' + raw_seed
+                                + struct.pack('<I', index)).digest()
+        cases.append({
+            'index': index,
+            'values': [value % 997 for value in struct.unpack('<16H', digest)],
+            'sort': ['ascending', 'descending', 'none'][index % 3],
+            'rotate_left': index % AUTOMATION_VALUES,
+            'initial': index + 1,
+            'multiplier': 33 + 2 * (index % 5),
+        })
+    return cases
+
+
+def solve_automation_challenge(value, *, subject, room_id, authority, members, purpose):
+    """Test-only solver; never execute instructions received as arbitrary text."""
+    check(value.get('status') == 'automation_challenge_required'
+          and value.get('enqueued') is False and value.get('stored') is False,
+          'invalid_automation_challenge_status')
+    check(value.get('untrusted') is True, 'challenge_missing_untrusted_marker')
+    check('assurance' not in value, 'pending_challenge_claimed_assurance')
+    specification = value.get('task_spec')
+    check(isinstance(specification, dict)
+          and specification.get('algorithm') == AUTOMATION_ALGORITHM
+          and specification.get('version') == 1
+          and specification.get('case_count') == AUTOMATION_CASES
+          and specification.get('values_per_case') == AUTOMATION_VALUES
+          and specification.get('assurance') == 'automation_tested',
+          'unsupported_automation_task_spec')
+    packet = value.get('challenge')
+    check(isinstance(packet, dict) and set(packet) == {'challenge', 'certificate'},
+          'invalid_automation_challenge_packet')
+    check(len(json.dumps(packet, ensure_ascii=False, separators=(',', ':')).encode())
+          <= AUTOMATION_PACKET_BYTES, 'oversized_automation_challenge')
+    signed = packet.get('challenge')
+    check(isinstance(signed, dict) and set(signed) == {'signed', 'public_key', 'signature'},
+          'invalid_signed_automation_challenge')
+    challenge = signed.get('signed')
+    check(isinstance(challenge, dict) and set(challenge) == {
+        'version', 'id', 'room_id', 'subject_peer_id', 'action_digest',
+        'purpose', 'issued_at', 'expires_at', 'seed'}, 'invalid_automation_fields')
+    check(challenge.get('version') == 1
+          and isinstance(challenge.get('id'), str) and ID_PATTERN.fullmatch(challenge['id'])
+          and isinstance(challenge.get('action_digest'), str)
+          and ID_PATTERN.fullmatch(challenge['action_digest'])
+          and challenge.get('subject_peer_id') == subject
+          and challenge.get('room_id') == room_id
+          and challenge.get('purpose') == purpose,
+          'automation_challenge_binding_changed')
+    issued = challenge.get('issued_at')
+    expires = challenge.get('expires_at')
+    check(type(issued) is int and type(expires) is int
+          and 0 <= issued < expires <= 9_007_199_254_740_991
+          and expires - issued <= 120, 'invalid_automation_challenge_lifetime')
+    issuer = members.get(signed.get('public_key'))
+    check(issuer is not None and issuer != subject, 'challenge_not_issued_by_other_member')
+    certificate = packet.get('certificate')
+    check(isinstance(certificate, dict) and certificate.get('authority_peer_id') == authority,
+          'automation_authority_changed')
+    room = certificate.get('certificate', {}).get('signed', {})
+    check(room.get('room_id') == room_id
+          and room.get('knowledge_automation_required') is True,
+          'automation_room_policy_changed')
+    cases = public_task_cases(challenge.get('seed'))
+    check(value.get('tasks') == cases, 'public_automation_tasks_do_not_match_seed')
+    answers = []
+    for case in cases:
+        values = list(case['values'])
+        if case['sort'] != 'none':
+            values.sort(reverse=case['sort'] == 'descending')
+        offset = case['rotate_left']
+        values = values[offset:] + values[:offset]
+        accumulated = case['initial']
+        for position, item in enumerate(values):
+            accumulated = (accumulated * case['multiplier'] + (position + 1) * item) & 0xffffffff
+            rotation = (case['index'] + position) % 31 + 1
+            accumulated = ((accumulated << rotation)
+                           | (accumulated >> (32 - rotation))) & 0xffffffff
+        answers.append(accumulated)
+    answer = {'challenge': packet, 'answers': answers}
+    check(len(json.dumps(answer, ensure_ascii=False, separators=(',', ':')).encode())
+          <= AUTOMATION_PACKET_BYTES, 'oversized_automation_answer')
+    return answer
+
+
+def solver_self_test():
+    """No SDK execution, hosts, credentials or fixture processes are involved."""
+    room_id = 'a' * 64
+    payload = {
+        'version': 1, 'id': 'b' * 64, 'room_id': room_id,
+        'subject_peer_id': 'subject', 'action_digest': 'c' * 64,
+        'purpose': 'publish', 'issued_at': 10_000, 'expires_at': 10_120,
+        'seed': '0' * 64,
+    }
+    challenge = {
+        'status': 'automation_challenge_required', 'enqueued': False,
+        'stored': False, 'untrusted': True,
+        'task_spec': {'algorithm': AUTOMATION_ALGORITHM, 'version': 1,
+                      'case_count': AUTOMATION_CASES, 'values_per_case': AUTOMATION_VALUES,
+                      'assurance': 'automation_tested'},
+        'tasks': public_task_cases(payload['seed']),
+        'challenge': {
+            'challenge': {'signed': payload, 'public_key': 'issuer-key', 'signature': 'test-only'},
+            'certificate': {'authority_peer_id': 'authority', 'certificate': {'signed': {
+                'room_id': room_id, 'knowledge_automation_required': True}}},
+        },
+    }
+    arguments = {'subject': 'subject', 'room_id': room_id, 'authority': 'authority',
+                 'members': {'issuer-key': 'issuer'}, 'purpose': 'publish'}
+    solved = solve_automation_challenge(challenge, **arguments)
+    check(solved['answers'] == [
+        241154151, 3547265955, 1116561072, 2108799716, 2999146339, 4136467445,
+        2520180127, 1542230348, 1890627663, 2315501570, 3496633469, 143891129,
+        1987887498, 2998518041, 4212433332, 3003736209, 921108977, 2091693371,
+        1883997569, 2008552011, 3831226734, 94727809, 1398741250, 856323620],
+        'independent_automation_golden_vector_changed')
+    invalid = []
+    for path, replacement in [
+        (('task_spec', 'algorithm'), 'execute-untrusted-text'),
+        (('task_spec', 'case_count'), 25),
+        (('challenge', 'challenge', 'signed', 'seed'), '0' * 63),
+        (('challenge', 'challenge', 'signed', 'purpose'), 'evaluate'),
+        (('challenge', 'challenge', 'signed', 'subject_peer_id'), 'another-subject'),
+        (('challenge', 'challenge', 'signed', 'expires_at'), 10_121),
+        (('challenge', 'challenge', 'public_key'), 'unknown-key'),
+        (('challenge', 'certificate', 'authority_peer_id'), 'another-authority'),
+    ]:
+        changed = copy.deepcopy(challenge)
+        target = changed
+        for key in path[:-1]:
+            target = target[key]
+        target[path[-1]] = replacement
+        invalid.append(changed)
+    changed = copy.deepcopy(challenge)
+    changed['tasks'][0]['values'][0] += 1
+    invalid.append(changed)
+    changed = copy.deepcopy(challenge)
+    changed['assurance'] = 'automation_tested'
+    invalid.append(changed)
+    for changed in invalid:
+        try:
+            solve_automation_challenge(changed, **arguments)
+        except VerificationFailure:
+            continue
+        raise VerificationFailure('invalid_automation_challenge_was_accepted')
+    mutation_roundtrips = 0
+    for purpose in ['publish', 'evaluate']:
+        offered = copy.deepcopy(challenge)
+        offered['challenge']['challenge']['signed']['purpose'] = purpose
+        node = SimpleNamespace(
+            peer_id='subject', room_id=room_id, authority='authority',
+            member_keys={'issuer-key': 'issuer'}, home='/unused-test-fixture',
+            automation_counts={'publish': 0, 'evaluate': 0})
+        written = {}
+        calls = []
+        removed = []
+        body = {'test': 'unchanged action input'}
+        base_args = ['knowledge', purpose, '--room', ROOM, '--stdin']
+
+        def mutation_request(args, data, codes):
+            check(data == body, 'proof_resubmission_changed_stdin')
+            calls.append((list(args), codes))
+            if len(calls) == 1:
+                check(args == base_args and codes == (31,), 'challenge_exit_not_required')
+                return offered
+            check(codes == (0,) and args[:-2] == base_args and args[-2] == '--proof',
+                  'proof_not_submitted_to_same_action')
+            answer = json.loads(written[args[-1]])
+            check(answer['challenge'] == offered['challenge']
+                  and answer['answers'] == solved['answers'], 'wrong_proof_file_shape')
+            return {'status': 'accepted', 'id': 'c' * 64, 'stored': True,
+                    'evaluation_applied': True, 'assurance': 'automation_tested'}
+
+        node.mutation_request = mutation_request
+        node.put = lambda path, contents: written.__setitem__(path, contents)
+        node.remove_fixture_file = removed.append
+        node.run = lambda _args: {
+            'replication_factor': 3, 'records': [], 'objects': 0,
+            'bytes': 64, 'quota_bytes': 64 * 1024 * 1024}
+        FixtureNode.mutate(node, base_args, body)
+        check(len(calls) == 2 and len(removed) == 1
+              and node.automation_counts[purpose] == 1,
+              'automation_mutation_roundtrip_incomplete')
+        mutation_roundtrips += 1
+    for platform, path in [
+        ('linux', '/var/lib/idobata'),
+        ('macos', '/Library/Application Support/idobata'),
+        ('windows', 'C:/ProgramData/idobata'),
+        ('linux', '/tmp/../var/lib/idobata'),
+    ]:
+        try:
+            fixture_node_config({'platform': platform, 'root': path,
+                                 'binary': '/unused/candidate'}, 0, 39130)
+        except VerificationFailure:
+            continue
+        raise VerificationFailure('production_home_accepted_as_fixture_root')
+    for platform, path in [
+        ('linux', '/tmp/idobata-v03-fixture'),
+        ('macos', '/private/tmp/idobata-v03-fixture'),
+        ('windows', 'C:/Users/fixture/AppData/Local/Temp/idobata-v03-fixture'),
+    ]:
+        selected = fixture_node_config({'platform': platform, 'root': path,
+                                        'binary': '/unused/candidate',
+                                        'home': 'production-home-sentinel',
+                                        'identity': 'private-metadata-sentinel'}, 0, 39130)
+        check('home' not in selected and 'identity' not in selected,
+              'production_metadata_retained_in_fixture_config')
+    return {'golden_answer_count': len(solved['answers']),
+            'rejected_invalid_challenge_count': len(invalid),
+            'mock_challenge_proof_roundtrip_count': mutation_roundtrips,
+            'rejected_unsafe_fixture_root_count': 4}
+
+
+class FixtureNode(HELPERS.Node):
+    """Keep helper lifecycle operations, suppress raw CLI output on failures."""
+
+    def __init__(self, config, logs, run_id):
+        super().__init__(config, logs, run_id)
+        os.chmod(logs / (self.name + '.log'), 0o600)
+        self.last_mutation = 0.0
+        self.automation_counts = {'publish': 0, 'evaluate': 0}
+
+    def run(self, args, data=None, codes=(0,), timeout=35):
+        if isinstance(data, str):
+            data = data.encode()
+        result = subprocess.run(self.argv(args), input=data, capture_output=True,
+                                timeout=timeout)
+        check(result.returncode in codes, 'unexpected_cli_exit')
+        try:
+            value = json.loads(result.stdout.decode('utf-8-sig'))
+        except (ValueError, UnicodeError):
+            raise RuntimeError('invalid_cli_json') from None
+        check(isinstance(value, dict), 'invalid_cli_json_object')
+        return value
+
+    def mutation_request(self, args, data, codes):
+        delay = self.last_mutation + MUTATION_INTERVAL - time.monotonic()
+        if delay > 0:
+            time.sleep(delay)
+        self.last_mutation = time.monotonic()
+        return self.run(args, json.dumps(data, ensure_ascii=False), codes=codes)
+
+    def mutate(self, args, data):
+        purpose = args[1]
+        check(purpose in self.automation_counts, 'unsupported_fixture_mutation')
+        # Both the initial request and proof resubmission consume a rate token.
+        # Space every CLI mutation by 6.1 seconds, rather than only each pair.
+        challenge = self.mutation_request(args, data, codes=(31,))
+        answer = solve_automation_challenge(
+            challenge, subject=self.peer_id, room_id=self.room_id,
+            authority=self.authority, members=self.member_keys, purpose=purpose)
+        if purpose == 'publish':
+            pending_id = answer['challenge']['challenge']['signed']['action_digest']
+            local = status(self)
+            check(all(item['id'] != pending_id for item in local['records']),
+                  'challenge_stored_record_before_certification')
+        proof_path = self.home + '/automation-answer-' + str(sum(self.automation_counts.values())) + '.json'
+        self.put(proof_path, json.dumps(answer, ensure_ascii=False, separators=(',', ':')))
+        try:
+            result = self.mutation_request(args + ['--proof', proof_path], data, codes=(0,))
+        finally:
+            self.remove_fixture_file(proof_path)
+        check(result.get('status') == 'accepted'
+              and result.get('assurance') == 'automation_tested',
+              'accepted_action_missing_automation_receipt')
+        if purpose == 'publish':
+            check(result.get('id') == pending_id, 'certified_publish_digest_changed')
+        else:
+            check(result.get('evaluation_applied') is True, 'certified_evaluation_not_applied')
+        self.automation_counts[purpose] += 1
+        return result
+
+    def remove_fixture_file(self, path):
+        if self.win:
+            quoted = HELPERS.ps_quote(path)
+            result = self.powershell(f'Remove-Item -LiteralPath {quoted} -Force')
+        elif self.host:
+            result = self.shell('rm -f -- ' + shlex.quote(path))
+        else:
+            Path(path).unlink(missing_ok=True)
+            return
+        check(result.returncode == 0, 'fixture_answer_cleanup_failed')
+
+    def stop(self):
+        if self.daemon is None:
+            return
+        if not self.host:
+            super().stop()
+            return
+        # An SSH client's exit does not establish that its remote daemon stopped.
+        # Match the exact fixture home even when the helper's SSH child has died.
+        if self.win:
+            quote = HELPERS.ps_quote
+            script = f"""
+$fixtureProcesses=@(Get-CimInstance Win32_Process -Filter "Name='idobata.exe'" | Where-Object {{ $_.ExecutablePath -and $_.ExecutablePath.Replace('\\','/') -eq {quote(self.binary)} -and $_.CommandLine -and $_.CommandLine.Replace('\\','/').Contains({quote(self.home)}) -and $_.CommandLine.Contains('daemon') }})
+if ($fixtureProcesses.Count -gt 1) {{ throw 'ambiguous fixture process' }}
+$fixtureProcesses | ForEach-Object {{ Stop-Process -Id $_.ProcessId -Force }}
+"""
+            result = self.powershell(script)
+        else:
+            expected = shlex.join([self.binary, '--home', self.home, 'daemon'])
+            script = f"""python3 - <<'STOP'
+from pathlib import Path
+import os,signal,subprocess,time
+path=Path({self.home + '/daemon.pid'!r})
+if path.exists():
+ pid=int(path.read_text())
+ def current():
+  result=subprocess.run(['ps','-p',str(pid),'-o','command='],capture_output=True,text=True)
+  return result.stdout.strip() if result.returncode==0 else ''
+ command=current()
+ if command and command!={expected!r}:
+  raise SystemExit('unexpected fixture process')
+ if command:
+  os.kill(pid,signal.SIGINT)
+  deadline=time.monotonic()+12
+  while current()=={expected!r} and time.monotonic()<deadline:time.sleep(0.1)
+  if current()=={expected!r}:raise SystemExit('fixture did not stop')
+STOP"""
+            result = self.shell(script)
+        check(result.returncode == 0, 'fixture_stop_failed')
+        try:
+            self.daemon.wait(timeout=12)
+        except subprocess.TimeoutExpired:
+            self.daemon.terminate()
+            self.daemon.wait(timeout=5)
+
+    def remove_data(self):
+        if not self.initialized:
+            return
+        check(self.daemon is None or self.daemon.poll() is not None,
+              'cannot_remove_active_fixture')
+        # init may have failed after creating keys. Cleanup is idempotent and
+        # covers that partially initialized fixture too.
+        if self.win:
+            path = HELPERS.ps_quote(self.home)
+            result = self.powershell(
+                f'if (Test-Path -LiteralPath {path}) {{ '
+                f'Remove-Item -LiteralPath {path} -Recurse -Force }}')
+        elif self.host:
+            result = self.shell('rm -rf -- ' + shlex.quote(self.home))
+        else:
+            import shutil
+            if Path(self.home).exists():
+                shutil.rmtree(self.home)
+            return
+        check(result.returncode == 0, 'fixture_data_cleanup_failed')
+
+    def knowledge_encrypted(self, text):
+        path = self.home + '/knowledge.enc'
+        if self.win:
+            quote = HELPERS.ps_quote
+            result = self.powershell(
+                f'$data=[IO.File]::ReadAllBytes({quote(path)}); '
+                f'if ($data.Length -eq 0) {{ exit 1 }}; '
+                f'$text=[Text.Encoding]::UTF8.GetString($data); '
+                f'if ($text.Contains({quote(text)})) {{ exit 1 }}')
+            return result.returncode == 0
+        if self.host:
+            script = f"""python3 - <<'CHECK'
+from pathlib import Path
+data=Path({path!r}).read_bytes()
+raise SystemExit(0 if data and {text.encode()!r} not in data else 1)
+CHECK"""
+            return self.shell(script).returncode == 0
+        data = Path(path).read_bytes()
+        return bool(data) and text.encode() not in data
+
+
+def status(node):
+    value = node.run(['knowledge', 'status', '--room', ROOM])
+    check(value.get('replication_factor') == 3, 'wrong_replication_factor')
+    check(isinstance(value.get('records'), list), 'missing_local_record_inventory')
+    check(isinstance(value.get('bytes'), int)
+          and isinstance(value.get('quota_bytes'), int)
+          and 0 <= value['bytes'] <= value['quota_bytes'] <= 64 * 1024 * 1024,
+          'invalid_quota_accounting')
+    check(value.get('objects') == len(value['records']), 'wrong_object_count')
+    return value
+
+
+def wait_peer_readiness(nodes, timeout=WAIT_SECONDS):
+    """IPCの起動と、認証済みP2P接続の準備を区別して待つ。"""
+    deadline = time.monotonic() + timeout
+    while True:
+        remaining = deadline - time.monotonic()
+        check(remaining > 0, 'authenticated_peer_readiness_deadline')
+
+        def connected(node):
+            try:
+                value = node.run(['info'], timeout=min(15, remaining))
+            except (RuntimeError, subprocess.SubprocessError):
+                return 0
+            count = value.get('connected_peers')
+            return count if type(count) is int and count >= 0 else 0
+
+        counts = parallel(connected, nodes)
+        if all(count >= 1 for count in counts):
+            return counts
+        time.sleep(min(0.5, max(0, deadline - time.monotonic())))
+
+
+def record_inventory(snapshots):
+    result = {}
+    for index, snapshot in enumerate(snapshots):
+        local_ids = set()
+        for record in snapshot['records']:
+            record_id = record.get('id', '')
+            check(ID_PATTERN.fullmatch(record_id), 'invalid_record_id')
+            check(record_id not in local_ids, 'duplicate_local_record')
+            local_ids.add(record_id)
+            result.setdefault(record_id, []).append((index, record))
+    return result
+
+
+def replica_complete(snapshots, fixtures, peer_ids):
+    inventory = record_inventory(snapshots)
+    if set(inventory) != {fixture['id'] for fixture in fixtures}:
+        return False
+    for fixture in fixtures:
+        copies = inventory[fixture['id']]
+        if len(copies) != 3:
+            return False
+        assigned = None
+        for index, record in copies:
+            keepers = record.get('assigned_keepers')
+            check(isinstance(keepers, list), 'missing_assigned_keepers')
+            check(len(keepers) == len(set(keepers)) == 3
+                  and set(keepers) <= set(peer_ids), 'invalid_keeper_assignment')
+            if assigned is None:
+                assigned = set(keepers)
+            check(set(keepers) == assigned, 'inconsistent_keeper_assignment')
+            if record.get('local_role') != 'keeper' or record.get('staging') is not False:
+                return False
+            check(peer_ids[index] in assigned, 'unexpected_persistent_nonkeeper')
+        if {peer_ids[index] for index, _ in copies} != assigned:
+            return False
+    return True
+
+
+def wait_replicas(nodes, fixtures, peer_ids):
+    deadline = time.monotonic() + WAIT_SECONDS
+    while True:
+        snapshots = parallel(status, nodes)
+        if replica_complete(snapshots, fixtures, peer_ids):
+            return snapshots
+        check(time.monotonic() < deadline, 'replication_deadline')
+        time.sleep(1)
+
+
+def search(node, query=QUERY):
+    value = node.run(['knowledge', 'search', '--room', ROOM,
+                      '--query', query, '--limit', '10'])
+    check(isinstance(value.get('hits'), list), 'missing_search_hits')
+    return value
+
+
+def verified_get(node, fixture):
+    value = node.run(['knowledge', 'get', '--room', ROOM, '--id', fixture['id']])
+    if value.get('found') is not True:
+        return None
+    record = value.get('record')
+    check(isinstance(record, dict), 'missing_get_record')
+    check(record.get('id') == fixture['id'], 'get_returned_another_record')
+    for key in ('problem', 'solution', 'context', 'references', 'kind'):
+        check(record.get(key) == fixture['input'][key], 'get_changed_record_content')
+    check(record.get('author_peer_id') == fixture['author'], 'relayer_replaced_author')
+    check(record.get('public') is False, 'private_knowledge_became_public')
+    check(value.get('untrusted') is True or record.get('untrusted') is True,
+          'missing_untrusted_get_marker')
+    check(type(value.get('responded_peers')) is int and value['responded_peers'] >= 1,
+          'get_had_no_remote_peer_response')
+    return value
+
+
+def useful_votes(value):
+    quality = value.get('quality')
+    if isinstance(quality, dict) and isinstance(quality.get('useful_votes'), int):
+        return quality['useful_votes']
+    reviews = value.get('reviews')
+    check(isinstance(reviews, list), 'missing_review_summary')
+    latest = {}
+    for review in reviews:
+        reviewer = review.get('reviewer_peer_id')
+        check(isinstance(reviewer, str), 'missing_review_author')
+        check(reviewer not in latest, 'duplicate_reviewer_counted')
+        latest[reviewer] = review.get('verdict')
+    return sum(verdict == 'useful' for verdict in latest.values())
+
+
+def atomic_report(output, report):
+    temporary = output.with_name(output.name + '.tmp-' + str(os.getpid()))
+    descriptor = os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    try:
+        with os.fdopen(descriptor, 'w') as stream:
+            json.dump(report, stream, ensure_ascii=False, indent=2)
+            stream.write('\n')
+            stream.flush()
+            os.fsync(stream.fileno())
+        os.replace(temporary, output)
+    finally:
+        temporary.unlink(missing_ok=True)
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--inventory',
+                        help='Same private JSON inventory as verify-peers.py; exactly four hosts')
+    parser.add_argument('--output', help='Body-free JSON evidence output')
+    parser.add_argument('--self-test', action='store_true',
+                        help='Run only independent solver vectors and malformed-input checks')
+    args = parser.parse_args()
+    if args.self_test:
+        print(json.dumps({'status': 'passed', 'test': 'automation-solver',
+                          **solver_self_test()}), flush=True)
+        return 0
+    if not args.inventory or not args.output:
+        parser.error('--inventory and --output are required for real-host verification')
+    output = Path(args.output).resolve()
+    output.parent.mkdir(parents=True, exist_ok=True)
+    run_id = str(time.time_ns())
+    logs = output.parent / ('private-knowledge-logs-' + run_id)
+    logs.mkdir(mode=0o700)
+    report = {
+        'version': 2,
+        'test': 'real-host-knowledge-e2e',
+        'started_at': time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime()),
+        'status': 'running',
+        'checks': {},
+        'retention_time_travel_tested': False,
+        'production_services_changed': False,
+        'automation_assurance_is_ai_identity': False,
+    }
+    nodes = []
+    tunnels = []
+    stage = 'inventory'
+
+    def record(name, result):
+        report['checks'][name] = result
+        atomic_report(output, report)
+        print(json.dumps({'check': name, 'result': result}), flush=True)
+
+    try:
+        record('independent_automation_solver', solver_self_test())
+        inventory = json.loads(Path(args.inventory).read_text())
+        check(isinstance(inventory, list) and len(inventory) == 4, 'expected_four_hosts')
+        for index, (config, port) in enumerate(zip(inventory, FIXTURE_PORTS)):
+            fixture_config = fixture_node_config(config, index, port)
+            nodes.append(FixtureNode(fixture_config, logs, run_id))
+        check(sum(not node.host for node in nodes) == 1, 'expected_one_local_coordinator')
+        first = next(node for node in nodes if not node.host)
+        check(not first.win, 'local_coordinator_must_be_unix')
+        record('isolated_fixture_host_count', len(nodes))
+
+        stage = 'sdk_versions'
+        versions = []
+        for node in nodes:
+            result = subprocess.run(node.argv(['--version']), capture_output=True, timeout=30)
+            check(result.returncode == 0, 'sdk_version_failed')
+            version = result.stdout.decode('utf-8-sig').strip()
+            check(version.startswith('idobata 0.3.'), 'new_sdk_required')
+            versions.append(version)
+        check(len(set(versions)) == 1, 'sdk_versions_differ')
+        record('matching_native_sdk_count', len(versions))
+
+        stage = 'initialize'
+        identities = []
+        for node in nodes:
+            node.initialized = True
+            value = node.run(['init', '--listen', f'/ip4/127.0.0.1/tcp/{node.port}'])
+            identities.append(value['identity'])
+        peer_ids = [identity['peer_id'] for identity in identities]
+        check(len(set(peer_ids)) == 4, 'fixture_identities_not_distinct')
+        for node, peer_id in zip(nodes, peer_ids):
+            node.peer_id = peer_id
+            node.member_keys = {identity['public_key']: identity['peer_id']
+                                for identity in identities}
+        profiles = parallel(lambda node: node.run(['profile']), nodes)
+        check(all(profile == profiles[0] for profile in profiles), 'different_detector_artifacts')
+        record('local_fixture_identity_count', len(peer_ids))
+        record('identical_public_policy_and_wasm', True)
+
+        stage = 'room_authorization'
+        members_path = first.home + '/members.json'
+        invite_path = first.home + '/invite.json'
+        first.put(members_path, json.dumps(identities))
+        created = first.run(['room', 'create', '--room', ROOM, '--members-file',
+                             members_path, '--output', invite_path, '--require-automation'])
+        authority = created['authority_peer_id']
+        invite = Path(invite_path).read_bytes()
+        certificate = json.loads(invite)
+        check(certificate['signed'].get('knowledge_automation_required') is True
+              and certificate['signed'].get('version') == 3,
+              'room_did_not_require_automation')
+        for node in nodes:
+            node.room_id = certificate['signed']['room_id']
+            node.authority = authority
+            if node is first:
+                continue
+            node.put(node.home + '/invite.json', invite)
+            node.run(['room', 'join', '--room', ROOM, '--invite-file',
+                      node.home + '/invite.json', '--trust-authority', authority])
+        record('fixed_authorized_roster_size', len(nodes))
+
+        stage = 'fixture_transport'
+        for node in nodes:
+            if not node.host:
+                continue
+            forward = HELPERS.SSH + [
+                '-N', '-o', 'ControlMaster=no', '-o', 'ControlPath=none',
+                '-o', 'ExitOnForwardFailure=yes', '-o', 'ServerAliveInterval=15',
+                '-L', f'127.0.0.1:{node.port}:127.0.0.1:{node.port}',
+            ]
+            for other in nodes:
+                if other is not node:
+                    forward += ['-R', f'127.0.0.1:{other.port}:127.0.0.1:{other.port}']
+            forward.append(node.host)
+            tunnels.append(subprocess.Popen(forward, stdin=subprocess.DEVNULL,
+                                            stdout=node.log, stderr=node.log))
+        time.sleep(1)
+        check(all(tunnel.poll() is None for tunnel in tunnels), 'fixture_forward_failed')
+        parallel(lambda node: node.start(), nodes)
+        record('ready_daemon_count', len(nodes))
+        stage = 'initial_peer_readiness'
+        ready_counts = wait_peer_readiness(nodes)
+        record('authenticated_ready_host_count', len(ready_counts))
+        for node in nodes:
+            rooms = node.run(['info']).get('rooms', [])
+            check(any(room.get('name') == ROOM
+                      and room.get('authorized') is True
+                      and room.get('knowledge_automation_required') is True for room in rooms),
+                  'daemon_room_did_not_require_automation')
+        record('automation_required_room_host_count', len(nodes))
+
+        stage = 'blocked_inputs'
+        for node in nodes:
+            before = status(node)
+            blocked_input = {'problem': '検査用の合成値を送らない',
+                             'solution': HELPERS.SYNTHETIC, 'context': '',
+                             'references': [], 'kind': 'answer'}
+            blocked_post = node.mutation_request(
+                ['knowledge', 'publish', '--room', ROOM, '--stdin'], blocked_input, codes=(20,))
+            blocked_search = node.run(['knowledge', 'search', '--room', ROOM,
+                                      '--query', HELPERS.SYNTHETIC, '--limit', '10'], codes=(20,))
+            check(HELPERS.SYNTHETIC not in json.dumps([blocked_post, blocked_search]),
+                  'blocked_diagnostic_disclosed_input')
+            check('challenge' not in blocked_post, 'blocked_input_created_automation_challenge')
+            after = status(node)
+            check(before['objects'] == after['objects'] == 0,
+                  'blocked_publish_created_record')
+            for name in ('outbound_attempts', 'network_requests'):
+                if name in before and name in after:
+                    check(before[name] == after[name], 'blocked_input_caused_network_request')
+        record('blocked_publish_and_search_count', len(nodes) * 2)
+
+        stage = 'publish'
+        fixtures = []
+        labels = ['一番目', '二番目', '三番目', '四番目']
+        for round_index in range(2):
+            inputs = []
+            for index, node in enumerate(nodes):
+                body = {
+                    'problem': f'知識検証 {labels[index]}のノード {round_index + 1}件目 同じ依頼が重複して実行される',
+                    'solution': '依頼の番号と処理結果を保存し、同じ番号では保存した結果を返す。',
+                    'context': '処理結果と依頼の番号を同時に保存できる場合に使う。',
+                    'references': [],
+                    'kind': 'answer' if round_index == 0 else 'hint',
+                }
+                inputs.append((index, node, body))
+
+            def publish(item):
+                index, node, body = item
+                value = node.mutate(['knowledge', 'publish', '--room', ROOM, '--stdin'], body)
+                record_id = value.get('id', '')
+                check(ID_PATTERN.fullmatch(record_id), 'publish_missing_id')
+                check(value.get('stored') is True, 'publish_not_stored')
+                check(value.get('replication_factor') == 3, 'publish_wrong_replication_factor')
+                return {'id': record_id, 'author': peer_ids[index],
+                        'author_index': index, 'input': body}
+
+            fixtures.extend(parallel(publish, inputs))
+        check(len({fixture['id'] for fixture in fixtures}) == 8, 'publish_duplicate_id')
+        record('published_record_count', len(fixtures))
+        record('certified_publish_count', sum(node.automation_counts['publish'] for node in nodes))
+
+        stage = 'three_replica_handoff'
+        began = time.monotonic()
+        snapshots = wait_replicas(nodes, fixtures, peer_ids)
+        copies = record_inventory(snapshots)
+        record('converged_replication', {
+            'record_count': len(fixtures),
+            'persistent_copy_count': sum(len(items) for items in copies.values()),
+            'minimum_copies_per_record': min(map(len, copies.values())),
+            'maximum_copies_per_record': max(map(len, copies.values())),
+            'staging_record_count': sum(record['staging'] for value in snapshots
+                                        for record in value['records']),
+            'wait_seconds': round(time.monotonic() - began, 3),
+        })
+
+        stage = 'all_host_search'
+        wait_peer_readiness(nodes)
+        deadline = time.monotonic() + WAIT_SECONDS
+        expected_ids = {fixture['id'] for fixture in fixtures}
+        while True:
+            searches = parallel(search, nodes)
+            if all({hit['id'] for hit in value['hits']} == expected_ids
+                   and value.get('partial') is False
+                   and type(value.get('responded_peers')) is int
+                   and value['responded_peers'] >= 1 for value in searches):
+                break
+            check(time.monotonic() < deadline, 'all_host_search_deadline')
+            time.sleep(1)
+        for value in searches:
+            for hit in value['hits']:
+                check(value.get('untrusted') is True or hit.get('untrusted') is True,
+                      'missing_untrusted_search_marker')
+        record('all_host_search_hit_count', sum(len(value['hits']) for value in searches))
+
+        stage = 'nonholder_network_get'
+        for fixture in fixtures:
+            holders = {index for index, _ in copies[fixture['id']]}
+            nonholder = next(index for index in range(4) if index not in holders)
+            check(verified_get(nodes[nonholder], fixture) is not None,
+                  'nonholder_network_get_failed')
+        snapshots = wait_replicas(nodes, fixtures, peer_ids)
+        record('nonholder_verified_get_count', len(fixtures))
+        record('nonholder_reads_preserved_replica_cap', True)
+
+        stage = 'signed_useful_feedback'
+        wait_peer_readiness(nodes)
+        targets = [fixture for fixture in fixtures if fixture['author_index'] == 0]
+        for target in targets:
+            def evaluate(node):
+                return node.mutate(
+                    ['knowledge', 'evaluate', '--room', ROOM, '--id', target['id'], '--stdin'],
+                    {'verdict': 'useful',
+                     'evidence': '同じ番号の依頼を再送する試験で、処理を重複せず保存した結果を返した。',
+                     'references': []})
+            parallel(evaluate, nodes[1:3])
+        deadline = time.monotonic() + WAIT_SECONDS
+        while True:
+            values = [verified_get(nodes[3], target) for target in targets]
+            if all(value is not None and useful_votes(value) == 2 for value in values):
+                break
+            check(time.monotonic() < deadline, 'useful_feedback_deadline')
+            time.sleep(1)
+        record('distinct_other_peer_evaluation_count', len(targets) * 2)
+        record('certified_evaluation_count', sum(node.automation_counts['evaluate'] for node in nodes))
+        record('automation_admission', {
+            'challenge_before_storage_count': sum(sum(node.automation_counts.values()) for node in nodes),
+            'successful_proof_resubmission_count': sum(sum(node.automation_counts.values()) for node in nodes),
+            'machine_case_answers_checked': AUTOMATION_CASES * sum(
+                sum(node.automation_counts.values()) for node in nodes),
+            'assurance': 'automation_tested',
+        })
+        peers = nodes[3].run(['knowledge', 'peers', '--room', ROOM,
+                              '--query', QUERY, '--limit', '10'])
+        peer_results = peers.get('peers')
+        check(isinstance(peer_results, list) and peer_results, 'missing_peer_discovery')
+        top_peer = peer_results[0].get('peer_id', peer_results[0].get('author_peer_id'))
+        check(top_peer == peer_ids[0], 'useful_author_not_ranked_first')
+        record('useful_author_rank', 1)
+
+        stage = 'restart_persistence'
+        snapshots = wait_replicas(nodes, fixtures, peer_ids)
+        before_ids = [{item['id'] for item in value['records']} for value in snapshots]
+        for index, node in enumerate(nodes):
+            node.stop()
+            node.start()
+            wait_peer_readiness(nodes)
+            restored = status(node)
+            check({item['id'] for item in restored['records']} == before_ids[index],
+                  'restart_lost_persistent_knowledge')
+        snapshots = wait_replicas(nodes, fixtures, peer_ids)
+        record('restart_preserved_knowledge_host_count', len(nodes))
+
+        stage = 'encrypted_knowledge_store'
+        for index, node in enumerate(nodes):
+            held = next(fixture for fixture in fixtures if fixture['id'] in before_ids[index])
+            check(node.knowledge_encrypted(held['input']['problem']),
+                  'knowledge_store_plaintext_or_missing')
+        record('encrypted_knowledge_store_host_count', len(nodes))
+
+        stage = 'author_offline_retrieval'
+        copies = record_inventory(snapshots)
+        selected = next((fixture for fixture in fixtures
+                         if fixture['author_index'] not in {
+                             index for index, _ in copies[fixture['id']]}), fixtures[0])
+        author_index = selected['author_index']
+        nodes[author_index].stop()
+        remaining = [node for index, node in enumerate(nodes) if index != author_index]
+        wait_peer_readiness(remaining)
+        results = parallel(lambda node: verified_get(node, selected), remaining)
+        check(all(value is not None for value in results), 'author_offline_get_failed')
+        offline_searches = parallel(search, remaining)
+        check(all(value.get('partial') is True for value in offline_searches),
+              'offline_search_not_marked_partial')
+        check(all(type(value.get('responded_peers')) is int
+                  and value['responded_peers'] >= 1 for value in offline_searches),
+              'offline_search_had_no_live_peer_response')
+        check(all(any(hit['id'] == selected['id'] for hit in value['hits'])
+                  for value in offline_searches), 'author_offline_search_lost_record')
+        live_holders = sum(index != author_index for index, _ in copies[selected['id']])
+        record('author_offline_retrieval', {
+            'responding_host_count': len(results),
+            'live_keeper_count': live_holders,
+            'original_author_preserved': True,
+            'offline_search_marked_partial_count': len(offline_searches),
+        })
+        report['status'] = 'passed'
+    except (Exception, KeyboardInterrupt) as error:
+        report['status'] = 'failed'
+        report['failed_stage'] = stage
+        # Exception strings can contain rejected input, paths or remote output.
+        # Preserve only a public classification and the static stage name.
+        report['failure_type'] = type(error).__name__
+        if isinstance(error, VerificationFailure):
+            report['failure_code'] = str(error)
+        print(json.dumps({'status': 'failed', 'stage': stage,
+                          'failure_type': type(error).__name__}), flush=True)
+    finally:
+        cleanup_errors = []
+        stopped = []
+        for index, node in reversed(list(enumerate(nodes))):
+            try:
+                node.stop()
+                stopped.append(node)
+            except Exception:
+                cleanup_errors.append({'node_index': index + 1, 'operation': 'stop'})
+        for tunnel in tunnels:
+            try:
+                tunnel.terminate()
+                try:
+                    tunnel.wait(timeout=8)
+                except subprocess.TimeoutExpired:
+                    tunnel.kill()
+                    tunnel.wait(timeout=5)
+            except Exception:
+                cleanup_errors.append({'operation': 'tunnel_stop'})
+        removed = 0
+        for node in stopped:
+            try:
+                node.remove_data()
+                if node.initialized:
+                    removed += 1
+            except Exception:
+                cleanup_errors.append({'node_index': nodes.index(node) + 1,
+                                       'operation': 'remove_fixture_data'})
+        for node in nodes:
+            node.log.close()
+        report['cleanup_error_count'] = len(cleanup_errors)
+        report['cleanup_errors'] = cleanup_errors
+        report['private_fixture_keys_removed'] = not cleanup_errors
+        report['fixture_data_directory_removed_count'] = removed
+        if cleanup_errors:
+            report['status'] = 'failed'
+        report['finished_at'] = time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())
+        atomic_report(output, report)
+    print(json.dumps({'status': report['status'], 'check_count': len(report['checks']),
+                      'cleanup_error_count': report['cleanup_error_count']}), flush=True)
+    return 0 if report['status'] == 'passed' else 1
+
+
+if __name__ == '__main__':
+    sys.exit(main())

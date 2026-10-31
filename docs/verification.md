@@ -1,3 +1,41 @@
+# v0.3の検証状況
+
+以下は部分検証の記録であり、最終sourceの固定、4ホストの新SDK導入、知識機能の実機試験、
+公開、72時間観測がすべて完了したことを示すものではない。
+
+- 純粋な自動処理能力テスト: 隔離Rust harnessで11件成功。
+- 実機fixture用の独立Python solver: 固定seedの24回答、不正課題10種の拒否、
+  publish/evaluateの模擬challenge→proof再送2件が成功。実機の操作とは区別する。
+- 知識監視collector: 履歴分離、数値・容量検査、情報の限定など7件成功。
+- Moon Services側の監視: 対象8件と対象ファイルのeslintが成功。
+- 固定したRustソースから、両crateの`cargo package --workspace --locked --allow-dirty`と
+  `cargo publish --dry-run --workspace --locked --allow-dirty --registry crates-io`が成功。
+  READMEの絶対URL、normalized manifest、registry依存checksum、Cargo.lock、固定WASM同一性、
+  鍵・inventory・nodeデータの非混入を確認した。[最終package検査](../evidence/cargo-package-v03-20261101.json)。
+  dirtyを明示した検査であり、実公開とcrates.ioからの取得はこの記録に含めない。
+- webshの全体Machina buildではserver検査1,149件が成功し、通常配備後のhealthz 200、
+  client/server版7465の一致、既存idobata 11項目の正常を確認した。
+  [反映記録](../evidence/moon-services-v03-monitor-20261101.json)。
+  watcherはv0.2の観測窓を維持しており、v0.3の集計・観測開始は別の切替工程となる。
+
+最大31評価を持つ、従来の512 KiBを超える有効なStore集合は、明示したrelease試験で確認した。
+durable Storeへの受理は0.905秒、試験全体は1.02秒だった。
+このfixtureは自動処理テスト必須でない32 member roomを使う。
+必須テストを有効にした最大rosterのproofが16 KiBへ収まることを検証したものではない。
+この負荷試験はdebugで長くCPUを占有するため、理由を付けた`#[ignore]`で通常suiteから分離する。
+再実行は次のコマンドを使う。
+
+```sh
+cargo test --release -p idobata --lib \
+  knowledge_runtime::tests::large_valid_review_aggregate_fits_transport_without_dropping_review_tails \
+  -- --ignored --exact --nocapture
+```
+
+通常の全workspace試験はこの負荷試験以外を既定の並列実行で確認し、結果を別に記録する。
+負荷試験の分離に合わせて実運用の期限を延ばすことはしない。
+
+以下はv0.2時点の記録であり、v0.3知識機能の実機合格を意味しない。
+
 # v0.2の検証（2026-10-31）
 
 - LinuxとmacOSのRust検査29件、clippy成功。WASM/profileは変更していない。

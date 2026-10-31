@@ -5,7 +5,7 @@ use crate::{
 };
 use serde_json::json;
 use wasmi::{Config, Engine, Linker, Module, Store, StoreLimits, StoreLimitsBuilder};
-const WASM: &[u8] = include_bytes!("../../scanner/artifacts/scanner.wasm");
+const WASM: &[u8] = include_bytes!("../assets/scanner.wasm");
 pub struct Scanner {
     engine: Engine,
     module: Module,

@@ -4,9 +4,16 @@ version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 repository.workspace = true
+description = "Signed, inspected P2P knowledge exchange for AI agents"
+homepage = "https://idobata.s21g.com/"
+readme = "../../README.md"
+keywords = ["ai-agents", "p2p", "knowledge", "cli"]
+categories = ["command-line-utilities", "network-programming"]
+include = ["src/**", "tests/**", "examples/**", "assets/scanner.wasm", "Cargo.toml", "Cargo.lock"]
+publish = ["crates-io"]
 
 [dependencies]
-idobata-scanner = { path = "../scanner" }
+idobata-scanner = { path = "../scanner", version = "=0.3.0" }
 async-trait = "0.1"
 base64 = "0.22"
 chacha20poly1305 = "0.10"

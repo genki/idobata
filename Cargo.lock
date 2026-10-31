@@ -1491,7 +1491,7 @@ dependencies = [
 
 [[package]]
 name = "idobata"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "async-trait",
  "base64 0.22.1",
@@ -1524,7 +1524,7 @@ dependencies = [
 
 [[package]]
 name = "idobata-scanner"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "base64 0.22.1",
  "html-escape",

@@ -54,6 +54,17 @@ struct Context {
     outbound_failures: u64,
     last_transport_error: Option<&'static str>,
 }
+
+fn room_authorized(room: &TrustedRoom, own: &str, own_public_key: &str) -> bool {
+    crypto::validate_room(room, &Scanner::policy_id(), util::now()).is_ok()
+        && room
+            .certificate
+            .signed
+            .members
+            .iter()
+            .any(|member| member.peer_id == own && member.public_key == own_public_key)
+}
+
 impl Context {
     fn charge(&mut self, owner: &str) -> bool {
         self.rates
@@ -100,9 +111,15 @@ impl Context {
     fn handle(&mut self, owner: &str, request: Request, connections: usize) -> Result<Reply> {
         let c = config::load(&self.home)?;
         match request {
+            Request::KnowledgePublish { .. }
+            | Request::KnowledgeSearch { .. }
+            | Request::KnowledgeGet { .. }
+            | Request::KnowledgeEvaluate { .. }
+            | Request::KnowledgePeers { .. }
+            | Request::KnowledgeStatus { .. } => Err(INVALID),
             Request::Info => Ok(Reply::new(
                 0,
-                json!({"status":"ready","version":env!("CARGO_PKG_VERSION"),"peer_id":self.own,"policy_id":Scanner::policy_id(),"scanner_wasm_sha256":Scanner::profile()["wasm_sha256"],"scanner_isolation":"wasm-no-host-imports","connected_peers":connections,"outbox_count":self.state.outbox.len(),"pending_count":self.state.outbox.iter().filter(|m|m.delivered.len()<m.recipients.len() && m.held.is_none()).count(),"held_count":self.state.outbox.iter().filter(|m|m.held.is_some()).count(),"delivered_count":self.state.outbox.iter().filter(|m|m.delivered.len()==m.recipients.len()).count(),"inbox_count":self.state.inbox.len(),"blocked_count":self.state.rejected_count,"outbound_attempts":self.outbound_attempts,"inbound_requests":self.inbound_requests,"outbound_failures":self.outbound_failures,"last_transport_error":self.last_transport_error,"uptime_seconds":self.started.elapsed().as_secs(),"rooms":c.rooms.iter().map(|(name,r)|json!({"name":name,"authorized":crypto::validate_room(r,&Scanner::policy_id(),util::now()).is_ok(),"public":r.certificate.signed.public,"expires_at":r.certificate.signed.expires_at,"epoch":r.certificate.signed.epoch})).collect::<Vec<_>>() }),
+                json!({"status":"ready","version":env!("CARGO_PKG_VERSION"),"peer_id":self.own,"policy_id":Scanner::policy_id(),"scanner_wasm_sha256":Scanner::profile()["wasm_sha256"],"scanner_isolation":"wasm-no-host-imports","connected_peers":connections,"outbox_count":self.state.outbox.len(),"pending_count":self.state.outbox.iter().filter(|m|m.delivered.len()<m.recipients.len() && m.held.is_none()).count(),"held_count":self.state.outbox.iter().filter(|m|m.held.is_some()).count(),"delivered_count":self.state.outbox.iter().filter(|m|m.delivered.len()==m.recipients.len()).count(),"inbox_count":self.state.inbox.len(),"blocked_count":self.state.rejected_count,"outbound_attempts":self.outbound_attempts,"inbound_requests":self.inbound_requests,"outbound_failures":self.outbound_failures,"last_transport_error":self.last_transport_error,"uptime_seconds":self.started.elapsed().as_secs(),"rooms":c.rooms.iter().map(|(name,r)|json!({"name":name,"authorized":room_authorized(r,&self.own,&crypto::public(&self.key)),"public":r.certificate.signed.public,"knowledge_automation_required":r.certificate.signed.knowledge_automation_required,"expires_at":r.certificate.signed.expires_at,"epoch":r.certificate.signed.epoch})).collect::<Vec<_>>() }),
             )),
             Request::Begin => {
                 self.reservations
@@ -796,6 +813,7 @@ pub async fn run(home: &Path) -> Result<()> {
         last_prune: Instant::now(),
     };
     network::refresh(&mut swarm, &c, &mut delivery.allowed, &own);
+    let mut knowledge = crate::knowledge_runtime::Runtime::open(home, key.clone())?;
     let mut ctx = Context {
         home: home.into(),
         key,
@@ -841,16 +859,80 @@ pub async fn run(home: &Path) -> Result<()> {
             _=&mut shutdown=>break,
             result=&mut ipc_task=>{return result.map_err(|_|STORAGE)?},
             Some(command)=rx.recv()=>{
-                let reply=ctx.handle(&command.owner,command.request,swarm.connected_peers().count())
-                    .unwrap_or_else(|e|Reply::new(e.code,json!({"status":"failed","error":e.error,"enqueued":false})));
-                let _=command.response.send(reply);
+                if crate::knowledge_runtime::Runtime::handles(&command.request) {
+                    knowledge.command(command,&mut swarm);
+                } else {
+                    let info=matches!(&command.request,Request::Info);
+                    let reply=ctx.handle(&command.owner,command.request,swarm.connected_peers().count());
+                    let mut reply=reply.unwrap_or_else(|e|Reply::new(e.code,json!({"status":"failed","error":e.error,"enqueued":false})));
+                    if info {reply.result["knowledge"]=knowledge.metrics();}
+                    let _=command.response.send(reply);
+                }
             },
-            event=swarm.select_next_some()=>transport_event(&mut ctx,&mut swarm,&mut delivery,event)?,
-            _=interval.tick()=>poll_delivery(&mut ctx,&mut swarm,&mut delivery)?,
+            event=swarm.select_next_some()=>match event {
+                SwarmEvent::Behaviour(BehaviourEvent::Knowledge(event))=>knowledge.event(event,&mut swarm),
+                event=>transport_event(&mut ctx,&mut swarm,&mut delivery,event)?,
+            },
+            _=interval.tick()=>{poll_delivery(&mut ctx,&mut swarm,&mut delivery)?;knowledge.poll(&mut swarm);},
         }
     }
     ipc_task.abort();
     ctx.storage.save(&ctx.state)?;
     drop(lock);
     Ok(())
+}
+
+#[cfg(test)]
+mod authorization_display_tests {
+    use super::*;
+
+    #[test]
+    fn valid_certificate_without_own_key_is_not_reported_as_authorized() {
+        let issuer = identity::Keypair::generate_ed25519();
+        let other = identity::Keypair::generate_ed25519();
+        let own = issuer.public().to_peer_id().to_string();
+        let now = util::now();
+        let signed = Room {
+            version: 1,
+            room_id: util::random_id(),
+            epoch: 1,
+            issued_at: now,
+            expires_at: now + 3600,
+            policy_id: Scanner::policy_id(),
+            members: [&issuer, &other]
+                .into_iter()
+                .map(|key| Member {
+                    peer_id: key.public().to_peer_id().to_string(),
+                    public_key: crypto::public(key),
+                    addresses: vec![],
+                })
+                .collect(),
+            public: false,
+            knowledge_automation_required: false,
+        };
+        let mut room = TrustedRoom {
+            authority_peer_id: own.clone(),
+            certificate: Signed {
+                signature: crypto::sign(&issuer, "idobata.room.v1", &signed).unwrap(),
+                public_key: crypto::public(&issuer),
+                signed,
+            },
+        };
+        assert!(room_authorized(&room, &own, &crypto::public(&issuer)));
+        assert!(!room_authorized(&room, &own, &crypto::public(&other)));
+        room.certificate
+            .signed
+            .members
+            .retain(|member| member.peer_id != own);
+        room.certificate.signed.epoch += 1;
+        room.certificate.signature =
+            crypto::sign(&issuer, "idobata.room.v1", &room.certificate.signed).unwrap();
+        crypto::validate_room(&room, &Scanner::policy_id(), now).unwrap();
+        assert!(!room_authorized(&room, &own, &crypto::public(&issuer)));
+        assert!(room_authorized(
+            &room,
+            &other.public().to_peer_id().to_string(),
+            &crypto::public(&other)
+        ));
+    }
 }

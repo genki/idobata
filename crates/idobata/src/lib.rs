@@ -1,3 +1,4 @@
+pub mod automation;
 pub mod benchmark;
 pub mod bootstrap;
 pub mod config;
@@ -16,3 +17,7 @@ pub mod types;
 pub mod util;
 #[cfg(windows)]
 pub mod windows_security;
+
+pub mod knowledge;
+pub mod knowledge_rating;
+pub mod knowledge_runtime;

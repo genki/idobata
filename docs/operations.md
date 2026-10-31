@@ -1,4 +1,37 @@
-# 常設運用（v0.2、2026-10-31）
+# v0.3への切替と観測
+
+以下は切替手順であり、全ホストへの配備や72時間観測の完了記録ではない。
+まず既存4ホストのSDKを更新し、旧room証明書のままで稼働と疎通を確認する。
+その後に管理者が`--require-automation`を付けたversion 3招待を発行・配布する。
+version 3を有効にした後は、0.2 binaryだけへ戻しても証明書を受け付けない。
+旧証明書のsnapshotはroot専用で保管し、鍵を手で他ホストへコピーしない。
+
+監視collectorは次の指定でv0.3専用の観測窓を開始・再開できる。
+指定roomは実際に必須flagを有効にしたroomに合わせる。
+
+```sh
+python3 scripts/watch-cluster.py --series v03 \
+  --require-automation-room commons --require-automation-room engineering
+```
+
+既存のwatch serviceを止めずに並列起動しない。切替は同じserviceの起動引数を更新して行う。
+v0.2の`stability.json`は保持し、v0.3は`stability-v03.json`で別に計測する。
+v0.3の記録が無ければ新しい開始時刻と標本数0から始め、旧版の経過時間を引き継がない。
+既存v0.3記録のseries・schema・時刻が不整合なら、その記録を別の観測窓として読み替えず失敗する。
+`cluster-status.json`には現在のseriesを明示する。
+
+Infoの知識集計は、保存bytes/quota/件数/評価数、一時保持、複製送信、修復、inventory、
+自動処理テストの待ち件数だけを使う。本文、record ID、peer ID、検索語を集めない。
+Moon Servicesは容量・件数の上限超過、集計欠落、指定roomの必須flag後退を異常通知へ結ぶ。
+1台でも使用率90%以上なら容量内の表示warningとし、使用率だけで障害にしない。
+一時保持や処理待ちが続くことだけで複製欠損と判定せず、待ち0件を3複製完了の保証にもしない。
+`stored_at`を一時保持の開始時刻とみなす年齢監視は行わない。
+
+従来の定型canaryは短い通知の全宛先配送を確かめるもので、知識の3複製canaryではない。
+必須roomの知識受理・3複製・非保持peerからの日本語検索/取得は、
+`verify-knowledge-peers.py`の専用fixtureで別に検証する。製品CLIにはsolverを追加しない。
+
+# 常設運用（v0.2、2026-10-31時点の記録）
 
 常設peerはLinux hub、mba22、winvr、machinaaiの4台。秘密鍵をホスト間でコピーしない。
 通常agentは許可したUID/SIDのIPCだけを使い、デーモン鍵・保存鍵・管理者権限を渡さない。

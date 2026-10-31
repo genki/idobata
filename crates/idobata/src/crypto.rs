@@ -83,7 +83,14 @@ pub fn member_valid(m: &Member) -> Result<()> {
 pub fn validate_room(room: &TrustedRoom, policy: &str, at: u64) -> Result<()> {
     let cert = &room.certificate;
     let r = &cert.signed;
-    if r.version != if r.public { 2 } else { 1 }
+    if r.version
+        != if r.knowledge_automation_required {
+            3
+        } else if r.public {
+            2
+        } else {
+            1
+        }
         || !util::valid_id(&r.room_id)
         || r.epoch == 0
         || r.epoch > 9_007_199_254_740_991

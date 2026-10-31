@@ -1,0 +1,122 @@
+{
+  "version": 1,
+  "test": "cargo-final-package-v03",
+  "status": "passed",
+  "checked_at": "2026-10-31T16:07:00Z",
+  "source_fingerprint": "540e6bdebd859c4090104c7fdc629abd9c1f67af547b5a70eb9248e3bd1bf4c8",
+  "source_fingerprint_method": "SHA256 of ordered relative filename + NUL + binary SHA256 for each listed file",
+  "source_fingerprint_files": [
+    "Cargo.toml",
+    "Cargo.lock",
+    "README.md",
+    "crates/idobata/Cargo.toml",
+    "crates/idobata/assets/scanner.wasm",
+    "crates/idobata/examples/refresh-tuf.rs",
+    "crates/idobata/src/automation.rs",
+    "crates/idobata/src/benchmark.rs",
+    "crates/idobata/src/bootstrap.rs",
+    "crates/idobata/src/config.rs",
+    "crates/idobata/src/crypto.rs",
+    "crates/idobata/src/daemon.rs",
+    "crates/idobata/src/discussion.rs",
+    "crates/idobata/src/error.rs",
+    "crates/idobata/src/ipc.rs",
+    "crates/idobata/src/knowledge.rs",
+    "crates/idobata/src/knowledge_rating.rs",
+    "crates/idobata/src/knowledge_runtime.rs",
+    "crates/idobata/src/lib.rs",
+    "crates/idobata/src/main.rs",
+    "crates/idobata/src/network.rs",
+    "crates/idobata/src/publication.rs",
+    "crates/idobata/src/releases.rs",
+    "crates/idobata/src/scanner.rs",
+    "crates/idobata/src/storage.rs",
+    "crates/idobata/src/trust.rs",
+    "crates/idobata/src/types.rs",
+    "crates/idobata/src/util.rs",
+    "crates/idobata/src/windows_security.rs",
+    "crates/idobata/tests/evolution.rs",
+    "crates/idobata/tests/knowledge_daemon.rs",
+    "crates/idobata/tests/publication.rs",
+    "crates/idobata/tests/security.rs",
+    "crates/scanner/Cargo.toml",
+    "crates/scanner/artifacts/scanner.wasm",
+    "crates/scanner/examples/calibrate.rs",
+    "crates/scanner/src/lib.rs"
+  ],
+  "source_unchanged_during_verification": true,
+  "checks": {
+    "cargo_package_workspace_locked": "passed",
+    "cargo_publish_dry_run_workspace_locked": "passed",
+    "normalized_manifests": "passed",
+    "registry_ready_readme": "passed",
+    "packaged_lockfiles": "passed",
+    "official_registry_sibling_checksum": "passed",
+    "embedded_wasm_byte_identical": "passed",
+    "only_allowlisted_package_files": "passed",
+    "no_keys_inventory_or_node_data": "passed"
+  },
+  "commands": [
+    {
+      "operation": "cargo package --workspace --locked --allow-dirty",
+      "exit_code": 0,
+      "elapsed_seconds": 44.593
+    },
+    {
+      "operation": "cargo publish --dry-run --workspace --locked --allow-dirty --registry crates-io",
+      "exit_code": 0,
+      "elapsed_seconds": 7.753
+    }
+  ],
+  "packages": [
+    {
+      "crate": "idobata-scanner",
+      "version": "0.3.0",
+      "filename": "idobata-scanner-0.3.0.crate",
+      "file_count": 7,
+      "bytes": 16075,
+      "sha256": "ab92f9c4da176b63b0ca5443230465560ba14715adbad9145569dbbde5d1adb7",
+      "readme_absolute_references": true,
+      "lockfile_included": true,
+      "normalized_manifest": true,
+      "sensitive_data_excluded": true,
+      "vcs_dirty": true
+    },
+    {
+      "crate": "idobata",
+      "version": "0.3.0",
+      "filename": "idobata-0.3.0.crate",
+      "file_count": 34,
+      "bytes": 276984,
+      "sha256": "96cc69bfff49135cd5302e422db5aea027a47cd798a621a5171485a3d9ed90eb",
+      "readme_absolute_references": true,
+      "lockfile_included": true,
+      "normalized_manifest": true,
+      "sensitive_data_excluded": true,
+      "vcs_dirty": true
+    }
+  ],
+  "embedded_wasm_sha256": "e765bdca9f335bed3c26c2dee1bce39e9eb652e2af2552945c1818934d88e4fd",
+  "logs": [
+    {
+      "file": "target/cargo-final-verification/package.log",
+      "sha256": "c7b53ee3a7e3228e3d6ec33d016f53f662710514f5f35f6bb42fbc66aa33a7e4",
+      "bytes": 1139,
+      "lines": 19
+    },
+    {
+      "file": "target/cargo-final-verification/publish-dry-run.log",
+      "sha256": "148f8a8dff738d8b2fa3b565eb6b8b6f1902ef5cb1c7c63bf704ba5eea8e079e",
+      "bytes": 1389,
+      "lines": 24
+    }
+  ],
+  "metadata_warning": "license or license-file not specified; left unchanged",
+  "actual_registry_upload": false,
+  "registry_install_verified": false,
+  "notes": [
+    "Archives were verified from the authorized dirty frozen source.",
+    "A later commit or README change can change package bytes and sibling checksum.",
+    "Publish scanner first, then repackage SDK against the published scanner checksum."
+  ]
+}

@@ -8,8 +8,10 @@ from pathlib import Path
 import plistlib
 import shlex
 import subprocess
+import tomllib
 
 ROOT = Path(__file__).resolve().parents[1]
+VERSION = tomllib.loads((ROOT / 'Cargo.toml').read_text())['workspace']['package']['version']
 SSH = ['ssh', '-o', 'BatchMode=yes', '-o', 'ConnectTimeout=15']
 
 
@@ -69,7 +71,7 @@ def linux(binary_source,expected_sha256):
     if not expected_sha256 or hashlib.sha256(source.read_bytes()).hexdigest()!=expected_sha256:
         raise ValueError("Linux binary checksum mismatch; wait for a complete verified transfer")
     version=run([str(source.resolve()),"--version"]).strip()
-    if version != "idobata 0.2.0": raise ValueError("Unexpected binary version")
+    if version != 'idobata ' + VERSION: raise ValueError("Unexpected binary version")
     home = '/var/lib/idobata'
     binary = '/usr/local/lib/idobata/idobata'
     endpoint = '/run/idobata/ipc.sock'

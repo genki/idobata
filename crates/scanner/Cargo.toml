@@ -4,6 +4,13 @@ version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 repository.workspace = true
+description = "Deterministic high-entropy substring inspection for idobata"
+homepage = "https://idobata.s21g.com/"
+readme = "../../README.md"
+keywords = ["entropy", "scanner", "wasm", "p2p"]
+categories = ["algorithms", "wasm"]
+include = ["src/**", "examples/**", "Cargo.toml", "Cargo.lock"]
+publish = ["crates-io"]
 
 [lib]
 crate-type = ["rlib", "cdylib"]

@@ -1,11 +1,110 @@
-# 配布と初期ノード（v0.2）
+# 配布と初期ノード
 
 配布元は `https://idobata.s21g.com/`、ソースと版固定の配布物は
 `https://github.com/genki/idobata`。ビルド・検査・配備は直接スクリプトを実行し、
 GitHub Actionsを使用しない。
 [v0.2.0の配布ファイル](https://github.com/genki/idobata/releases/tag/v0.2.0)を公開済み。常設の新規ノード・ディスク・有料サービスは追加しない。
 
-## バイナリの取得と検証
+## crates.ioからCLIを導入する（公開待ち）
+
+Rustの公式レジストリは[crates.io](https://crates.io/)を使う。
+v0.3.0の`idobata`と`idobata-scanner`は公開準備中であり、現時点で公開済みとはしない。
+2026-11-01の公式API確認では両名とも404だった。これは名前の予約や今後の取得を保証しない。
+確認対象4ホストでCargoの読取操作`cargo owner --list --registry crates-io idobata`を実行し、
+通常のCargo設定ではtokenが見つからなかった。その後、保護された既存資格情報を公開用の子Cargoへ
+限定して渡し、既存crateの所有者一覧取得に成功した。実公開で必要な権限は公開時の結果で確認する。
+tokenの新規発行や`cargo login`による永続保存は行っていない。
+2026-11-01にCargo 1.96で`cargo package --workspace --locked --allow-dirty`と
+`cargo publish --dry-run --workspace --locked --allow-dirty --registry crates-io`が成功した。
+追加された自動処理テストを含む固定ソースでも、両packageの展開後buildと公開dry-runが成功した。
+[最終package検査の記録](../evidence/cargo-package-v03-20261101.json)に、file数・SHA・ログのhash・
+同梱物の確認を残した。実公開・crates.ioからのinstallは別に確認する。
+
+公開後はRust 1.88以降とネイティブのビルド環境を用意し、次を実行する。
+
+```sh
+cargo install idobata --locked
+idobata --version
+```
+
+版を固定する場合は`cargo install idobata --version 0.3.0 --locked`を使う。
+Cargoは既定でcrates.ioから取得し、`--locked`で配布物に含まれる`Cargo.lock`を使う。
+[Cargo公式の導入仕様](https://doc.rust-lang.org/cargo/commands/cargo-install.html)を参照。
+WindowsではRustのMSVC向けビルド環境、macOSではCommand Line Tools等が別途必要となる。
+WASM検知器は埋め込み済みなので、導入時にWASM targetや検知器の再生成は不要。
+
+この操作はCLIを利用者のCargoのbinディレクトリへ置く。デーモンのサービス登録、roomへの参加、
+管理者用ディレクトリの作成を自動実行しない。既存の認可済みデーモンを使うagentは、
+鍵や管理者権限を受け取らず、既存の共有IPCを利用する。
+
+```sh
+idobata --socket ENDPOINT knowledge status --room engineering
+```
+
+接続先は資格情報ではなく、OSのUID/SIDで利用を認可する。
+`--socket`を明示した場合はそれを優先し、ローカル設定があればその設定を使う。
+ローカル設定がなければ、SDK自身がOSごとの既存共有IPCを選ぶ。
+明示した`--home`の設定が無い・読めない場合は、共有IPCへ黙って切り替えない。
+native launcherも既存の接続先を補完するが、cargo版の利用に別のlauncherは必須としない。
+
+## crates.ioへ公開する手順
+
+配布単位は次の2つとする。
+
+| パッケージ | 内容 | 公開順 |
+| --- | --- | --- |
+| `idobata-scanner` | 固定profileとネイティブ検査器のRustライブラリー | 先 |
+| `idobata` | CLI・デーモン、署名・保存・P2P通信、固定WASM | 後 |
+
+SDKの依存にはpathと`version = "=0.3.0"`を併記する。公開用manifestからpathが除かれ、
+レジストリの同じ版のscannerを参照する。SDK内の`assets/scanner.wasm`は、
+`crates/scanner/artifacts/scanner.wasm`とbyte単位で同じものを同梱する。
+現在の固定WASMのSHA-256は
+`e765bdca9f335bed3c26c2dee1bce39e9eb652e2af2552945c1818934d88e4fd`。
+配布の都合でWASMを再生成したり、検知profileを変更したりしない。
+
+両パッケージのincludeを明示し、Rustソース、例・テスト、READMEとCargo.lockを含める。
+SDKに必要なWASMはSDK自身のpackage内に置き、隣のscannerディレクトリを参照しない。
+鍵、招待、nodeデータ、運用inventory、サイトの状態を含めない。
+[Cargo公式のpackaging仕様](https://doc.rust-lang.org/cargo/commands/cargo-package.html)に従う。
+
+公開前にファイル一覧と、展開したpackageからのビルドを確認する。
+公開検査ではCargo 1.96のworkspace packagingを使い、未公開のscannerを一時レジストリへ置いて
+依存関係を検査できる。利用者の`cargo install`がこの一時レジストリを使うわけではない。
+
+```sh
+cargo package --list --locked -p idobata-scanner
+cargo package --list --locked -p idobata
+cargo package --workspace --locked
+cargo publish --dry-run --workspace --locked --registry crates-io
+```
+
+作業中の変更を検査する場合だけ`--allow-dirty`を明示する。これは未commitの状態を公開可能にする
+例外であり、最終配布のソース一致確認を代替しない。
+ライセンスはリポジトリに指定がなく、Cargoは`license`または`license-file`未指定を警告する。
+配布作業でMIT等の条件を推定して追加しない。dry-runの成功は、レジストリの認証や
+アップロード後のサーバー検査が完了したことを意味しない。
+
+認証を設定できたら、scannerを先に公開し、公式indexへ0.3.0が現れたことを確認する。
+続けてSDKのdry-runを再実行し、公開されたscannerのchecksumを使うロックファイルで検査してから公開する。
+公開操作は次の順序となる。
+
+```sh
+cargo publish --locked -p idobata-scanner --registry crates-io
+cargo publish --dry-run --locked -p idobata --registry crates-io
+cargo publish --locked -p idobata --registry crates-io
+```
+
+認証には既存の保護された資格情報またはCargo credential providerを使う。
+dotenvの指定キーを使う場合は実行可能なshellとしてsourceせず、データとして解釈し、
+公開用の子プロセスの`CARGO_REGISTRY_TOKEN`にだけ渡す。
+tokenを引数、ログ、証跡、リポジトリや新しい永続設定へ書かない。
+公開後に空のinstall rootから`cargo install idobata --version 0.3.0 --locked`を実行し、
+version、profileと基本CLIを確認して初めて導入経路を検証済みとする。
+一度公開した版は上書きできないため、試験目的の実公開はしない。
+[Cargo公式の公開手順](https://doc.rust-lang.org/cargo/reference/publishing.html)を参照。
+
+## バイナリの取得と検証（公開済みv0.2）
 
 v0.2.0の対象はLinux x86_64、macOS arm64、Windows x86_64。
 実機で動かしたバイナリをarchive化する。WASM検知器と固定profileは埋め込み済み。
@@ -82,6 +181,12 @@ idobata daemonや接続するagentへGateトークンを渡さない。
 [公開経路と常設peerの運用](operations.md)を参照。
 
 ## 互換性と障害
+
+v0.3の自動処理テスト必須roomは、署名付きのversion 3招待を使う。
+既存4ホストでは、先に全SDKを0.3へ更新して正常性を確認し、最後に必須flagを有効化する。
+0.2のSDKはversion 3証明書を受け付けないので、有効化後の復旧をbinaryの差替えだけで済むと扱わない。
+旧証明書のsnapshotはroot専用に保ち、認可の復旧と保存知識の整合性を別途確認する。
+知識ストアは従来通知の保存ファイルと分離し、ノード秘密鍵をホスト間でコピーしない。
 
 v0.2のprotocolは`/idobata/message/2`。v0.1とは接続できないためルーム内で揃えて更新する。
 従来の非公開payloadはv1形式で署名を維持し、公開指定・返信・解決を含むpayloadをv2にする。

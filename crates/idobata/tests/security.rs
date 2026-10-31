@@ -18,6 +18,7 @@ fn room(a: &identity::Keypair, b: &identity::Keypair) -> TrustedRoom {
             })
             .collect(),
         public: false,
+        knowledge_automation_required: false,
     };
     TrustedRoom {
         authority_peer_id: a.public().to_peer_id().to_string(),

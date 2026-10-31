@@ -114,6 +114,16 @@ pub fn create_room_with_visibility(
     hours: u64,
     public: bool,
 ) -> Result<Signed<Room>> {
+    create_room_with_policy(home, alias, members, hours, public, false)
+}
+pub fn create_room_with_policy(
+    home: &Path,
+    alias: &str,
+    members: Vec<Member>,
+    hours: u64,
+    public: bool,
+    require_automation: bool,
+) -> Result<Signed<Room>> {
     if !util::valid_alias(alias) || hours == 0 || hours > 168 {
         return Err(INVALID);
     }
@@ -123,6 +133,13 @@ pub fn create_room_with_visibility(
     if !members.iter().any(|m| m.peer_id == own) {
         return Err(INVALID);
     }
+    // Renewals inherit the admission policy. Omitting a new CLI flag must not
+    // silently reopen a room that already requires an automation test.
+    let require_automation = require_automation
+        || config
+            .rooms
+            .get(alias)
+            .is_some_and(|old| old.certificate.signed.knowledge_automation_required);
     let (room_id, epoch) = if let Some(old) = config.rooms.get(alias) {
         if old.authority_peer_id != own || old.certificate.signed.public != public {
             return Err(INVALID);
@@ -136,7 +153,13 @@ pub fn create_room_with_visibility(
     };
     let at = util::now();
     let room = Room {
-        version: if public { 2 } else { 1 },
+        version: if require_automation {
+            3
+        } else if public {
+            2
+        } else {
+            1
+        },
         room_id,
         epoch,
         issued_at: at,
@@ -144,6 +167,7 @@ pub fn create_room_with_visibility(
         policy_id: Scanner::policy_id(),
         members,
         public,
+        knowledge_automation_required: require_automation,
     };
     let cert = Signed {
         signature: crypto::sign(&key, "idobata.room.v1", &room)?,
@@ -182,6 +206,8 @@ pub fn join_room(home: &Path, alias: &str, cert: Signed<Room>, authority: &str) 
     if let Some(old) = config.rooms.get(alias) {
         if old.authority_peer_id != authority
             || old.certificate.signed.public != trusted.certificate.signed.public
+            || (old.certificate.signed.knowledge_automation_required
+                && !trusted.certificate.signed.knowledge_automation_required)
             || old.certificate.signed.room_id != trusted.certificate.signed.room_id
             || trusted.certificate.signed.epoch < old.certificate.signed.epoch
         {
@@ -195,4 +221,69 @@ pub fn join_room(home: &Path, alias: &str, cert: Signed<Room>, authority: &str) 
     }
     config.rooms.insert(alias.into(), trusted);
     save(home, &config)
+}
+
+#[cfg(test)]
+mod automation_policy_tests {
+    use super::*;
+
+    #[test]
+    fn automation_policy_upgrades_are_signed_inherited_and_cannot_be_downgraded() {
+        let temporary = tempfile::tempdir().unwrap();
+        let first = temporary.path().join("issuer");
+        let second = temporary.path().join("member");
+        let a = init(&first, vec!["/ip4/127.0.0.1/tcp/39101".into()]).unwrap();
+        let b = init(&second, vec!["/ip4/127.0.0.1/tcp/39102".into()]).unwrap();
+        let members = vec![a.clone(), b];
+        let old = create_room(&first, "exchange", members.clone(), 1).unwrap();
+        assert_eq!(old.signed.version, 1);
+        assert!(!old.signed.knowledge_automation_required);
+        assert!(
+            serde_json::to_value(&old.signed)
+                .unwrap()
+                .get("knowledge_automation_required")
+                .is_none()
+        );
+        let gated =
+            create_room_with_policy(&first, "exchange", members.clone(), 1, false, true).unwrap();
+        assert_eq!(gated.signed.room_id, old.signed.room_id);
+        assert_eq!(gated.signed.version, 3);
+        assert!(gated.signed.knowledge_automation_required);
+        join_room(&second, "exchange", gated.clone(), &a.peer_id).unwrap();
+        let renewed = create_room_with_visibility(&first, "exchange", members, 1, false).unwrap();
+        assert!(renewed.signed.knowledge_automation_required);
+        assert_eq!(renewed.signed.version, 3);
+        join_room(&second, "exchange", renewed.clone(), &a.peer_id).unwrap();
+
+        let key = crypto::load_key(&first).unwrap();
+        let mut downgrade = renewed;
+        downgrade.signed.epoch += 1;
+        downgrade.signed.version = 1;
+        downgrade.signed.knowledge_automation_required = false;
+        downgrade.signature = crypto::sign(&key, "idobata.room.v1", &downgrade.signed).unwrap();
+        assert!(join_room(&second, "exchange", downgrade, &a.peer_id).is_err());
+        assert!(
+            load(&second).unwrap().rooms["exchange"]
+                .certificate
+                .signed
+                .knowledge_automation_required
+        );
+    }
+
+    #[test]
+    fn public_automation_rooms_use_version_three_and_bind_the_policy_flag() {
+        let temporary = tempfile::tempdir().unwrap();
+        let home = temporary.path().join("node");
+        let own = init(&home, vec!["/ip4/127.0.0.1/tcp/39101".into()]).unwrap();
+        let cert =
+            create_room_with_policy(&home, "public", vec![own.clone()], 1, true, true).unwrap();
+        assert_eq!(cert.signed.version, 3);
+        let mut room = load(&home).unwrap().rooms["public"].clone();
+        room.certificate.signed.knowledge_automation_required = false;
+        // Changing the policy without a new valid signature is never a renewal.
+        assert!(crypto::validate_room(&room, &Scanner::policy_id(), util::now()).is_err());
+        let legacy =
+            create_room_with_visibility(&home, "legacy-public", vec![own], 1, true).unwrap();
+        assert_eq!(legacy.signed.version, 2);
+    }
 }

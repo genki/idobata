@@ -1,0 +1,48 @@
+{
+  "version": 1,
+  "test": "moon-services-knowledge-monitor",
+  "checked_at": "2026-10-31T15:49:44Z",
+  "status": "passed",
+  "scope": "monitor implementation and backward-compatible v02 deployment",
+  "websh_commit": "c8bb817c",
+  "build": {
+    "project": "websh",
+    "target": "aarch64-apple-darwin",
+    "mode": "full",
+    "job_id": "f78bbc92b1b04cd898f48338c2246f9c",
+    "server_tests": 1149,
+    "server_tests_passed": 1149,
+    "archive": "websh-release.tar.gz",
+    "archive_bytes": 179924286,
+    "archive_sha256": "db87f8867a4b72f7f66f81e5417764087e68bc41c9ead8cdb7b3a4b48cac6ea7",
+    "archive_files": 310,
+    "monitor_entries_in_server_bundle": true
+  },
+  "deployment": {
+    "method": "normal deploy.sh",
+    "revision": 7465,
+    "healthz_status": 200,
+    "client_server_revision_match": true,
+    "root_and_legacy_client_revision_match": true,
+    "served_client_entry_matches_verified_artifact": true,
+    "served_client_entry_assets_checksum_verified": 2,
+    "existing_idobata_checks": 11,
+    "existing_idobata_checks_up": 11,
+    "observation_series": "v02",
+    "knowledge_rows_active": false,
+    "v03_collector_installed": false,
+    "v03_observation_started": false
+  },
+  "focused_tests": {
+    "collector": 7,
+    "moon_monitor": 8,
+    "eslint": "passed"
+  },
+  "preserved_foreign_dirty_paths": 84,
+  "notice_message_sent": false,
+  "limitations": [
+    "v03 SDK fleet and collector switch are separate phases",
+    "pending queue counts do not prove replica completeness",
+    "72-hour observation not claimed complete"
+  ]
+}

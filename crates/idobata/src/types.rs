@@ -21,6 +21,8 @@ pub struct Room {
     pub members: Vec<Member>,
     #[serde(default, skip_serializing_if = "is_false")]
     pub public: bool,
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub knowledge_automation_required: bool,
 }
 pub fn is_false(value: &bool) -> bool {
     !*value
@@ -133,6 +135,37 @@ pub enum WireResponse {
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(tag = "action", rename_all = "snake_case", deny_unknown_fields)]
 pub enum Request {
+    KnowledgePublish {
+        room: String,
+        input: crate::knowledge::KnowledgeInput,
+        public: bool,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        proof: Option<crate::automation::AutomationAnswer>,
+    },
+    KnowledgeSearch {
+        room: String,
+        query: String,
+        limit: usize,
+    },
+    KnowledgeGet {
+        room: String,
+        id: String,
+    },
+    KnowledgeEvaluate {
+        room: String,
+        id: String,
+        input: crate::knowledge::ReviewInput,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        proof: Option<crate::automation::AutomationAnswer>,
+    },
+    KnowledgePeers {
+        room: String,
+        query: String,
+        limit: usize,
+    },
+    KnowledgeStatus {
+        room: Option<String>,
+    },
     Info,
     Begin,
     Scan {
@@ -225,4 +258,44 @@ pub struct State {
     pub inbox: Vec<Inbox>,
     pub prepared: Vec<Prepared>,
     pub rejected_count: u64,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn knowledge_ipc_actions_remain_explicit_and_reject_unknown_fields() {
+        let search =
+            json!({"action":"knowledge_search","room":"engineering","query":"retry","limit":10});
+        let request = serde_json::from_value::<Request>(search.clone()).unwrap();
+        assert!(
+            matches!(&request, Request::KnowledgeSearch { room, query, limit: 10 } if room == "engineering" && query == "retry")
+        );
+        assert_eq!(serde_json::to_value(request).unwrap(), search);
+        let legacy_publish = json!({"action":"knowledge_publish","room":"engineering","public":false,"input":{"problem":"retry","solution":"backoff"}});
+        let request = serde_json::from_value::<Request>(legacy_publish).unwrap();
+        assert!(matches!(
+            &request,
+            Request::KnowledgePublish { proof: None, .. }
+        ));
+        assert!(
+            serde_json::to_value(request)
+                .unwrap()
+                .get("proof")
+                .is_none()
+        );
+        let mut unknown = search;
+        unknown["include_private_rooms"] = true.into();
+        assert!(serde_json::from_value::<Request>(unknown).is_err());
+        assert!(
+            serde_json::from_value::<Request>(json!({"action":"knowledge_get","id":"record"}))
+                .is_err()
+        );
+        assert!(serde_json::from_value::<Request>(json!({"action":"knowledge_publish","room":"engineering","public":false,"input":{"problem":"retry","solution":"backoff","collect_environment":true}})).is_err());
+        assert!(
+            serde_json::from_value::<Request>(json!({"action":"knowledge_export_all"})).is_err()
+        );
+    }
 }

@@ -17,11 +17,12 @@ use std::{
 #[command(
     name = "idobata",
     version,
-    about = "Inspected, authenticated P2P messages for AI agents"
+    about = "Distributed, inspected knowledge exchange for AI agents"
 )]
 struct Cli {
-    #[arg(long, global = true, default_value = ".idobata")]
-    home: PathBuf,
+    /// Node home; defaults to .idobata, then the installed shared IPC endpoint.
+    #[arg(long, global = true)]
+    home: Option<PathBuf>,
     #[arg(long, global = true)]
     socket: Option<String>,
     #[arg(long, global = true)]
@@ -31,6 +32,10 @@ struct Cli {
 }
 #[derive(Subcommand)]
 enum Command {
+    Knowledge {
+        #[command(subcommand)]
+        command: KnowledgeCommand,
+    },
     Init {
         #[arg(long, default_value = "/ip4/127.0.0.1/tcp/19061")]
         listen: Vec<String>,
@@ -132,6 +137,134 @@ enum Command {
     },
 }
 #[derive(Subcommand)]
+enum KnowledgeCommand {
+    Publish {
+        #[arg(long)]
+        room: String,
+        #[arg(long)]
+        stdin: bool,
+        #[arg(long)]
+        public: bool,
+        /// JSON automation challenge answers; contains no daemon credentials.
+        #[arg(long)]
+        proof: Option<PathBuf>,
+    },
+    Search {
+        #[arg(long)]
+        room: String,
+        #[arg(long, default_value = "")]
+        query: String,
+        #[arg(long, default_value_t = 10)]
+        limit: usize,
+    },
+    Get {
+        #[arg(long)]
+        room: String,
+        #[arg(long)]
+        id: String,
+    },
+    Evaluate {
+        #[arg(long)]
+        room: String,
+        #[arg(long)]
+        id: String,
+        #[arg(long)]
+        stdin: bool,
+        #[arg(long)]
+        proof: Option<PathBuf>,
+    },
+    Peers {
+        #[arg(long)]
+        room: String,
+        #[arg(long, default_value = "")]
+        query: String,
+        #[arg(long, default_value_t = 10)]
+        limit: usize,
+    },
+    Status {
+        #[arg(long)]
+        room: Option<String>,
+    },
+}
+fn stdin_json<T: serde::de::DeserializeOwned>(explicit: bool) -> Result<T> {
+    if !explicit || std::io::stdin().is_terminal() {
+        return Err(Error::new(30, "stdin_required"));
+    }
+    read_json(std::io::stdin())
+}
+fn read_json<T: serde::de::DeserializeOwned>(reader: impl Read) -> Result<T> {
+    let mut bytes = vec![];
+    reader
+        .take(65537)
+        .read_to_end(&mut bytes)
+        .map_err(|_| Error::new(22, "input_unreadable"))?;
+    if bytes.len() > 65536 {
+        return Err(Error::new(22, "input_limit"));
+    }
+    serde_json::from_slice(&bytes).map_err(|_| INVALID)
+}
+
+fn read_proof(path: Option<&Path>) -> Result<Option<idobata::automation::AutomationAnswer>> {
+    path.map(|path| {
+        let bytes = util::read_bounded(path, 65_536)?;
+        serde_json::from_slice(&bytes).map_err(|_| INVALID)
+    })
+    .transpose()
+}
+
+fn resolve_endpoint(
+    socket: Option<&str>,
+    home: &Path,
+    home_explicit: bool,
+    shared: impl FnOnce() -> Result<String>,
+) -> Result<String> {
+    if let Some(socket) = socket {
+        return Ok(socket.into());
+    }
+    let local_config = if home_explicit {
+        true
+    } else {
+        match std::fs::symlink_metadata(home.join("config.json")) {
+            Ok(_) => true,
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => false,
+            Err(_) => return Err(idobata::error::STORAGE),
+        }
+    };
+    if local_config {
+        // Config contains the endpoint. Client selection never opens identity.key
+        // or storage.key and never probes a dedicated daemon's private home.
+        return Ok(config::load(home)?.endpoint);
+    }
+    shared()
+}
+
+fn shared_endpoint() -> Result<String> {
+    #[cfg(windows)]
+    {
+        read_public_endpoint(Path::new(r"C:\Program Files\idobata\agent.socket"))
+    }
+    #[cfg(target_os = "macos")]
+    {
+        Ok("/Library/Caches/idobata-runtime/ipc.sock".into())
+    }
+    #[cfg(all(unix, not(target_os = "macos")))]
+    {
+        Ok("/run/idobata/ipc.sock".into())
+    }
+}
+
+#[cfg(any(windows, test))]
+fn read_public_endpoint(path: &Path) -> Result<String> {
+    let bytes = util::read_bounded(path, 512)?;
+    let text = std::str::from_utf8(&bytes).map_err(|_| INVALID)?;
+    let text = text.strip_suffix('\n').unwrap_or(text);
+    let text = text.strip_suffix('\r').unwrap_or(text);
+    if text.is_empty() || text.chars().any(char::is_control) {
+        return Err(INVALID);
+    }
+    Ok(text.into())
+}
+#[derive(Subcommand)]
 enum RoomCommand {
     Leave {
         #[arg(long)]
@@ -148,6 +281,8 @@ enum RoomCommand {
         output: PathBuf,
         #[arg(long)]
         public: bool,
+        #[arg(long)]
+        require_automation: bool,
     },
     Join {
         #[arg(long)]
@@ -376,13 +511,10 @@ fn publication_state(
     Ok((f, w, r, keys))
 }
 async fn execute(cli: Cli) -> Result<i32> {
-    let endpoint = || -> Result<String> {
-        if let Some(s) = &cli.socket {
-            Ok(s.clone())
-        } else {
-            Ok(config::load(&cli.home)?.endpoint)
-        }
-    };
+    let home_explicit = cli.home.is_some();
+    let home = cli.home.unwrap_or_else(|| PathBuf::from(".idobata"));
+    let endpoint =
+        || resolve_endpoint(cli.socket.as_deref(), &home, home_explicit, shared_endpoint);
     let request = match cli.command {
         Command::Bootstrap { command } => {
             match command {
@@ -392,7 +524,7 @@ async fn execute(cli: Cli) -> Result<i32> {
                     revision,
                 } => {
                     let node = crypto::load_key(&node_home)?;
-                    let key = crypto::load_key(&cli.home)?;
+                    let key = crypto::load_key(&home)?;
                     let doc = idobata::bootstrap::create(&node, &key, revision, util::now())?;
                     idobata::bootstrap::verify(&doc, &crypto::public(&key), util::now(), None)?;
                     util::atomic_write(&output, &util::canonical(&doc)?)?;
@@ -487,18 +619,18 @@ async fn execute(cli: Cli) -> Result<i32> {
             return Ok(0);
         }
         Command::Init { listen } => {
-            let member = config::init(&cli.home, listen)?;
+            let member = config::init(&home, listen)?;
             print(
-                &json!({"status":"initialized","identity":member,"endpoint":config::load(&cli.home)?.endpoint}),
+                &json!({"status":"initialized","identity":member,"endpoint":config::load(&home)?.endpoint}),
             );
             return Ok(0);
         }
         Command::Identity { address } => {
-            print(&config::identity(&cli.home, address)?);
+            print(&config::identity(&home, address)?);
             return Ok(0);
         }
         Command::Daemon => {
-            daemon::run(&cli.home).await?;
+            daemon::run(&home).await?;
             return Ok(0);
         }
         Command::Profile => {
@@ -517,16 +649,16 @@ async fn execute(cli: Cli) -> Result<i32> {
                         return Err(Error::new(30, "confirm_public_required"));
                     }
                     let draft = stdin_draft(stdin, input)?;
-                    util::protected(&cli.home)?;
+                    util::protected(&home)?;
                     // 同じ公開ファイルの更新を直列化する。daemonの状態は開かない。
                     let lock = std::fs::OpenOptions::new()
                         .read(true)
-                        .open(cli.home.join("identity.key"))
+                        .open(home.join("identity.key"))
                         .map_err(|_| INVALID)?;
                     fs2::FileExt::try_lock_exclusive(&lock).map_err(|_| INVALID)?;
-                    let key = crypto::load_key(&cli.home)?;
+                    let key = crypto::load_key(&home)?;
                     let (existing, withdrawn, revision, keys) =
-                        publication_state(&cli.home, &feed, &key)?;
+                        publication_state(&home, &feed, &key)?;
                     let public = publication::append_with_keys(
                         Some(existing),
                         &key,
@@ -607,7 +739,7 @@ async fn execute(cli: Cli) -> Result<i32> {
                     let keys: Vec<idobata::trust::Grant> =
                         serde_json::from_slice(&util::read_bounded(&grants, 65536)?)
                             .map_err(|_| INVALID)?;
-                    let root = crypto::load_key(&cli.home)?;
+                    let root = crypto::load_key(&home)?;
                     let trust = idobata::trust::create(&root, keys, revoke, revision, util::now())?;
                     util::atomic_write(&output, &util::canonical(&trust)?)?;
                     print(
@@ -620,14 +752,14 @@ async fn execute(cli: Cli) -> Result<i32> {
                     withdraw,
                     ttl_seconds,
                 } => {
-                    util::protected(&cli.home)?;
+                    util::protected(&home)?;
                     let lock = std::fs::OpenOptions::new()
                         .read(true)
-                        .open(cli.home.join("identity.key"))
+                        .open(home.join("identity.key"))
                         .map_err(|_| INVALID)?;
                     fs2::FileExt::try_lock_exclusive(&lock).map_err(|_| INVALID)?;
-                    let key = crypto::load_key(&cli.home)?;
-                    let (mut f, mut w, r, keys) = publication_state(&cli.home, &feed, &key)?;
+                    let key = crypto::load_key(&home)?;
+                    let (mut f, mut w, r, keys) = publication_state(&home, &feed, &key)?;
                     if let Some(room) = room {
                         let mut before = None;
                         let mut all = Vec::new();
@@ -694,11 +826,11 @@ async fn execute(cli: Cli) -> Result<i32> {
         Command::Room { command } => {
             match command {
                 RoomCommand::Leave { room } => {
-                    let mut config = config::load(&cli.home)?;
+                    let mut config = config::load(&home)?;
                     if config.rooms.remove(&room).is_none() {
                         return Err(INVALID);
                     }
-                    config::save(&cli.home, &config)?;
+                    config::save(&home, &config)?;
                     print(&json!({"status":"room_left"}));
                 }
                 RoomCommand::Create {
@@ -707,6 +839,7 @@ async fn execute(cli: Cli) -> Result<i32> {
                     expires_hours,
                     output,
                     public,
+                    require_automation,
                 } => {
                     let members = serde_json::from_slice::<Vec<Member>>(&util::read_bounded(
                         &members_file,
@@ -716,12 +849,13 @@ async fn execute(cli: Cli) -> Result<i32> {
                     if output.exists() {
                         return Err(INVALID);
                     }
-                    let cert = config::create_room_with_visibility(
-                        &cli.home,
+                    let cert = config::create_room_with_policy(
+                        &home,
                         &room,
                         members,
                         expires_hours,
                         public,
+                        require_automation,
                     )?;
                     export(&output, &cert)?;
                     print(
@@ -739,11 +873,11 @@ async fn execute(cli: Cli) -> Result<i32> {
                         65536,
                     )?)
                     .map_err(|_| INVALID)?;
-                    config::join_room(&cli.home, &room, cert, &trust_authority)?;
+                    config::join_room(&home, &room, cert, &trust_authority)?;
                     print(&json!({"status":"room_joined"}));
                 }
                 RoomCommand::Export { room, output } => {
-                    let c = config::load(&cli.home)?;
+                    let c = config::load(&home)?;
                     let cert = &c.rooms.get(&room).ok_or(INVALID)?.certificate;
                     export(&output, cert)?;
                     print(&json!({"status":"room_exported"}));
@@ -751,6 +885,38 @@ async fn execute(cli: Cli) -> Result<i32> {
             }
             return Ok(0);
         }
+        Command::Knowledge { command } => match command {
+            KnowledgeCommand::Publish {
+                room,
+                stdin,
+                public,
+                proof,
+            } => Request::KnowledgePublish {
+                room,
+                input: stdin_json(stdin)?,
+                public,
+                proof: read_proof(proof.as_deref())?,
+            },
+            KnowledgeCommand::Search { room, query, limit } => {
+                Request::KnowledgeSearch { room, query, limit }
+            }
+            KnowledgeCommand::Get { room, id } => Request::KnowledgeGet { room, id },
+            KnowledgeCommand::Evaluate {
+                room,
+                id,
+                stdin,
+                proof,
+            } => Request::KnowledgeEvaluate {
+                room,
+                id,
+                input: stdin_json(stdin)?,
+                proof: read_proof(proof.as_deref())?,
+            },
+            KnowledgeCommand::Peers { room, query, limit } => {
+                Request::KnowledgePeers { room, query, limit }
+            }
+            KnowledgeCommand::Status { room } => Request::KnowledgeStatus { room },
+        },
         Command::Info => Request::Info,
         Command::Doctor => {
             let reply = ipc::call(&endpoint()?, &Request::Info).await?;
@@ -937,4 +1103,228 @@ async fn main() {
         }
     };
     std::process::exit(code)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use idobata::knowledge::{KnowledgeInput, ReviewInput};
+
+    #[test]
+    fn knowledge_cli_accepts_all_agent_operations_and_global_endpoint_flags() {
+        for operation in ["publish", "search", "get", "evaluate", "peers", "status"] {
+            let mut args = vec!["idobata", "knowledge", operation, "--room", "engineering"];
+            if ["get", "evaluate"].contains(&operation) {
+                args.extend(["--id", "record-id"]);
+            }
+            if ["publish", "evaluate"].contains(&operation) {
+                args.push("--stdin");
+            }
+            args.extend(["--socket", "/run/idobata/ipc.sock", "--json"]);
+            let cli = Cli::try_parse_from(args).unwrap();
+            assert_eq!(cli.socket.as_deref(), Some("/run/idobata/ipc.sock"));
+            assert!(cli.json);
+            assert!(matches!(cli.command, Command::Knowledge { .. }));
+        }
+        let cli = Cli::try_parse_from(["idobata", "knowledge", "status"]).unwrap();
+        assert!(matches!(
+            cli.command,
+            Command::Knowledge {
+                command: KnowledgeCommand::Status { room: None }
+            }
+        ));
+    }
+
+    #[test]
+    fn knowledge_search_defaults_allow_browsing_without_implicit_room_selection() {
+        let cli = Cli::try_parse_from(["idobata", "knowledge", "search", "--room", "engineering"])
+            .unwrap();
+        let Command::Knowledge {
+            command: KnowledgeCommand::Search { room, query, limit },
+        } = cli.command
+        else {
+            panic!("wrong command");
+        };
+        assert_eq!(room, "engineering");
+        assert!(query.is_empty());
+        assert_eq!(limit, 10);
+        assert!(
+            Cli::try_parse_from(["idobata", "knowledge", "search", "--query", "retry"]).is_err()
+        );
+    }
+
+    #[test]
+    fn knowledge_json_rejects_unknown_duplicate_and_trailing_input() {
+        let input: KnowledgeInput =
+            read_json(br#"{"problem":"retry","solution":"bounded backoff"}"#.as_slice()).unwrap();
+        assert_eq!(input.kind, "answer");
+        assert!(
+            read_json::<KnowledgeInput>(
+                br#"{"problem":"retry","solution":"backoff","environment":"collect"}"#.as_slice()
+            )
+            .is_err()
+        );
+        assert!(
+            read_json::<KnowledgeInput>(
+                br#"{"problem":"one","problem":"two","solution":"backoff"}"#.as_slice()
+            )
+            .is_err()
+        );
+        assert!(
+            read_json::<KnowledgeInput>(
+                br#"{"problem":"retry","solution":"backoff"} {}"#.as_slice()
+            )
+            .is_err()
+        );
+        assert!(
+            read_json::<ReviewInput>(
+                br#"{"verdict":"useful","evidence":"retried successfully","extra":"field"}"#
+                    .as_slice()
+            )
+            .is_err()
+        );
+    }
+
+    #[test]
+    fn knowledge_json_is_bounded_before_parsing() {
+        let bytes = vec![b' '; 65_537];
+        let error = match read_json::<KnowledgeInput>(bytes.as_slice()) {
+            Ok(_) => panic!("oversized input accepted"),
+            Err(error) => error,
+        };
+        assert_eq!(error.error, "input_limit");
+    }
+
+    #[test]
+    fn explicit_home_provenance_and_automation_flags_survive_cli_parsing() {
+        for args in [
+            vec!["idobata", "--home", ".idobata", "info"],
+            vec!["idobata", "--home=.idobata", "info"],
+        ] {
+            assert_eq!(
+                Cli::try_parse_from(args).unwrap().home,
+                Some(PathBuf::from(".idobata"))
+            );
+        }
+        assert!(
+            Cli::try_parse_from(["idobata", "info"])
+                .unwrap()
+                .home
+                .is_none()
+        );
+        let cli = Cli::try_parse_from([
+            "idobata",
+            "knowledge",
+            "publish",
+            "--room",
+            "engineering",
+            "--stdin",
+            "--proof",
+            "answer.json",
+        ])
+        .unwrap();
+        assert!(
+            matches!(cli.command, Command::Knowledge { command: KnowledgeCommand::Publish { proof: Some(path), public: false, .. } } if path == Path::new("answer.json"))
+        );
+        let cli = Cli::try_parse_from([
+            "idobata",
+            "room",
+            "create",
+            "--room",
+            "engineering",
+            "--members-file",
+            "members.json",
+            "--output",
+            "invite.json",
+            "--require-automation",
+        ])
+        .unwrap();
+        assert!(matches!(
+            cli.command,
+            Command::Room {
+                command: RoomCommand::Create {
+                    require_automation: true,
+                    ..
+                }
+            }
+        ));
+    }
+
+    #[test]
+    fn endpoint_overrides_never_fall_through_to_another_node() {
+        let temporary = tempfile::tempdir().unwrap();
+        let home = temporary.path().join("missing");
+        assert_eq!(
+            resolve_endpoint(Some("explicit.sock"), &home, true, || panic!(
+                "unexpected shared endpoint read"
+            ))
+            .unwrap(),
+            "explicit.sock"
+        );
+        assert!(resolve_endpoint(None, &home, true, || Ok("shared.sock".into())).is_err());
+        assert_eq!(
+            resolve_endpoint(None, &home, false, || Ok("shared.sock".into())).unwrap(),
+            "shared.sock"
+        );
+        std::fs::create_dir(&home).unwrap();
+        std::fs::write(home.join("config.json"), "invalid configuration").unwrap();
+        assert!(
+            resolve_endpoint(None, &home, false, || panic!(
+                "invalid local configuration must fail closed"
+            ))
+            .is_err()
+        );
+        assert_eq!(
+            resolve_endpoint(Some("explicit.sock"), &home, false, || panic!(
+                "unexpected fallback"
+            ))
+            .unwrap(),
+            "explicit.sock"
+        );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn local_endpoint_selection_does_not_read_node_keys() {
+        use std::os::unix::fs::PermissionsExt;
+        let temporary = tempfile::tempdir().unwrap();
+        let home = temporary.path().join("node");
+        config::init(&home, vec!["/ip4/127.0.0.1/tcp/0".into()]).unwrap();
+        let expected = config::load(&home).unwrap().endpoint;
+        for key in ["identity.key", "storage.key"] {
+            std::fs::write(home.join(key), "invalid key that must never be decoded").unwrap();
+            std::fs::set_permissions(home.join(key), std::fs::Permissions::from_mode(0o0)).unwrap();
+        }
+        assert_eq!(
+            resolve_endpoint(None, &home, false, || panic!("local endpoint ignored")).unwrap(),
+            expected
+        );
+        assert_eq!(
+            resolve_endpoint(None, &home, true, || panic!("explicit home ignored")).unwrap(),
+            expected
+        );
+        std::fs::remove_file(home.join("config.json")).unwrap();
+        assert_eq!(
+            resolve_endpoint(None, &home, false, || Ok("shared.sock".into())).unwrap(),
+            "shared.sock"
+        );
+    }
+
+    #[test]
+    fn public_locator_and_automation_answers_are_bounded_data_files() {
+        let temporary = tempfile::tempdir().unwrap();
+        let locator = temporary.path().join("agent.socket");
+        std::fs::write(&locator, "shared.sock\r\n").unwrap();
+        assert_eq!(read_public_endpoint(&locator).unwrap(), "shared.sock");
+        for invalid in [vec![b'x'; 513], b"one\ntwo".to_vec(), vec![0xff], vec![]] {
+            std::fs::write(&locator, invalid).unwrap();
+            assert!(read_public_endpoint(&locator).is_err());
+        }
+        assert!(read_proof(None).unwrap().is_none());
+        let proof = temporary.path().join("answer.json");
+        std::fs::write(&proof, vec![b' '; 65_537]).unwrap();
+        assert!(read_proof(Some(&proof)).is_err());
+        std::fs::write(&proof, b"{}").unwrap();
+        assert!(read_proof(Some(&proof)).is_err());
+    }
 }
