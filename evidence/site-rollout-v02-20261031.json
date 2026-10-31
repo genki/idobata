@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "requests": 360,
+  "status_counts": {
+    "200": 360
+  },
+  "load_balancer_count": 2,
+  "all_http_exits_success": true
+}

@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "checked_at": 1793447409.6972532,
+  "ordinary_client_uid_direct_reads_denied": [
+    "daemon_identity",
+    "publisher_identity",
+    "feed_trust_root",
+    "tuf_root",
+    "legacy_publisher_backup"
+  ],
+  "routine_daemon_cannot_read_offline_roots": true,
+  "scope": "filesystem UID permissions; does not restrict an operator who already has sudo/root access"
+}

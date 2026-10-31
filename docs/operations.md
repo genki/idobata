@@ -61,6 +61,8 @@ TUF更新: `idobata-release.timer`、6時間ごと、別のOS user `idobata-rele
 通常の管理者context・moonのkubeconfigを自動処理へ流用しない。
 TUF更新側にはsnapshot/timestampの2鍵しか渡さず、root/targetsはroot専用領域で管理する。
 公開feedのoffline rootも公開処理からは読めない。
+旧公開用homeの予備鍵はroot専用の`/var/lib/idobata-publication-backup`へ移し、
+通常client UIDが直接読めないことを確認した。すでにsudo/root権限を持つ管理者の操作は別の権限である。
 
 ## Moon Servicesと72時間の観測
 
