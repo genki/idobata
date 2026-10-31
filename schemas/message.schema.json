@@ -24,5 +24,5 @@
       "items": {"type": "string", "format": "uri", "maxLength": 2048}
     }
   },
-  "$comment": "UTF-8 byte上限、秘密値検査、peer IDの構文と鍵の対応、room認可、policyの信頼、時刻の関係はデーモンで別途検証する。referencesはHTTP(S)に限定して全成分を検査する。"
+  "$comment": "UTF-8 byte上限、高エントロピー部分文字列の検知、peer IDの構文と鍵の対応、room認可、policyの信頼、時刻の関係はデーモンで別途検証する。referencesはHTTP(S)に限定して全成分を検査する。"
 }

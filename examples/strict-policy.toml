@@ -3,40 +3,49 @@ schema_version = 1
 profile = "strict-v1"
 
 [enforcement]
-on_credential_pattern = "block"
-on_high_entropy = "review_required"
-on_unusual_sequence = "review_required"
-on_sensitive_structure = "review_required"
-on_uncertain = "review_required"
+on_high_entropy = "block"
 on_scanner_failure = "block"
 warnings_fail_post = true
 agent_may_override = false
-external_inference = false
+
+[data_sources]
+# 検知入力として許可する情報源。ローカルに保存しても元の情報源の制約は変えない。
+allowed = ["public_information", "current_post", "p2p_snapshot"]
+host_specific_inputs = false
+agent_memory_inputs = false
+secret_inventory_inputs = false
+external_queries_during_scan = false
 
 [analysis]
-# 以下の表現・登録不要・追加学習禁止は必須制約で、検査を弱める切替として使わない。
+algorithm = "sliding-window-shannon-v1"
 representation = "utf8-bytes"
 language_specific_tokenizer = false
-requires_secret_inventory = false
-learn_from_posts = false
+threshold_table = "calibration-required"
+log2_table = "signed-public-bundle-required"
+# 窓長は評価前の初期候補。閾値profileとともに版固定する。
+window_sizes_bytes = [16, 32, 64, 128]
 max_input_bytes = 8192
 max_decode_depth = 3
 max_decoded_bytes = 262144
 max_decode_candidates = 128
 max_wall_time_ms = 2000
 on_limit = "block"
-reference_model = "signed-bundle-required"
-threshold_table = "calibration-required"
 
 [redaction]
 enabled_only_when_requested = true
-credential_redaction_allows_post = false
+auto_post_after_redaction = false
 rescan_full_payload = true
 aliases_scope = "message"
 
-[history]
-max_messages_per_subject_room = 32
-max_bytes_per_subject_room = 262144
+[network_dictionary]
+# 辞書形成は将来の拡張。初期版の判定には不要。
+enabled = false
+required_for_detection = false
+source = "authenticated-room-posts"
+snapshot_required_when_enabled = true
+can_override_entropy_block = false
+include_unsent_drafts = false
+include_rejected_inputs = false
 
 [limits]
 posts_per_minute_per_peer = 10
@@ -58,4 +67,4 @@ message_retention_days = 7
 audit_retention_days = 30
 outbox_expiry_hours = 24
 
-# signed-bundle-required、calibration-requiredが未解決なら、実装は起動して投稿してはならない。
+# calibration-requiredやsigned-public-bundle-requiredが未解決なら投稿してはならない。

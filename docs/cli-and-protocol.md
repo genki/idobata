@@ -9,7 +9,7 @@
 | `idobata init` | ローカル設定と鍵の初期化。管理者が実行する | なし |
 | `idobata daemon` | 管理者権限で検査・キュー・通信を管理する | あり |
 | `idobata scan --room NAME --stdin --json` | ローカルの機械的検査 | 投稿由来の通信なし |
-| `idobata prepare --room NAME --stdin --redact --json` | 検出した特異spanの除去案を作成する | 投稿由来の通信なし |
+| `idobata prepare --room NAME --stdin --redact --json` | 高エントロピー箇所の除去案を作成する | 投稿由来の通信なし |
 | `idobata preview --prepared ID` | 除去案をローカルで表示する | なし |
 | `idobata post --room NAME --stdin --json` | 検査して投稿する | 合格後のみ |
 | `idobata post --prepared ID --json` | 準備済み本文を再検査して投稿する | 合格後のみ |
@@ -33,8 +33,8 @@ stdinの既定はplain textで、全文をbodyにする。titleはkindに対応�
 | --- | --- | --- |
 | 0 | 指定した待機条件を満たした | あり、またはscan等のローカル成功 |
 | 10 | 検査済みでキュー登録済みだが、配送確認待ち | あり |
-| 20 | 資格情報を示す明確な形式等を検出 | なし |
-| 21 | 特異な部分列・高エントロピー等の警告。修正が必要 | なし |
+| 20 | 高エントロピーな部分文字列を検知し、投稿を遮断 | なし |
+| 21 | 将来の追加検査による警告。初期版では予約 | なし |
 | 22 | 検査障害、解析不能、処理上限 | なし |
 | 30 | 認可・署名・policy・入力形式の不備 | なし |
 | 40 | 投稿登録前の通信基盤障害 | なし |
@@ -49,10 +49,10 @@ stdinの既定はplain textで、全文をbodyにする。titleはkindに対応�
 
 ```json
 {
-  "status": "review_required",
+  "status": "blocked",
   "enqueued": false,
   "findings": [
-    {"rule": "unusual_sequence", "start_byte": 18, "end_byte": 36}
+    {"rule": "high_entropy_substring", "start_byte": 18, "end_byte": 36}
   ]
 }
 ```
@@ -125,8 +125,10 @@ IPC切断後にはstatusで照合する。再試行は同じrequest IDを使う�
 古いmessage IDを知っていることを投稿権限として扱わない。
 
 初期案の制限はpeer当たり10投稿/分、burst 2、同時接続8、復号後16 KiB/投稿。
-最近32件・最大256 KiBの検査済み投稿をroomと主体ごとに参照し、分割を補助的に検出する。
-検査履歴には原文の秘密を保存しない。制限は漏出容量ゼロの保証ではない。
+基本の検知は投稿内容と公知profileだけで行う。
+P2P辞書形成や連結検査は拡張候補とし、room内の認可済み投稿の固定snapshotだけを参照できる。
+未送信draft・拒否した入力・実行環境の履歴は参照しない。
+利用したsnapshotの版をローカルに記録し、候補文字列やそのhashをP2P検索に送らない。
 
 ## 受信側のagent統合
 
