@@ -1,0 +1,130 @@
+{
+  "version": 1,
+  "checked_at": "2026-10-31T12:03:45.759Z",
+  "artifact": {
+    "version": 1,
+    "archive_sha256": "05283d3ffd9814e43fbc3b53990992a01eb47db5978ead71e85fae83150bcba1",
+    "revision": {
+      "rev": 7464,
+      "updated": "2026-10-31T11:54:51Z"
+    },
+    "client": {
+      "rev": 7464,
+      "updated": "2026-10-31T11:54:51Z"
+    },
+    "archive_members": 332,
+    "server_tests": 1144
+  },
+  "live_revision": {
+    "rev": 7464,
+    "updated": "2026-10-31T11:54:51Z",
+    "clientRev": 7464
+  },
+  "health": {
+    "ok": true
+  },
+  "entries": [
+    {
+      "id": "idobata-feed",
+      "status": "up",
+      "kind": "audit",
+      "detail": "署名検証済み rev.110 / 7件",
+      "checkedAt": "2026-10-31T12:03:18.600Z",
+      "notificationEligible": true
+    },
+    {
+      "id": "idobata-site",
+      "status": "up",
+      "kind": "audit",
+      "detail": "配備revision b2d1e685e1faabb7",
+      "checkedAt": "2026-10-31T12:03:18.314Z",
+      "notificationEligible": true
+    },
+    {
+      "id": "idobata-peer-linux",
+      "status": "up",
+      "kind": "audit",
+      "detail": "稼働中 / 接続 1 / 未配送 0 / 保留 0 / 配送済 4 / 参加期限 2026-11-07T11:10:27.000Z",
+      "checkedAt": "2026-10-31T12:03:25.931Z",
+      "notificationEligible": true
+    },
+    {
+      "id": "idobata-peer-mba22",
+      "status": "up",
+      "kind": "audit",
+      "detail": "稼働中 / 接続 0 / 未配送 0 / 保留 0 / 配送済 4 / 参加期限 2026-11-07T11:10:27.000Z",
+      "checkedAt": "2026-10-31T12:03:25.931Z",
+      "notificationEligible": true
+    },
+    {
+      "id": "idobata-peer-winvr",
+      "status": "up",
+      "kind": "audit",
+      "detail": "稼働中 / 接続 0 / 未配送 0 / 保留 0 / 配送済 2 / 参加期限 2026-11-07T11:10:27.000Z",
+      "checkedAt": "2026-10-31T12:03:25.931Z",
+      "notificationEligible": true
+    },
+    {
+      "id": "idobata-peer-machinaai",
+      "status": "up",
+      "kind": "audit",
+      "detail": "稼働中 / 接続 0 / 未配送 0 / 保留 0 / 配送済 2 / 参加期限 2026-11-07T11:10:27.000Z",
+      "checkedAt": "2026-10-31T12:03:25.931Z",
+      "notificationEligible": true
+    },
+    {
+      "id": "idobata-delivery",
+      "status": "up",
+      "kind": "audit",
+      "detail": "署名付き受領 3/3",
+      "checkedAt": "2026-10-31T12:03:25.931Z",
+      "notificationEligible": true
+    },
+    {
+      "id": "idobata-stability",
+      "status": "up",
+      "kind": "audit",
+      "detail": "0.2/72時間 / 異常標本 0 / OS再起動 未観測 / スリープ 未観測",
+      "checkedAt": "2026-10-31T12:03:25.931Z",
+      "notificationEligible": false
+    },
+    {
+      "id": "idobata-publication",
+      "status": "up",
+      "kind": "audit",
+      "detail": "公開 rev.111 / 7件 / 期限 2026-10-31T12:13:22.000Z",
+      "checkedAt": "2026-10-31T12:03:25.931Z",
+      "notificationEligible": true
+    },
+    {
+      "id": "idobata-public-route",
+      "status": "up",
+      "kind": "audit",
+      "detail": "公開WSS経由の署名付き受領 1/1",
+      "checkedAt": "2026-10-31T12:03:25.931Z",
+      "notificationEligible": true
+    },
+    {
+      "id": "idobata-release",
+      "status": "up",
+      "kind": "audit",
+      "detail": "metadata rev.101 / 3配布",
+      "checkedAt": "2026-10-31T12:03:25.931Z",
+      "notificationEligible": true
+    }
+  ],
+  "stability": {
+    "version": 1,
+    "started_at": 1793447305.375905,
+    "checked_at": 1793448200.7296526,
+    "elapsed_seconds": 895.3537476062775,
+    "required_seconds": 259200,
+    "samples": 29,
+    "failed_samples": 0,
+    "service_restarts": {},
+    "max_observation_gap_seconds": 38.33318591117859,
+    "time_window_complete": false,
+    "os_reboot_test": "not_yet_observed",
+    "sleep_test": "not_yet_observed"
+  }
+}
