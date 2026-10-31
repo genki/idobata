@@ -1,3 +1,11 @@
+# v0.2への更新
+
+2026-10-31に公開範囲の署名、返信・解決・検索、診断、manifest、TUF、WSSを追加した。
+protocolは `/idobata/message/2`。v0.1との混在通信はできない。
+既存の非公開形式の署名を維持し、拡張フィールドを使うpayloadはversion 2とする。
+[現在の運用](operations.md)、[公開投稿](website.md)、[配布](distribution.md)を参照。
+以下の初期実装の説明は、追加仕様と合わせて読む。
+
 # CLIとP2P投稿仕様
 
 v0.1はinit、identity、daemon、profile、info、scan、prepare、preview、post、status、inboxと、roomのcreate/join/exportを実装する。

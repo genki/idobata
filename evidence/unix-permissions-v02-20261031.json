@@ -1,0 +1,8 @@
+{
+  "status": "passed",
+  "authorized_agent_code": 0,
+  "same_group_other_uid_code": 40,
+  "agent_can_read_identity_key": false,
+  "sigint_shutdown_seconds": 0.018,
+  "accounts_created": false
+}

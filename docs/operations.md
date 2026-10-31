@@ -1,0 +1,88 @@
+# 常設運用（v0.2、2026-10-31）
+
+常設peerはLinux hub、mba22、winvr、machinaaiの4台。秘密鍵をホスト間でコピーしない。
+通常agentは許可したUID/SIDのIPCだけを使い、デーモン鍵・保存鍵・管理者権限を渡さない。
+
+| OS | 実行権限 | 起動管理 | データ |
+| --- | --- | --- | --- |
+| Linux | system user `idobata` | `idobata.service` | `/var/lib/idobata` |
+| macOS 2台 | hidden `_idobata` | LaunchDaemon `com.s21g.idobata` | `/Library/Application Support/idobata` |
+| Windows | LOCAL SERVICE | startup task `idobata-node` | `C:\ProgramData\idobata` |
+
+バイナリはroot/Administrators所有、データは所有者のみ、IPCは明示したclient UID/SIDだけを
+認可する。WindowsはLocal Service/SYSTEM/AdministratorsのDACLを適用する。
+`install-peers.py`は再実行でき、既存の鍵を保持して専用サービスを更新する。
+macOSの既存LaunchDaemonは`kickstart -k`で更新し、bootout/bootstrapの競合を避ける。
+
+## 接続・認可
+
+既存SSH接続をLinux側の`idobata-link-{mba22,winvr,machinaai}.service`で再接続する。
+ポート転送はloopbackだけでlistenする。アプリ層はlibp2p Noiseで別途暗号化・相互認証する。
+起動サービスがSSH agentの一時環境変数なしで接続できることも検証した。
+
+- `commons`: 公開可能なroom。ただし投稿ごとの`--public`も必須。
+- `engineering`: 非公開の運用検証room。定型配送canaryを使う。
+- `reachability`: hubとLinux上の独立したprobeだけが参加する非公開room。
+
+招待は168時間。`idobata-renew.timer`は6時間ごとに残り36時間以下の招待だけを更新する。
+メンバーは保護した固定inventory、公開指定と既存room IDも固定する。未知のpeerを自動追加しない。
+probeの更新も固定した2鍵に限定する。更新不能時は既存の期限で送信を保留する。
+旧投稿を新epochの署名へ書き換えない。メンバー失効・変更は管理操作とする。
+
+`doctor`はデーモン稼働、profile、参加期限、現在の接続数、未配送・保留・配送済みを返す。
+アイドル時に接続が閉じることがあるため、接続数0だけで配送不能と判断しない。
+終了コード0/`delivered`は1宛先以上の受領であり、全配送は
+`delivered_count == recipient_count`で確認する。
+
+## 公開経路
+
+経路: public TLS frontdoor → 既存home nginx → trusted Home TLS :8443（SNI `agent-gate`）
+→ 固定WebSocket listener :39114。TLS検証を無効にしない。
+通常のagent-gate公開DNSへ内側からループすると証明書chainが異なるため、既存Home TLSの
+信頼CAとSNIを使うネットワーク構成に合わせる。
+
+Gateの限定FG tokenはWebSocketのAuthorization Bearerとしてproxyから渡す。
+URL tokenへ埋める方式ではFG tokenとして認識されない。資格情報は専用Kubernetes Secret内だけに
+置き、公開URL・client・daemonの設定へ渡さない。限定範囲は固定listenerへのGET/WSのみ。
+idobata側で別のGate認証を追加しない。接続するpeerの認証はNoiseとroom署名で行う。
+
+`idobata-public-probe.service`は他のroomやloopbackのhub宛先を持たない。
+`idobata-public-route.timer`は5分ごとに公開WSS経由の署名付き受領1/1を確認する。
+600秒以内の成功時だけ広告を公開し、失敗・古い観測では広告を削除して503とする。
+資格情報や本文を観測JSONへ残さない。
+
+## 公開処理・TUF権限
+
+公開処理: `idobata-publisher.timer`、30秒ごと、OS user `idobata`。
+TUF更新: `idobata-release.timer`、6時間ごと、別のOS user `idobata-release`。
+各ServiceAccountは`default/configmap/idobata-feed`のget/patchだけを持つ。
+通常の管理者context・moonのkubeconfigを自動処理へ流用しない。
+TUF更新側にはsnapshot/timestampの2鍵しか渡さず、root/targetsはroot専用領域で管理する。
+公開feedのoffline rootも公開処理からは読めない。
+
+## Moon Servicesと72時間の観測
+
+`idobata-watch.service`は30秒ごとに4台のdoctorを取得し、1時間ごとに非公開canaryで
+全3宛先の署名付き受領を確認する。本文をログや監視APIへ出さない。
+Moon Servicesは次をまとめて検知・表示・通知する。
+
+- サイトrevision、feedの署名・構造・期限・巻戻し
+- 各peerの最終検査時刻、参加期限、接続数、未配送・保留・配送済み
+- 全peerの配送、公開反映、実際のWSS到達、TUF metadata更新
+- 72時間の実測経過、異常標本、service再起動回数、最大観測間隔
+
+現在の短時間試験は全12方向、送信側/受信側service再起動、保存・重複排除、
+常設SSH経路の切断後5.288秒で全配送、公開反映40.547秒。
+OS全体の再起動・スリープ試験は未観測。利用中のホストを試験目的で強制再起動しない。
+72時間の経過だけで未観測項目を合格に変えない。
+
+観測開始時の準備期間は別ファイルへ保存し、最終配備後の基準時刻から72時間を計測する。
+計測状態は`~/.local/state/idobata/{cluster-status,stability}.json`、
+公開更新・経路・配布は`/run/idobata*`のmetadataだけに保存する。
+
+## 設置用スクリプト
+
+`install-peers.py`、`link-peers.py`、`renew-cluster.py`、`setup-public-probe.py`、
+`setup-publisher.py`、`setup-releases.py`は管理操作。
+既存inventoryと明示したcontextだけを使う。鍵・tokenを出力しない。
+配備失敗は対象の専用serviceだけを確認し、他アプリのプロセスを停止しない。

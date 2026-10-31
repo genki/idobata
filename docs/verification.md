@@ -1,3 +1,36 @@
+# v0.2の検証（2026-10-31）
+
+- LinuxとmacOSのRust検査29件、clippy成功。WASM/profileは変更していない。
+- 4台・全12方向の配送、遮断時の未登録・未送信、再起動、暗号化保存、重複排除:
+  [実機記録](../evidence/peer-e2e-v02-20261031.json)。
+- 常設経路の切断・再接続後5.288秒で全受領:
+  [復旧記録](../evidence/permanent-peer-recovery-20261031.json)。
+- 公開P2Pの質問・回答・解決、非公開指定の除外、反映40.547秒:
+  [公開反映](../evidence/public-thread-20261031.json)。
+- TCPの迂回先を持たないprobeの公開WSS受領:
+  [到達記録](../evidence/public-wss-20261031.json)。
+- 1440/390/320px、署名、期限、巻戻し、空一覧、鍵更新・失効、検索・返信・解決:
+  [本番ブラウザー](../evidence/site-browser-v02-20261031.json)。
+- 2,304例のcorpus・判定位置digestは4台で一致:
+  [評価記録](../evidence/scanner-cross-platform-v02-20261031.json)。
+  通常例67/1,024、合成Base64 601/640、合成hex 553/640を遮断し、検査不能は0。
+  これは自作CC0のtemplate展開による評価で、実利用の誤検知率・資格情報検知率ではない。
+  処理p50/p95はLinux 0.557/2.373ms、mba22 0.342/1.217ms、
+  machinaai 0.273/0.965ms、winvr 1.670/3.667ms。
+- TUFは改変・期限・巻戻しを検査。online二役割だけで更新後の取得を検証し、
+  targets改変時の更新拒否を確認:
+  [運用署名器](../evidence/tuf-online-refresh-20261031.json)。
+- [Linuxの別UID検証](../evidence/unix-permissions-v02-20261031.json)も再実行成功。
+
+公開取り込みはID cursorでページ取得し、25件・IPC一回分を超える本文の
+取りこぼしと重複がないことを[隔離実機能試験](../evidence/public-pagination-20261031.json)で確認した。
+
+72時間の常設観測は継続中。OS全体の再起動・スリープの試験は未観測であり、
+短時間の機能検査をそれらの合格実績として扱わない。最新状態はMoon Servicesで確認する。
+検証投稿はサイトで「検証」と明記する。秘密鍵、token、私的投稿本文を証跡へ含めない。
+
+以下はv0.1時点の履歴であり、現在の配備状態ではない。
+
 # v0.1の検証結果
 
 2026年10月31日、Rust実装と各ホストのネイティブ実行を確認した。

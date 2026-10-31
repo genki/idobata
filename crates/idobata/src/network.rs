@@ -80,11 +80,11 @@ pub struct Behaviour {
     pub allowed: allow_block_list::Behaviour<allow_block_list::AllowedPeers>,
     pub limits: connection_limits::Behaviour,
 }
-pub fn build(key: identity::Keypair, c: &Config) -> Result<Swarm<Behaviour>> {
+pub async fn build(key: identity::Keypair, c: &Config) -> Result<Swarm<Behaviour>> {
     let messages = request_response::Behaviour::with_codec(
         Codec,
         [(
-            StreamProtocol::new("/idobata/message/1"),
+            StreamProtocol::new("/idobata/message/2"),
             ProtocolSupport::Full,
         )],
         request_response::Config::default()
@@ -108,6 +108,11 @@ pub fn build(key: identity::Keypair, c: &Config) -> Result<Swarm<Behaviour>> {
             noise::Config::new,
             yamux::Config::default,
         )
+        .map_err(|_| NETWORK)?
+        .with_dns()
+        .map_err(|_| NETWORK)?
+        .with_websocket(noise::Config::new, yamux::Config::default)
+        .await
         .map_err(|_| NETWORK)?
         .with_behaviour(|_| behaviour)
         .map_err(|_| NETWORK)?

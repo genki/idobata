@@ -105,6 +105,15 @@ pub fn create_room(
     members: Vec<Member>,
     hours: u64,
 ) -> Result<Signed<Room>> {
+    create_room_with_visibility(home, alias, members, hours, false)
+}
+pub fn create_room_with_visibility(
+    home: &Path,
+    alias: &str,
+    members: Vec<Member>,
+    hours: u64,
+    public: bool,
+) -> Result<Signed<Room>> {
     if !util::valid_alias(alias) || hours == 0 || hours > 168 {
         return Err(INVALID);
     }
@@ -115,7 +124,7 @@ pub fn create_room(
         return Err(INVALID);
     }
     let (room_id, epoch) = if let Some(old) = config.rooms.get(alias) {
-        if old.authority_peer_id != own {
+        if old.authority_peer_id != own || old.certificate.signed.public != public {
             return Err(INVALID);
         }
         (
@@ -127,13 +136,14 @@ pub fn create_room(
     };
     let at = util::now();
     let room = Room {
-        version: 1,
+        version: if public { 2 } else { 1 },
         room_id,
         epoch,
         issued_at: at,
         expires_at: at + hours * 3600,
         policy_id: Scanner::policy_id(),
         members,
+        public,
     };
     let cert = Signed {
         signature: crypto::sign(&key, "idobata.room.v1", &room)?,
@@ -171,6 +181,7 @@ pub fn join_room(home: &Path, alias: &str, cert: Signed<Room>, authority: &str) 
     }
     if let Some(old) = config.rooms.get(alias) {
         if old.authority_peer_id != authority
+            || old.certificate.signed.public != trusted.certificate.signed.public
             || old.certificate.signed.room_id != trusted.certificate.signed.room_id
             || trusted.certificate.signed.epoch < old.certificate.signed.epoch
         {

@@ -1,122 +1,92 @@
-# idobata.s21g.comの配布と初期ノード広告
+# 配布と初期ノード（v0.2）
 
-## サイトの役割
+配布元は `https://idobata.s21g.com/`、ソースと版固定の配布物は
+`https://github.com/genki/idobata`。ビルド・検査・配備は直接スクリプトを実行し、
+GitHub Actionsを使用しない。常設の新規ノード・ディスク・有料サービスは追加しない。
 
-`https://idobata.s21g.com` を公式の配布・説明・初期ノード探索の拠点とする。
-GitHubのソースリポジトリは `https://github.com/genki/idobata`。
-2026-10-31に概要・導入案内・最近の公開投稿を配備した。
-バイナリ配布、TUF更新、署名付き公開bootstrapは引き続き設計段階。
-[現在のサイトと公開投稿の運用](website.md)を参照。
+## バイナリの取得と検証
 
-| 経路 | 内容 |
-| --- | --- |
-| `/` | ツール概要、安全性の保証範囲、配布版への入口 |
-| `/docs/` | CLI、情報除去policy、運用・更新手順 |
-| `/posts.json` | 明示的に公開した署名付き開発投稿の配備時スナップショット |
-| `/publisher.json` | 公開投稿の署名検証用公開鍵。独立した信頼の起点ではない |
-| `/releases/` | OS/architecture別の署名検証可能な配布物 |
-| `/updates/` | TUFのmetadataとtargets |
-| `/.well-known/idobata/bootstrap.json` | 署名・期限付きの初期ノード広告 |
-| `/healthz` | 公開サイトの最小限の稼働確認 |
+v0.2.0の対象はLinux x86_64、macOS arm64、Windows x86_64。
+実機で動かしたバイナリをarchive化する。WASM検知器と固定profileは埋め込み済み。
+配布ファイル、長さ、SHA-256は`/releases.json`、信頼metadataは`/updates/`で配信する。
+archiveはGitHub Releaseへ保存し、サイトの`/releases/FILE`からHTTPSで転送する。
 
-サイトには投稿受付APIを設けない。管理者が明示的に公開した本文だけを、
-同じ検知器で検査して署名した後に配備する。非公開roomの自動転載は行わない。
-除去前データ、検出語、秘密値のhash、接続先・room一覧を受け付けない。
-初期ノードを紹介することと、room内の投稿を中継・保存することを分離する。
-NAT中継が必要な場合は別のpeerサービスとして運用し、HTTP配布サイトへ原文を預けない。
+初回はソースを確認して`cargo build --locked --release`でCLIを用意する。
+TUF rootはリポジトリの`site/updates/root.json`を取得し、別経路のfingerprintと照合する。
+同じWebサイトから取得した未検証のchecksumだけを独立した信頼根拠としない。
+初期root.jsonのSHA-256: `e62718a4d4b3095906ce8015d40466c586eebd3161ea6117f86915bf15c4494f`。
+すでに信頼済みのCLIから、次のように取得する。
 
-## 初期ノードと通常peer
+```sh
+idobata release download --root-file root.json \
+  --target idobata-0.2.0-linux-x86_64.tar.gz \
+  --state ./update-state --output ./idobata-0.2.0.tar.gz
+```
 
-初期ノードは接続の足掛かりとなる管理者承認済みのbootstrap/relay peerとする。
-初期ノードの署名が正しくても、roomの本文を読む権限は与えない。
-通常peerの一覧、参加room、利用者名、内部アドレスを公開directoryにしない。
+macOSは`idobata-0.2.0-macos-arm64.tar.gz`、Windowsは
+`idobata-0.2.0-windows-x86_64.zip`を指定する。更新履歴のstateを削除しない。
+TUFライブラリー`tough`で署名・役割・期限・版・hash・長さを検証し、streamが最後まで
+正常に終わった時点で出力する。不正・不完全なファイルを実行対象へ配置しない。
+展開・配置は管理者が明示的に行い、`idobata --version`と`idobata profile`を確認する。
+取得したshellの即時実行、自動実行、自動バイナリ置換は行わない。
 
-初期版では匿名の任意ノード登録を受け付けない。
-`idobata advertise --enable` は管理者が有効化した公開ノードだけに使う。
-承認済みpeer IDの一覧に対応する鍵で署名した広告を管理経路へ登録する。
-管理経路は一般投稿APIから分離し、署名と認可を検証する。
-本文中の「広告してほしい」という記述で登録を発動しない。
+### 署名と有効期限
 
-通常peerは招待ファイルに含まれる署名付きの接続情報も使える。
-private roomの接続先一覧は認可された相手にだけ渡し、配布サイトへ登録しない。
-公開DHTとmDNS広告は既定で無効とする。
+| 役割 | 保管・使用 | metadataの期限 |
+| --- | --- | --- |
+| root | 管理者だけのoffline用ディレクトリ、常駐処理から読めない | 365日 |
+| targets | 同じくoffline管理。配布物の固定hashを署名 | 90日 |
+| snapshot | 専用の更新アカウントだけが使用 | 7日、上位の期限を超えない |
+| timestamp | 同じく専用アカウント | 1日、上位の期限を超えない |
 
-## 広告の形式
+秘密鍵はGitや配布物へ入れない。offlineは専用サービスから切り離した管理操作を意味し、
+今回の保管先は同一ホスト上のroot専用ディレクトリである。物理的な取り外し保管ではない。
+ホストrootの侵害まで防ぐ構成ではない。
 
-`schemas/bootstrap.schema.json` が公開レスポンスを定義する。
-含めるのは版、revision、期限、署名者、peer ID、公開接続アドレス、役割だけ。
-自由な説明、任意のタグ、ローカルなホスト名、OSユーザー名、作業ディレクトリ、ログ、
-所有者メールアドレス、任意のquery parameterは載せない。
+`release create`は4役割を初期化・版更新する管理操作。
+`examples/refresh-tuf.rs`は署名済みroot/targetsを確認し、二つのonline鍵だけで
+snapshot/timestampを更新する。targetsの改変や期限切れを受け入れず、配布物を追加できない。
+6時間ごとの`idobata-release.timer`が実行し、更新先は限定RBACのfeed ConfigMapだけ。
+root/targetsの90日/365日期限を延ばすには管理者による新しい署名が必要である。
+TUF rootの正規の更新は旧rootと新rootの閾値を満たすTUFの手順で管理する。
 
-初期案の広告有効期間は10分、更新間隔は3分。
-実際の公開アドレスを承認した管理者の設定と、デーモンが確認した接続情報から生成する。
-任意のagent入力をpeer IDや暗号用の値へ詰め替えて広告することは許さない。
-広告の署名と、公開bundle全体の配布者署名を検証する。
+## 初期ノード広告
 
-個別広告は、schema内のpeerオブジェクトからsignatureだけを除いたオブジェクトをJCS化し、
-`idobata.advertisement.v1` とNULを先頭に付けて、そのpeerのEd25519鍵で署名する。
-peer IDから検証可能な鍵を取り出して対応を確認し、管理者承認済みpeer一覧とも照合する。
-公開bundleのexpires_atは、含める各広告の期限を超えない。
+公開広告のURLは`/.well-known/idobata/bootstrap.json`。
+公開用の署名鍵を`site/publisher.json`など別経路で確認し、pinとして明示する。
+feedのoffline root承認とは別に、現CLIのbootstrap取得はruntime公開鍵を直接pinする。
+bootstrap用pinの変更は管理操作で行う。
 
-アドレスはlibp2p multiaddrとして構文解析し、明示的に対応したtransportだけを許す。
-公開広告にはloopback、link-local、private/reserved IP、内部DNS名を含めない。
-DNS名を使う場合は管理者が承認した名前とする。
-接続時にも解決先を検査し、DNS rebindingで私的アドレスへ誘導されないようにする。
-IPの公開・私的区分とportの許可は正規表現だけでは判定しない。
+```sh
+idobata bootstrap fetch --trust-publisher publisher.json \
+  --checkpoint bootstrap-checkpoint.json --output bootstrap.json
+```
 
-広告登録先が任意のURLへ到達性確認を行う仕組みは設けない。
-到達性は固定のpeer protocolで鍵を検証するchallengeに限定し、
-公開IP・許可されたport・接続回数・timeoutを制限する。
-署名だけを、アドレス所有や実際の到達性の証拠とはしない。
-未確認のノードを「到達性確認済み」と表示しない。
+bundle署名 `idobata.bootstrap.v1` と、node本人の広告署名
+`idobata.advertisement.v1` を検証する。domain + NUL + JCSを署名する。
+peer IDに埋め込まれたEd25519鍵との一致、最大600秒の期限、revision巻戻しを検査する。
+初回取得では未観測履歴まで判定しない。空一覧は探索先なし、失効・取得不能は探索保留として扱う。
+新たなroom加入を許可する機能ではなく、署名付き招待と有効な参加資格が別途必要である。
 
-## bootstrap応答の信頼
+広告する接続先は管理者が固定した
+`/dns4/idobata-peer.s21g.com/tcp/443/wss` だけ。内部IPや内部DNS、room一覧を含めない。
+任意ドメインを投稿内容から登録・検査する機構を持たない。公開DNS/TLSの運用者自体の侵害を
+広告の署名だけで防げるとは扱わない。
+公開経路以外の宛先を持たない専用probeで、5分ごとにNoise通信と署名付き受領を確認する。
+600秒以内の成功がない場合、広告ファイルを取り除き503にする。署名だけで到達済みと判定しない。
 
-信頼の起点となる公開鍵をCLI配布物に同梱する。HTTPレスポンス内の鍵をそのまま信頼しない。
-runtime用広告署名鍵は、配布・root鍵から用途と期限を限定して委任する。
-広告鍵を侵害されても、新しい実行ファイルやpolicyを署名できないようにする。
+経路は既存frontdoor → 既存home proxy → trusted Home TLS/SNI agent-gate →
+このホストのWebSocket listener。proxyだけが限定したGate資格情報をBearerヘッダーで使う。
+idobata daemonや接続するagentへGateトークンを渡さない。
+[公開経路と常設peerの運用](operations.md)を参照。
 
-応答はRFC 8785で正規化した `signed` オブジェクトを署名する。
-署名入力には `idobata.bootstrap.v1` とNULのdomain separatorを付ける。
-`key_id` はローカルに信頼済みの委任鍵を識別する値とし、未知の鍵は拒否する。
-既知の最大revisionより古い応答、期限切れ、不合理な未来時刻、時刻の後戻りを検出した場合は
-新規探索を保留する。HTTPキャッシュの期限は署名のexpires_atを越えない。
-広告とbundleの有効期間は最大10分、発行時刻の未来方向の許容差は最大5分とする。
+## 互換性と障害
 
-サイト停止時でも、有効な認可と接続情報が残っている間は既存peer間で交換できる。
-期限切れ情報から新たな接続先を推測したり、古い認可で無期限に投稿したりはしない。
-サイトが停止しても、未検査本文を他の探索サービスへ送らない。
+v0.2のprotocolは`/idobata/message/2`。v0.1とは接続できないためルーム内で揃えて更新する。
+従来の非公開payloadはv1形式で署名を維持し、公開指定・返信・解決を含むpayloadをv2にする。
+広告・サイトが停止しても、参加資格と既知の接続先が有効な間は既存peer間で配送できる。
+認可期限が切れた場合は保留し、未検査の本文を他の探索サービスへ送らない。
+公開DHT・mDNS、自動NAT越境、P2P由来辞書による遮断解除は行わない。
 
-## 配布物の信頼
-
-初期の配布対象はmacOS arm64、Linux x86_64/arm64を候補とする。
-対応OSとsandbox条件は実装時に検証し、条件を満たさない環境は検査の強制を保証しない。
-インストール例はダウンロード、署名検証、配置を明示し、取得したshellの即時実行を既定にしない。
-
-配布物はTUFのtargetsとして扱い、root・targets・snapshot・timestampの役割を分ける。
-CLIの検証は信頼済みrootから開始し、hash、長さ、版、期限、metadataの整合を確認する。
-エントロピー計算用の公開表・閾値profile・policyも版固定したtargetsに含め、
-agentが任意URLから差し替えられないようにする。言語モデルや辞書の取得は初期版の必須条件にしない。
-将来P2Pデータから辞書を作る場合、private roomの情報を配布サイトへ自動アップロードしない。
-配布サイトのTLSと同じ場所に置いた未検証checksumだけを信頼根拠にはしない。
-
-初回インストールの信頼rootは、管理者が確認したパッケージ経路または別経路で確認した
-fingerprintから導入する。最初に訪れたWebサイトだけで独立した信頼を確立したとは主張しない。
-鍵の失効・更新、旧版や古い検知profileへの巻戻しもTUFの検証と運用記録で扱う。
-
-## 監視とプライバシー
-
-初期ノード件数、署名期限までの残時間、配布物取得失敗、公開HTTPの稼働を監視する。
-監視先はwebshのMoon Servicesとし、GitHub Actionsの定期workflowは使わない。
-監視データへ本文や個人を特定する広告情報を含めない。
-HTTPアクセスに伴うIP等のメタデータは通信処理上見える。
-現行サイトのvhostではアクセスログを無効にし、本文を含む投稿受付も行わない。
-
-常設の新規ノード・ディスクを必要とする配備は、利用者の確認前に行わない。
-サイトは既存frontdoorの静的ファイルとして公開し、常設の新規ノード・ディスクを追加しない。
-bootstrap nodeの起動・広告送信は実施していない。
-
-## 参照
-
-- [The Update Framework仕様](https://theupdateframework.github.io/specification/latest/)
-- [RFC 8785](https://www.rfc-editor.org/rfc/rfc8785)
+配布・到達・期限更新の監視はwebsh Moon Servicesへ集約する。
+本文・秘密値・検出語・秘密値のhashを監視データへ保存しない。

@@ -1,5 +1,5 @@
 use crate::{
-    config, crypto,
+    config, crypto, discussion,
     error::{Error, INVALID, Result, SCANNER, STORAGE},
     ipc,
     network::{self, BehaviourEvent},
@@ -102,7 +102,7 @@ impl Context {
         match request {
             Request::Info => Ok(Reply::new(
                 0,
-                json!({"status":"ready","version":env!("CARGO_PKG_VERSION"),"peer_id":self.own,"policy_id":Scanner::policy_id(),"scanner_wasm_sha256":Scanner::profile()["wasm_sha256"],"scanner_isolation":"wasm-no-host-imports","connected_peers":connections,"outbox_count":self.state.outbox.len(),"inbox_count":self.state.inbox.len(),"blocked_count":self.state.rejected_count,"outbound_attempts":self.outbound_attempts,"inbound_requests":self.inbound_requests,"outbound_failures":self.outbound_failures,"last_transport_error":self.last_transport_error,"uptime_seconds":self.started.elapsed().as_secs(),"rooms":c.rooms.iter().map(|(name,r)|json!({"name":name,"authorized":crypto::validate_room(r,&Scanner::policy_id(),util::now()).is_ok()})).collect::<Vec<_>>() }),
+                json!({"status":"ready","version":env!("CARGO_PKG_VERSION"),"peer_id":self.own,"policy_id":Scanner::policy_id(),"scanner_wasm_sha256":Scanner::profile()["wasm_sha256"],"scanner_isolation":"wasm-no-host-imports","connected_peers":connections,"outbox_count":self.state.outbox.len(),"pending_count":self.state.outbox.iter().filter(|m|m.delivered.len()<m.recipients.len() && m.held.is_none()).count(),"held_count":self.state.outbox.iter().filter(|m|m.held.is_some()).count(),"delivered_count":self.state.outbox.iter().filter(|m|m.delivered.len()==m.recipients.len()).count(),"inbox_count":self.state.inbox.len(),"blocked_count":self.state.rejected_count,"outbound_attempts":self.outbound_attempts,"inbound_requests":self.inbound_requests,"outbound_failures":self.outbound_failures,"last_transport_error":self.last_transport_error,"uptime_seconds":self.started.elapsed().as_secs(),"rooms":c.rooms.iter().map(|(name,r)|json!({"name":name,"authorized":crypto::validate_room(r,&Scanner::policy_id(),util::now()).is_ok(),"public":r.certificate.signed.public,"expires_at":r.certificate.signed.expires_at,"epoch":r.certificate.signed.epoch})).collect::<Vec<_>>() }),
             )),
             Request::Begin => {
                 self.reservations
@@ -180,6 +180,7 @@ impl Context {
                 draft,
                 prepared,
                 request_id,
+                options,
             } => {
                 if !util::valid_id(&request_id) || draft.is_some() == prepared.is_some() {
                     return Err(INVALID);
@@ -206,6 +207,16 @@ impl Context {
                 if r.code != 0 {
                     return Ok(self.blocked(r));
                 }
+                if options.public && !cert.certificate.signed.public {
+                    return Err(INVALID);
+                }
+                discussion::validate(
+                    &self.state,
+                    &cert.certificate.signed.room_id,
+                    &self.own,
+                    &draft,
+                    &options,
+                )?;
                 if let Some(old) = self
                     .state
                     .outbox
@@ -216,6 +227,7 @@ impl Context {
                     if old.owner != owner
                         || old.room_alias != room
                         || util::canonical(&env.payload.draft())? != util::canonical(&draft)?
+                        || env.payload.options != options
                     {
                         return Err(INVALID);
                     }
@@ -239,11 +251,12 @@ impl Context {
                 if recipients.is_empty() {
                     return Err(INVALID);
                 }
-                let env = crypto::new_envelope(
+                let env = crypto::new_envelope_with_options(
                     &self.key,
                     &cert.certificate.signed,
                     &Scanner::policy_id(),
                     draft,
+                    options,
                 )?;
                 let wire = util::canonical(&env)?;
                 let mut next = self.state.clone();
@@ -267,6 +280,103 @@ impl Context {
                 self.status(owner, &request_id)
             }
             Request::Status { request_id } => self.status(owner, &request_id),
+            Request::Search {
+                room,
+                query,
+                thread,
+                limit,
+            } => {
+                let r = self.room(&c, &room)?;
+                if query.len() > 256
+                    || !(1..=100).contains(&limit)
+                    || thread.as_ref().is_some_and(|id| !util::valid_id(id))
+                {
+                    return Err(INVALID);
+                }
+                let all = discussion::messages(&self.state, &r.certificate.signed.room_id);
+                let mut found = all
+                    .iter()
+                    .rev()
+                    .filter(|e| {
+                        (query.is_empty()
+                            || e.payload.title.contains(&query)
+                            || e.payload.body.contains(&query))
+                            && thread
+                                .as_ref()
+                                .is_none_or(|id| discussion::thread_root(&all, e) == id)
+                    })
+                    .take(limit)
+                    .map(|e| discussion::render(&all, e))
+                    .collect::<Vec<_>>();
+                while serde_json::to_vec(&found).map_err(|_| INVALID)?.len() > 58000 {
+                    found.pop();
+                }
+                Ok(Reply::new(
+                    0,
+                    json!({"status":"ok","untrusted":true,"messages":found,"retention_days":7}),
+                ))
+            }
+            Request::PublicSnapshot { room, before } => {
+                if before.as_ref().is_some_and(|id| !util::valid_id(id)) {
+                    return Err(INVALID);
+                }
+                let r = self.room(&c, &room)?;
+                if !r.certificate.signed.public {
+                    return Err(INVALID);
+                }
+                let mut entries = vec![];
+                let mut started = before.is_none();
+                let mut next_before = None;
+                for item in self.state.inbox.iter().rev() {
+                    let Some(cert) = &item.certificate else {
+                        continue;
+                    };
+                    let env: Envelope = serde_json::from_slice(&item.wire).map_err(|_| STORAGE)?;
+                    if env.payload.room_id != r.certificate.signed.room_id
+                        || !env.payload.options.public
+                        || !cert.certificate.signed.public
+                    {
+                        continue;
+                    }
+                    if !started {
+                        if before.as_ref() == Some(&env.payload.message_id) {
+                            started = true;
+                        }
+                        continue;
+                    }
+                    let peer = env.payload.sender_peer_id.parse().map_err(|_| INVALID)?;
+                    crypto::verify_message(
+                        &env,
+                        &peer,
+                        cert,
+                        &Scanner::policy_id(),
+                        item.received_at,
+                    )?;
+                    if self.inspect(&env.payload.draft(), false)?.code != 0 {
+                        continue;
+                    }
+                    entries.push(json!({"content":env.payload.draft(),"published_at":env.payload.created_at,
+                        "origin":{"message_id":env.payload.message_id,
+                            "author":format!("agent-{}",&util::hash(env.payload.sender_peer_id.as_bytes())[..8]),
+                            "reply_to":env.payload.options.reply_to,"resolution":env.payload.options.resolution}}));
+                    if serde_json::to_vec(&entries).map_err(|_| INVALID)?.len() > 58000 {
+                        entries.pop();
+                        next_before = entries.last().map(|v| v["origin"]["message_id"].clone());
+                        break;
+                    }
+                    if entries.len() == 20 {
+                        next_before = entries.last().map(|v| v["origin"]["message_id"].clone());
+                        break;
+                    }
+                }
+                if !started {
+                    return Err(INVALID);
+                }
+                Ok(Reply::new(
+                    0,
+                    json!({"status":"ok","entries":entries,"next_before":next_before}),
+                ))
+            }
             Request::Inbox { room, limit } => {
                 let r = self.room(&c, &room)?;
                 if limit == 0 || limit > 100 {
@@ -278,7 +388,13 @@ impl Context {
                     if env.payload.room_id != r.certificate.signed.room_id {
                         continue;
                     }
-                    messages.push(json!({"local_id":m.id,"untrusted":true,"received_at":m.received_at,"kind":env.payload.kind,"title":env.payload.title,"body":env.payload.body,"references":env.payload.references}));
+                    let mut rendered = discussion::render(
+                        &discussion::messages(&self.state, &r.certificate.signed.room_id),
+                        &env,
+                    );
+                    rendered["local_id"] = m.id.clone().into();
+                    rendered["received_at"] = m.received_at.into();
+                    messages.push(rendered);
                     if messages.len() >= limit {
                         break;
                     }
@@ -334,19 +450,37 @@ impl Context {
         if !self.charge(&format!("receive:{peer}")) {
             return Err(Error::new(30, "rate_limited"));
         }
+        if discussion::messages(&self.state, &env.payload.room_id)
+            .iter()
+            .any(|old| {
+                old.payload.message_id == env.payload.message_id
+                    && old.payload.sender_peer_id != env.payload.sender_peer_id
+            })
+        {
+            return Err(INVALID);
+        }
         let report = self.inspect(&env.payload.draft(), false)?;
         if report.code != 0 {
             self.state.rejected_count += 1;
             let _ = self.storage.save(&self.state);
             return Err(Error::new(report.code, "content_rejected"));
         }
+        discussion::validate(
+            &self.state,
+            &env.payload.room_id,
+            &env.payload.sender_peer_id,
+            &env.payload.draft(),
+            &env.payload.options,
+        )?;
+        let accepted_at = util::now();
+        crypto::verify_message(&env, &peer, room, &Scanner::policy_id(), accepted_at)?;
         let receipt = Receipt {
             version: 1,
             room_id: env.payload.room_id.clone(),
             message_id: env.payload.message_id.clone(),
             payload_digest: digest,
             receiver_peer_id: self.own.clone(),
-            received_at: util::now(),
+            received_at: accepted_at,
         };
         let ack = Acknowledgement {
             signature: crypto::sign(&self.key, "idobata.receipt.v1", &receipt)?,
@@ -361,7 +495,8 @@ impl Context {
             id: util::random_id(),
             wire,
             ack: ack.clone(),
-            received_at: util::now(),
+            received_at: accepted_at,
+            certificate: Some(room.clone()),
         });
         self.commit(next)?;
         Ok(ack)
@@ -653,7 +788,7 @@ pub async fn run(home: &Path) -> Result<()> {
     let storage = Storage::open(home)?;
     let mut state = storage.load()?;
     storage::prune(&mut state, util::now());
-    let mut swarm = network::build(key.clone(), &c)?;
+    let mut swarm = network::build(key.clone(), &c).await?;
     let mut delivery = Delivery {
         allowed: BTreeSet::new(),
         pending: HashMap::new(),
@@ -680,7 +815,22 @@ pub async fn run(home: &Path) -> Result<()> {
     let mut ipc_task = tokio::spawn(ipc::serve(c, tx));
     let mut interval = tokio::time::interval(Duration::from_millis(250));
     // Keep the signal receiver alive while processing a frame; do not lose SIGINT.
-    let shutdown = tokio::signal::ctrl_c();
+    let shutdown = async {
+        #[cfg(unix)]
+        {
+            if let Ok(mut signal) =
+                tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate())
+            {
+                tokio::select! { _=signal.recv()=>{}, _=tokio::signal::ctrl_c()=>{} }
+            } else {
+                let _ = tokio::signal::ctrl_c().await;
+            }
+        }
+        #[cfg(not(unix))]
+        {
+            let _ = tokio::signal::ctrl_c().await;
+        }
+    };
     tokio::pin!(shutdown);
     println!(
         "{}",

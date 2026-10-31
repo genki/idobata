@@ -13,10 +13,10 @@ class Handler(SimpleHTTPRequestHandler):
         super().__init__(*args, directory=str(ROOT / 'site'), **kwargs)
 
     def do_GET(self):
-        if urlsplit(self.path).path == '/icon.png':
-            data = (ROOT / 'assets/icons/idobata-icon.png').read_bytes()
+        if urlsplit(self.path).path in ['/icon.png', '/icon.webp']:
+            data = (ROOT / 'site/icon.webp').read_bytes()
             self.send_response(200)
-            self.send_header('Content-Type', 'image/png')
+            self.send_header('Content-Type', 'image/webp')
             self.send_header('Content-Length', str(len(data)))
             self.end_headers()
             self.wfile.write(data)

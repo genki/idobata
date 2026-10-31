@@ -1,0 +1,142 @@
+{
+  "version": 1,
+  "evaluation": "2304 authored/template-expanded synthetic cases; not a representative real-world false-positive estimate",
+  "reports": [
+    {
+      "arch": "x86_64",
+      "cases": 2304,
+      "corpus_sha256": "3c39679cdab9edcd80b216d027257ac17a82b01fb7f276915c565166a7fc38fc",
+      "decision_sha256": "0bfe05eb1ac330ddb038684ce41f2b2553de8374873f46dadc74dc8f4cedc9c2",
+      "groups": {
+        "ordinary": {
+          "blocked": 67,
+          "count": 1024,
+          "failed": 0
+        },
+        "synthetic_base64": {
+          "blocked": 601,
+          "count": 640,
+          "failed": 0
+        },
+        "synthetic_hex": {
+          "blocked": 553,
+          "count": 640,
+          "failed": 0
+        }
+      },
+      "latency_us": {
+        "p50": 557,
+        "p95": 2373
+      },
+      "license": "CC0-1.0 authored synthetic fixtures",
+      "os": "linux",
+      "profile": "c82f9fed20148ff5dba8718396cc4eaeb995ad56e6f9800c203783b289901952",
+      "scope": "authored template-expanded multilingual prose and deterministic synthetic tokens; not real credential prevalence",
+      "version": 1,
+      "wasm_sha256": "e765bdca9f335bed3c26c2dee1bce39e9eb652e2af2552945c1818934d88e4fd",
+      "host": "linux"
+    },
+    {
+      "arch": "aarch64",
+      "cases": 2304,
+      "corpus_sha256": "3c39679cdab9edcd80b216d027257ac17a82b01fb7f276915c565166a7fc38fc",
+      "decision_sha256": "0bfe05eb1ac330ddb038684ce41f2b2553de8374873f46dadc74dc8f4cedc9c2",
+      "groups": {
+        "ordinary": {
+          "blocked": 67,
+          "count": 1024,
+          "failed": 0
+        },
+        "synthetic_base64": {
+          "blocked": 601,
+          "count": 640,
+          "failed": 0
+        },
+        "synthetic_hex": {
+          "blocked": 553,
+          "count": 640,
+          "failed": 0
+        }
+      },
+      "latency_us": {
+        "p50": 342,
+        "p95": 1217
+      },
+      "license": "CC0-1.0 authored synthetic fixtures",
+      "os": "macos",
+      "profile": "c82f9fed20148ff5dba8718396cc4eaeb995ad56e6f9800c203783b289901952",
+      "scope": "authored template-expanded multilingual prose and deterministic synthetic tokens; not real credential prevalence",
+      "version": 1,
+      "wasm_sha256": "e765bdca9f335bed3c26c2dee1bce39e9eb652e2af2552945c1818934d88e4fd",
+      "host": "mba22"
+    },
+    {
+      "arch": "x86_64",
+      "cases": 2304,
+      "corpus_sha256": "3c39679cdab9edcd80b216d027257ac17a82b01fb7f276915c565166a7fc38fc",
+      "decision_sha256": "0bfe05eb1ac330ddb038684ce41f2b2553de8374873f46dadc74dc8f4cedc9c2",
+      "groups": {
+        "ordinary": {
+          "blocked": 67,
+          "count": 1024,
+          "failed": 0
+        },
+        "synthetic_base64": {
+          "blocked": 601,
+          "count": 640,
+          "failed": 0
+        },
+        "synthetic_hex": {
+          "blocked": 553,
+          "count": 640,
+          "failed": 0
+        }
+      },
+      "latency_us": {
+        "p50": 1670,
+        "p95": 3667
+      },
+      "license": "CC0-1.0 authored synthetic fixtures",
+      "os": "windows",
+      "profile": "c82f9fed20148ff5dba8718396cc4eaeb995ad56e6f9800c203783b289901952",
+      "scope": "authored template-expanded multilingual prose and deterministic synthetic tokens; not real credential prevalence",
+      "version": 1,
+      "wasm_sha256": "e765bdca9f335bed3c26c2dee1bce39e9eb652e2af2552945c1818934d88e4fd",
+      "host": "winvr"
+    },
+    {
+      "arch": "aarch64",
+      "cases": 2304,
+      "corpus_sha256": "3c39679cdab9edcd80b216d027257ac17a82b01fb7f276915c565166a7fc38fc",
+      "decision_sha256": "0bfe05eb1ac330ddb038684ce41f2b2553de8374873f46dadc74dc8f4cedc9c2",
+      "groups": {
+        "ordinary": {
+          "blocked": 67,
+          "count": 1024,
+          "failed": 0
+        },
+        "synthetic_base64": {
+          "blocked": 601,
+          "count": 640,
+          "failed": 0
+        },
+        "synthetic_hex": {
+          "blocked": 553,
+          "count": 640,
+          "failed": 0
+        }
+      },
+      "latency_us": {
+        "p50": 273,
+        "p95": 965
+      },
+      "license": "CC0-1.0 authored synthetic fixtures",
+      "os": "macos",
+      "profile": "c82f9fed20148ff5dba8718396cc4eaeb995ad56e6f9800c203783b289901952",
+      "scope": "authored template-expanded multilingual prose and deterministic synthetic tokens; not real credential prevalence",
+      "version": 1,
+      "wasm_sha256": "e765bdca9f335bed3c26c2dee1bce39e9eb652e2af2552945c1818934d88e4fd",
+      "host": "machinaai"
+    }
+  ]
+}

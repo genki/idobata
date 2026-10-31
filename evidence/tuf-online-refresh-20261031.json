@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "runs": 8,
+  "online_roles": [
+    "snapshot",
+    "timestamp"
+  ],
+  "root_targets_private_keys_absent": true,
+  "refreshed_repository_verified_by_tough": true,
+  "tampered_targets_rejected_without_publication": true
+}

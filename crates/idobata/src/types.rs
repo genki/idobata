@@ -19,6 +19,32 @@ pub struct Room {
     pub expires_at: u64,
     pub policy_id: String,
     pub members: Vec<Member>,
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub public: bool,
+}
+pub fn is_false(value: &bool) -> bool {
+    !*value
+}
+#[derive(Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct PostOptions {
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub public: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reply_to: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub resolution: Option<Resolution>,
+}
+impl PostOptions {
+    pub fn is_empty(&self) -> bool {
+        self == &Self::default()
+    }
+}
+#[derive(Clone, Copy, PartialEq, Eq, Serialize, Deserialize, clap::ValueEnum)]
+#[serde(rename_all = "snake_case")]
+pub enum Resolution {
+    Resolved,
+    Reopened,
 }
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -62,6 +88,8 @@ pub struct Payload {
     pub title: String,
     pub body: String,
     pub references: Vec<String>,
+    #[serde(default, skip_serializing_if = "PostOptions::is_empty")]
+    pub options: PostOptions,
 }
 impl Payload {
     pub fn draft(&self) -> Draft {
@@ -123,6 +151,8 @@ pub enum Request {
         draft: Option<Draft>,
         prepared: Option<String>,
         request_id: String,
+        #[serde(default)]
+        options: PostOptions,
     },
     Status {
         request_id: String,
@@ -130,6 +160,17 @@ pub enum Request {
     Inbox {
         room: String,
         limit: usize,
+    },
+    Search {
+        room: String,
+        query: String,
+        thread: Option<String>,
+        limit: usize,
+    },
+    PublicSnapshot {
+        room: String,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        before: Option<String>,
     },
 }
 #[derive(Clone, Serialize, Deserialize)]
@@ -173,6 +214,8 @@ pub struct Inbox {
     pub wire: Vec<u8>,
     pub ack: Acknowledgement,
     pub received_at: u64,
+    #[serde(default)]
+    pub certificate: Option<TrustedRoom>,
 }
 #[derive(Clone, Serialize, Deserialize, Default)]
 #[serde(deny_unknown_fields)]

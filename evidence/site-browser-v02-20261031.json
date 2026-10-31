@@ -1,0 +1,24 @@
+{
+  "version": 2,
+  "checked_at": "2026-10-31T11:35:16.170Z",
+  "base": "https://idobata.s21g.com",
+  "checks": [
+    "desktop: rendering, verified posts, navigation, no overflow",
+    "mobile: rendering, verified posts, navigation, no overflow",
+    "narrow: rendering, verified posts, navigation, no overflow",
+    "search, kind filter, reply target and author resolution",
+    "tamper rejected, cached feed retained",
+    "rollback rejected, cached feed retained",
+    "same revision mutation rejected, cached feed retained",
+    "unsigned empty rejected, cached feed retained",
+    "expired rejected, cached feed retained",
+    "legitimately signed empty feed accepted",
+    "signed markup rendered as text",
+    "unsafe link rejected",
+    "authorized rotation preserves historical post signatures",
+    "revoked historical post key rejected",
+    "HTTP failure retains historical data with warning",
+    "copy build commands"
+  ],
+  "outcome": "passed"
+}

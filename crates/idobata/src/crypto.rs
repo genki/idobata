@@ -51,11 +51,19 @@ pub fn load_key(home: &Path) -> Result<identity::Keypair> {
 pub fn address(s: &str, listen: bool) -> Result<Multiaddr> {
     let addr: Multiaddr = s.parse().map_err(|_| INVALID)?;
     let mut parts = addr.iter();
-    if !matches!(parts.next(), Some(Protocol::Ip4(_) | Protocol::Ip6(_))) {
+    let first = parts.next();
+    let dns = matches!(&first,Some(Protocol::Dns4(name)) if &**name=="idobata-peer.s21g.com");
+    if !(matches!(first, Some(Protocol::Ip4(_) | Protocol::Ip6(_))) || dns && !listen) {
         return Err(INVALID);
     }
-    if !matches!(parts.next(),Some(Protocol::Tcp(p)) if listen||p>0) || parts.next().is_some() {
+    if !matches!(parts.next(),Some(Protocol::Tcp(p)) if listen||p>0) {
         return Err(INVALID);
+    }
+    match parts.next() {
+        None if !dns => {}
+        Some(Protocol::Ws(path)) if !dns && &*path == "/" && parts.next().is_none() => {}
+        Some(Protocol::Wss(path)) if dns && &*path == "/" && parts.next().is_none() => {}
+        _ => return Err(INVALID),
     }
     Ok(addr)
 }
@@ -75,7 +83,7 @@ pub fn member_valid(m: &Member) -> Result<()> {
 pub fn validate_room(room: &TrustedRoom, policy: &str, at: u64) -> Result<()> {
     let cert = &room.certificate;
     let r = &cert.signed;
-    if r.version != 1
+    if r.version != if r.public { 2 } else { 1 }
         || !util::valid_id(&r.room_id)
         || r.epoch == 0
         || r.epoch > 9_007_199_254_740_991
@@ -161,7 +169,13 @@ pub fn verify_message(
     validate_room(room, policy, at)?;
     let p = &env.payload;
     let r = &room.certificate.signed;
-    if p.version != 1
+    if p.version != if p.options.is_empty() { 1 } else { 2 }
+        || (p.options.public && !r.public)
+        || p.options
+            .reply_to
+            .as_ref()
+            .is_some_and(|id| !util::valid_id(id))
+        || (p.options.resolution.is_some() && p.options.reply_to.is_none())
         || !util::valid_id(&p.message_id)
         || p.sender_peer_id != peer.to_string()
         || p.room_id != r.room_id
@@ -195,9 +209,21 @@ pub fn new_envelope(
     policy: &str,
     draft: Draft,
 ) -> Result<Envelope> {
+    new_envelope_with_options(key, room, policy, draft, PostOptions::default())
+}
+pub fn new_envelope_with_options(
+    key: &identity::Keypair,
+    room: &Room,
+    policy: &str,
+    draft: Draft,
+    options: PostOptions,
+) -> Result<Envelope> {
+    if options.public && !room.public {
+        return Err(INVALID);
+    }
     let at = util::now();
     let payload = Payload {
-        version: 1,
+        version: if options.is_empty() { 1 } else { 2 },
         message_id: util::random_id(),
         sender_peer_id: key.public().to_peer_id().to_string(),
         room_id: room.room_id.clone(),
@@ -209,6 +235,7 @@ pub fn new_envelope(
         title: draft.title,
         body: draft.body,
         references: draft.references,
+        options,
     };
     let signature = sign(key, "idobata.message.v1", &payload)?;
     let env = Envelope { payload, signature };

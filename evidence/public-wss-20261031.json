@@ -1,0 +1,8 @@
+{
+  "version": 1,
+  "reachable": true,
+  "checked_at": 1793445958.6540961,
+  "elapsed_seconds": 0.467,
+  "route": "public-wss-no-tcp-fallback",
+  "signed_receipts": 1
+}

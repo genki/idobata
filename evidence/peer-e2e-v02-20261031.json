@@ -1,0 +1,76 @@
+{
+  "version": 1,
+  "test": "real-peer-e2e",
+  "started_at": "2026-10-31T11:29:00Z",
+  "transport": "libp2p TCP / Noise / Yamux over loopback-only SSH forwards",
+  "nodes": [
+    "vagrant",
+    "mba22",
+    "winvr",
+    "machinaai"
+  ],
+  "checks": {
+    "identical_public_policy_and_wasm": true,
+    "each_identity_kept_on_its_own_host": true,
+    "all_daemons_ready": true,
+    "identical_decisions_across_platforms": [
+      {
+        "name": "plain-ja",
+        "code": 0,
+        "report_sha256": "26568b67b30c2dfc8230a1bfaa010770d294364868f2107c7f854c8c1d2f17d6"
+      },
+      {
+        "name": "plain-ja-varied",
+        "code": 0,
+        "report_sha256": "26568b67b30c2dfc8230a1bfaa010770d294364868f2107c7f854c8c1d2f17d6"
+      },
+      {
+        "name": "plain-en",
+        "code": 0,
+        "report_sha256": "26568b67b30c2dfc8230a1bfaa010770d294364868f2107c7f854c8c1d2f17d6"
+      },
+      {
+        "name": "token",
+        "code": 20,
+        "report_sha256": "9a4ef97e5f2bd46e8b666cbadea1419a470c51cab8c675d37a041040b88167e1"
+      },
+      {
+        "name": "padded-token",
+        "code": 20,
+        "report_sha256": "fd1042a1afba897599542a3726f76d993e7eb22c929d9760b82157b4c8957276"
+      },
+      {
+        "name": "percent-token",
+        "code": 20,
+        "report_sha256": "e5ddc16fa9a8de4974d33e65483d88c071603959cf5aa751cb02a56cd8b6ca0f"
+      },
+      {
+        "name": "html-token",
+        "code": 20,
+        "report_sha256": "98b68b2ad98b209b8ad427513e8c76a52cf27c6401b46c23dd4c91b233656768"
+      },
+      {
+        "name": "json-escapes",
+        "code": 20,
+        "report_sha256": "384f4ca0210a0059653a927acb16792884b4a7f80db94fedaf8d5675273d65c7"
+      },
+      {
+        "name": "unicode-control",
+        "code": 22,
+        "report_sha256": "f271d549e4915549d8536cbf97c57b3a6d41d5474f10479df7f1f7d45f770386"
+      }
+    ],
+    "all_directed_peer_routes": 12,
+    "blocked_posts_neither_queued_nor_sent": true,
+    "redaction_is_explicit_and_post_is_reinspected": true,
+    "offline_delivery_sender_restart_receiver_restart_and_idempotency": true,
+    "tampered_invite_rejected_without_replacing_trust": true,
+    "validated_messages_encrypted_at_rest": true
+  },
+  "policy_id": "c82f9fed20148ff5dba8718396cc4eaeb995ad56e6f9800c203783b289901952",
+  "scanner_wasm_sha256": "e765bdca9f335bed3c26c2dee1bce39e9eb652e2af2552945c1818934d88e4fd",
+  "status": "passed",
+  "cleanup_errors": [],
+  "private_fixture_keys_removed": true,
+  "finished_at": "2026-10-31T11:30:41Z"
+}

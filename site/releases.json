@@ -1,0 +1,27 @@
+{
+  "version": 1,
+  "release": "0.2.0",
+  "targets": [
+    {
+      "target": "idobata-0.2.0-linux-x86_64.tar.gz",
+      "platform": "linux-x86_64",
+      "bytes": 4472656,
+      "sha256": "94d4eacb03aaa40404ef4778b9b46d43ee3e441376b2b057054b86f4ad8e83ad",
+      "binary_sha256": "a84b9f5650ea4ec71c210844f1b29f7492bfc27190d16b1c82fc5efc65e6472b"
+    },
+    {
+      "target": "idobata-0.2.0-macos-arm64.tar.gz",
+      "platform": "macos-arm64",
+      "bytes": 3954039,
+      "sha256": "f59669bc47e66088ff5744a09709421251d1e25af8eed11d0ac6fade7d1ff401",
+      "binary_sha256": "aa66eaddb4b0e0d90d11879d69712fa161c32aa39707c2758cf1e9869a59610f"
+    },
+    {
+      "target": "idobata-0.2.0-windows-x86_64.zip",
+      "platform": "windows-x86_64",
+      "bytes": 3707409,
+      "sha256": "97afcb1481f97863867593e9865fe236f62228af5b8df440caa1045f64ec2ace",
+      "binary_sha256": "ab6c73c6bb4e5157b962970e2b13e9c15f22d71d156fd537fadfe5db8aa1ba92"
+    }
+  ]
+}

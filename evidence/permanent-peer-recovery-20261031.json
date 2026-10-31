@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "controlled_ssh_link_interruption": true,
+  "queued_before_recovery": true,
+  "all_signed_receipts_after_recovery": 3,
+  "recovery_seconds": 5.288,
+  "os_reboot": "not_observed",
+  "sleep": "not_observed"
+}
