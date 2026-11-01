@@ -1,0 +1,203 @@
+{
+  "version": 1,
+  "checked_at": 1793521117.5293553,
+  "status": "passed",
+  "deployed_revision": "e99c5834cb656b17313150e257a06e9b3a1651ef44ee9ddee31185ec15e0a123",
+  "published_sdk_version": "0.4.0",
+  "load_balancers": [
+    {
+      "label": "lb_a",
+      "published_sdk_04_html": true,
+      "docs_ledger_unconfigured_one_operator_disclosure": true,
+      "public_projection_disclosure": true,
+      "health_200": true,
+      "revision_matches": true,
+      "tuf_unchanged": true
+    },
+    {
+      "label": "lb_b",
+      "published_sdk_04_html": true,
+      "docs_ledger_unconfigured_one_operator_disclosure": true,
+      "public_projection_disclosure": true,
+      "health_200": true,
+      "revision_matches": true,
+      "tuf_unchanged": true
+    }
+  ],
+  "release_route_checks": [
+    {
+      "load_balancer": "lb_a",
+      "filename": "idobata-0.2.0-linux-x86_64.tar.gz",
+      "status": 302,
+      "exact_location_verified": true
+    },
+    {
+      "load_balancer": "lb_a",
+      "filename": "idobata-0.2.0-macos-arm64.tar.gz",
+      "status": 302,
+      "exact_location_verified": true
+    },
+    {
+      "load_balancer": "lb_a",
+      "filename": "idobata-0.2.0-windows-x86_64.zip",
+      "status": 302,
+      "exact_location_verified": true
+    },
+    {
+      "load_balancer": "lb_a",
+      "filename": "idobata-0.3.0-linux-x86_64.tar.gz",
+      "status": 302,
+      "exact_location_verified": true
+    },
+    {
+      "load_balancer": "lb_a",
+      "filename": "idobata-0.3.0-macos-arm64.tar.gz",
+      "status": 302,
+      "exact_location_verified": true
+    },
+    {
+      "load_balancer": "lb_a",
+      "filename": "idobata-0.3.0-windows-x86_64.zip",
+      "status": 302,
+      "exact_location_verified": true
+    },
+    {
+      "load_balancer": "lb_a",
+      "filename": "idobata-0.4.0-linux-x86_64.tar.gz",
+      "status": 302,
+      "exact_location_verified": true
+    },
+    {
+      "load_balancer": "lb_a",
+      "filename": "idobata-0.4.0-macos-arm64.tar.gz",
+      "status": 302,
+      "exact_location_verified": true
+    },
+    {
+      "load_balancer": "lb_a",
+      "filename": "idobata-0.4.0-windows-x86_64.zip",
+      "status": 302,
+      "exact_location_verified": true
+    },
+    {
+      "load_balancer": "lb_b",
+      "filename": "idobata-0.2.0-linux-x86_64.tar.gz",
+      "status": 302,
+      "exact_location_verified": true
+    },
+    {
+      "load_balancer": "lb_b",
+      "filename": "idobata-0.2.0-macos-arm64.tar.gz",
+      "status": 302,
+      "exact_location_verified": true
+    },
+    {
+      "load_balancer": "lb_b",
+      "filename": "idobata-0.2.0-windows-x86_64.zip",
+      "status": 302,
+      "exact_location_verified": true
+    },
+    {
+      "load_balancer": "lb_b",
+      "filename": "idobata-0.3.0-linux-x86_64.tar.gz",
+      "status": 302,
+      "exact_location_verified": true
+    },
+    {
+      "load_balancer": "lb_b",
+      "filename": "idobata-0.3.0-macos-arm64.tar.gz",
+      "status": 302,
+      "exact_location_verified": true
+    },
+    {
+      "load_balancer": "lb_b",
+      "filename": "idobata-0.3.0-windows-x86_64.zip",
+      "status": 302,
+      "exact_location_verified": true
+    },
+    {
+      "load_balancer": "lb_b",
+      "filename": "idobata-0.4.0-linux-x86_64.tar.gz",
+      "status": 302,
+      "exact_location_verified": true
+    },
+    {
+      "load_balancer": "lb_b",
+      "filename": "idobata-0.4.0-macos-arm64.tar.gz",
+      "status": 302,
+      "exact_location_verified": true
+    },
+    {
+      "load_balancer": "lb_b",
+      "filename": "idobata-0.4.0-windows-x86_64.zip",
+      "status": 302,
+      "exact_location_verified": true
+    }
+  ],
+  "new_route_count": 3,
+  "preserved_old_route_count": 6,
+  "unrelated_frontdoor_configuration_preserved": true,
+  "feed_publisher_preserved": true,
+  "tuf_root_and_metadata_preserved": true,
+  "tuf_versions": {
+    "root": 1,
+    "targets": 303,
+    "snapshot": 304,
+    "timestamp": 304
+  },
+  "tuf_target_count": 9,
+  "deployment_script": "scripts/deploy-site.py",
+  "existing_frontdoor_only": true,
+  "production_post_or_key_mutations": false,
+  "manual_external_notifications_sent": false,
+  "source_sha256": {
+    "site/index.html": "68b131ced7b39ba4adb5484b121ac9965aaf7c1cf8e96501f9911a0cda27c8c7",
+    "site/docs/index.html": "0e328da7534f534833233446fa4f04a475a5f871f9cdfd853565b3f73db9e94b",
+    "site/nginx.conf": "28a9cccd0c5e11e2098c8153b5744bc521cb6a973f197a21f63e1055b5bac298"
+  },
+  "releases_json_version": "0.4.0",
+  "release_asset_count": 3,
+  "both_public_release_manifests_match_source": true,
+  "public_tuf_root_byte_sha256": "e62718a4d4b3095906ce8015d40466c586eebd3161ea6117f86915bf15c4494f",
+  "both_public_tuf_root_bytes_match_original_pin": true,
+  "verification_completed_at": 1793521217.3674486,
+  "browser_qa": {
+    "status": "passed",
+    "checked_at": "2026-11-01T08:19:17.309Z",
+    "base": "https://idobata.s21g.com",
+    "existing_script": "scripts/verify-site.cjs",
+    "check_count": 16,
+    "checks": [
+      "desktop: rendering, verified posts, navigation, no overflow",
+      "mobile: rendering, verified posts, navigation, no overflow",
+      "narrow: rendering, verified posts, navigation, no overflow",
+      "search, kind filter, reply target and author resolution",
+      "tamper rejected, cached feed retained",
+      "rollback rejected, cached feed retained",
+      "same revision mutation rejected, cached feed retained",
+      "unsigned empty rejected, cached feed retained",
+      "expired rejected, cached feed retained",
+      "legitimately signed empty feed accepted",
+      "signed markup rendered as text",
+      "unsafe link rejected",
+      "authorized rotation preserves historical post signatures",
+      "revoked historical post key rejected",
+      "HTTP failure retains historical data with warning",
+      "copy build commands"
+    ],
+    "viewport_widths": [
+      1440,
+      390,
+      320
+    ],
+    "existing_playwright_and_chrome_only": true,
+    "tamper_cases_browser_fixture_only": true,
+    "production_post_or_key_mutations": false,
+    "screenshots_directory": "/tmp/idobata-v04-site-deploy/browser",
+    "screenshots_sha256": {
+      "desktop.png": "d91093657bd9346b08d645aee19f0ad6267f6d36de39c88c79d661a56e728aa5",
+      "mobile.png": "223aeb13e727ef73c0e77bdb9f6fba310bf73df0fb91e91d700d8a3014749e24",
+      "narrow.png": "2fbd449ca8974e14a7006090e62693f951daea75299cd13b187d7c119851477e"
+    }
+  }
+}

@@ -1,0 +1,32 @@
+{
+  "status": "verified",
+  "root_sha256": "e62718a4d4b3095906ce8015d40466c586eebd3161ea6117f86915bf15c4494f",
+  "targets_metadata_version": 303,
+  "timestamp_metadata_version": 304,
+  "native_targets": [
+    {
+      "platform": "linux-x86_64",
+      "target": "idobata-0.4.0-linux-x86_64.tar.gz",
+      "archive_sha256": "dce7665d8799791205a20939c0bda1c58d9f839433ae5907574d73ec036efeb1",
+      "public_default_urls_verified": true,
+      "fresh_rollback_state": true
+    },
+    {
+      "platform": "macos-arm64",
+      "target": "idobata-0.4.0-macos-arm64.tar.gz",
+      "archive_sha256": "0c118aa645cd5ff7c3fdac7bfe03cb9e78c4c2bee141448edd64833f093b94ea",
+      "public_default_urls_verified": true,
+      "fresh_rollback_state": true
+    },
+    {
+      "platform": "windows-x86_64",
+      "target": "idobata-0.4.0-windows-x86_64.zip",
+      "archive_sha256": "fb8f67f6ad21723655b9fb4c50d67156133953df9ef00e9104a62f574454d03f",
+      "public_default_urls_verified": true,
+      "fresh_rollback_state": true
+    }
+  ],
+  "legacy_targets_retained": 6,
+  "total_targets": 9,
+  "credential_required": false
+}

@@ -1,27 +1,27 @@
 {
   "version": 1,
-  "release": "0.3.0",
+  "release": "0.4.0",
   "targets": [
     {
-      "target": "idobata-0.3.0-linux-x86_64.tar.gz",
+      "target": "idobata-0.4.0-linux-x86_64.tar.gz",
       "platform": "linux-x86_64",
-      "bytes": 4772267,
-      "sha256": "9a23a9093dd0692bee6194891ddbbe220bd300f3bcf6b6f117219b271d8a231e",
-      "binary_sha256": "529ee8ca4fa287afb4ff23b0b8f9c40951df8b1312619c3bc1a921ebbef9a312"
+      "bytes": 5352995,
+      "sha256": "dce7665d8799791205a20939c0bda1c58d9f839433ae5907574d73ec036efeb1",
+      "binary_sha256": "ef4f1d9f3f542ca70ee99d01101578552bc389483d1f0f33e2b8d44fe019c935"
     },
     {
-      "target": "idobata-0.3.0-macos-arm64.tar.gz",
+      "target": "idobata-0.4.0-macos-arm64.tar.gz",
       "platform": "macos-arm64",
-      "bytes": 4340670,
-      "sha256": "b75fdd4344b09c530d8c34968548e7c2456dd53e2fff8af7a91ccf4764c30da5",
-      "binary_sha256": "03a979d349f913eadb043532847a089833f3ea5bc822aae4e3f90c5dd0694275"
+      "bytes": 4701575,
+      "sha256": "0c118aa645cd5ff7c3fdac7bfe03cb9e78c4c2bee141448edd64833f093b94ea",
+      "binary_sha256": "4685daf4672b7254c266c71930130360438b0297be137adccb458b4cd91a9e4e"
     },
     {
-      "target": "idobata-0.3.0-windows-x86_64.zip",
+      "target": "idobata-0.4.0-windows-x86_64.zip",
       "platform": "windows-x86_64",
-      "bytes": 4066424,
-      "sha256": "101bd9113f0b98b48be5b6c54cefc371d815da37e81c3809ab35e3a883cf842b",
-      "binary_sha256": "77d0b8a3d8099f176137eb98c7e36a5cc2a3c7ad95354f96dbe7a474221fd187"
+      "bytes": 4491014,
+      "sha256": "fb8f67f6ad21723655b9fb4c50d67156133953df9ef00e9104a62f574454d03f",
+      "binary_sha256": "30a03ab8a6b46157fe1db0adfd5496925da7e3173356bedcf6c1069b6d615344"
     }
   ]
 }

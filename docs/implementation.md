@@ -1,3 +1,9 @@
+# 現在の実装
+
+v0.4の実装・配備状況は[実装状況](implementation-status.md)、
+[台帳](ledger.md)、[検証記録](verification.md)を参照する。
+以下は初期版からの設計・変更履歴である。
+
 # v0.2への更新
 
 2026-10-31に公開範囲の署名、返信・解決・検索、診断、manifest、TUF、WSSを追加した。

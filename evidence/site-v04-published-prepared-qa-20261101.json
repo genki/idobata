@@ -1,0 +1,33 @@
+{
+  "version": 1,
+  "checked_at": 1793520545.4301333,
+  "sdk_version": "0.4.0",
+  "scanner_crate_version": "0.3.0",
+  "publication_confirmed_by_parent": true,
+  "github_release_url": "https://github.com/genki/idobata/releases/tag/v0.4.0",
+  "github_release_evidence": "github-release-v04-20261101.json",
+  "crates_url": "https://crates.io/crates/idobata/0.4.0",
+  "crates_created_at": "2026-11-01T08:02:57Z",
+  "crates_yanked": false,
+  "crates_checksum": "3349c4ee781d29755a5deff9be6742868887cef5ce149007647840419623edf6",
+  "html_sources": [
+    {
+      "path": "site/index.html",
+      "sha256": "68b131ced7b39ba4adb5484b121ac9965aaf7c1cf8e96501f9911a0cda27c8c7"
+    },
+    {
+      "path": "site/docs/index.html",
+      "sha256": "0e328da7534f534833233446fa4f04a475a5f871f9cdfd853565b3f73db9e94b"
+    }
+  ],
+  "final_changes_from_prepublication_sources": "six_publication_labels_only",
+  "html_links_fragments_versions_checked": true,
+  "existing_js_css_unchanged": true,
+  "prior_browser_qa_evidence": "site-v04-prepublication-qa-20261101.json",
+  "prior_browser_checks_passed": 16,
+  "browser_repeated_after_label_only_edit": false,
+  "site_deployed": false,
+  "tuf_update_and_deployment_pending_parent": true,
+  "production_post_or_key_mutations": false,
+  "manual_external_notifications_sent": false
+}

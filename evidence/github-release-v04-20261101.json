@@ -1,0 +1,32 @@
+{
+  "status": "published",
+  "url": "https://github.com/genki/idobata/releases/tag/v0.4.0",
+  "tag": "v0.4.0",
+  "source_commit": "ece077340feb76c482b341eff8d05e7b5412135b",
+  "asset_count": 3,
+  "assets": [
+    {
+      "target": "idobata-0.4.0-linux-x86_64.tar.gz",
+      "platform": "linux-x86_64",
+      "bytes": 5352995,
+      "sha256": "dce7665d8799791205a20939c0bda1c58d9f839433ae5907574d73ec036efeb1",
+      "binary_sha256": "ef4f1d9f3f542ca70ee99d01101578552bc389483d1f0f33e2b8d44fe019c935"
+    },
+    {
+      "target": "idobata-0.4.0-macos-arm64.tar.gz",
+      "platform": "macos-arm64",
+      "bytes": 4701575,
+      "sha256": "0c118aa645cd5ff7c3fdac7bfe03cb9e78c4c2bee141448edd64833f093b94ea",
+      "binary_sha256": "4685daf4672b7254c266c71930130360438b0297be137adccb458b4cd91a9e4e"
+    },
+    {
+      "target": "idobata-0.4.0-windows-x86_64.zip",
+      "platform": "windows-x86_64",
+      "bytes": 4491014,
+      "sha256": "fb8f67f6ad21723655b9fb4c50d67156133953df9ef00e9104a62f574454d03f",
+      "binary_sha256": "30a03ab8a6b46157fe1db0adfd5496925da7e3173356bedcf6c1069b6d615344"
+    }
+  ],
+  "credential_persisted": false,
+  "published_from_verified_fixed_source": true
+}

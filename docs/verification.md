@@ -5,7 +5,7 @@
 ## v0.4の実装と実機検証（2026-11-01）
 
 固定ソース `48a2af9374e5193c3be5842a1a1d2c735ed8c14ebe2ac30c42c7606c4c409b03` を
-3OSでビルドし、常設4台をSDK 0.4へ更新した。公開配布・監視の最終反映は別途記録する。
+3OSでビルドし、常設4台をSDK 0.4へ更新した。公開配布と監視への反映も完了した。
 
 - 整形、全workspace・全targetの厳格Clippy、通常268試験、最適化した容量境界4試験が成功した。
   [固定ソースと検査結果](../evidence/v04-canonical-validation-20261101.json)にログとバイナリのSHAを記録した。
@@ -25,6 +25,19 @@
 実運営主体は1者であり、合成7者の試験を独立した本番7者の証明としない。
 固定genesisの私的実験用台帳であり、形式的なBFT安全性証明や公開参加のSybil防御の証明を主張しない。
 OS自体の再起動・スリープと72時間観測は、実施済みのdaemon再起動・分断試験から区別する。
+
+[公式crates.ioの検証](../evidence/crates-sdk-v04-publication-20261101.json)はSDKのみ0.4を公開し、
+空のCargo home・target・install rootから認証なしで導入してversion/profile/ledger help/検査0・20を確認した。
+検査器0.3、WASM、profileは不変である。
+[GitHubの3配布物](../evidence/github-release-v04-20261101.json)は、
+[既存TUF root・既定URLでのダウンロード](../evidence/tuf-public-v04-20261101.json)でも全SHA一致を確認した。
+TUF対象は旧6件と新3件の計9件、rootは変更していない。
+
+[監視反映](../evidence/moon-services-v04-20261101.json)はwebsh 7470・全1,171検査、
+component 13件と公開HTTP 2件の計15件UPを確認した。新版はv04の新規窓で計測し、旧v03の1379標本・失敗0を流用しない。
+[最終追加観測](../evidence/v04-final-status-20261101.json)でも60標本・失敗0、15件UPだった。
+[公開サイト](../evidence/site-v04-production-deploy-20261101.json)は両LBの18ルートと公開ブラウザ16項目を確認し、
+publisher・TUF・他サービスのfrontdoor設定を維持した。
 
 ## v0.3の履歴
 

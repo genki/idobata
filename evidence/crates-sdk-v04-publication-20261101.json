@@ -1,0 +1,134 @@
+{
+  "version": 1,
+  "status": "published_and_clean_registry_install_verified",
+  "verified_at_utc": "2026-11-01T08:14:51.313603+00:00",
+  "crate": "idobata",
+  "crate_version": "0.4.0",
+  "crate_sha256": "3349c4ee781d29755a5deff9be6742868887cef5ce149007647840419623edf6",
+  "crate_bytes": 432917,
+  "published_at_utc": "2026-11-01T08:02:57.115541Z",
+  "yanked": false,
+  "official_api": "https://crates.io/api/v1/crates/idobata/0.4.0",
+  "official_download": "https://static.crates.io/crates/idobata/idobata-0.4.0.crate",
+  "crate_page": "https://crates.io/crates/idobata/0.4.0",
+  "source": {
+    "commit": "ece077340feb76c482b341eff8d05e7b5412135b",
+    "clean_detached_worktree": true,
+    "cargo_vcs_info_commit_equal": true,
+    "cargo_vcs_info_dirty_not_true": true,
+    "archive_sha256": "48a2af9374e5193c3be5842a1a1d2c735ed8c14ebe2ac30c42c7606c4c409b03",
+    "compiled_tree_sha256": "d3831ac1fd58ba95d54f413c1d5e1102550d6de5d0b46d0a98eca49938412385",
+    "all_archive_files_equal_to_clean_commit": 62
+  },
+  "package": {
+    "command": [
+      "cargo",
+      "package",
+      "-p",
+      "idobata",
+      "--locked"
+    ],
+    "compile_verification_passed": true,
+    "package_files": 52,
+    "source_asset_license_original_manifest_files_equal": 48,
+    "readme_equal": true,
+    "license": "MIT",
+    "download_exactly_equal_to_verified_package": true
+  },
+  "publication": {
+    "command": [
+      "cargo",
+      "publish",
+      "-p",
+      "idobata",
+      "--locked",
+      "--registry",
+      "crates-io"
+    ],
+    "exit_code": 0,
+    "sdk_only": true,
+    "scanner_published": false,
+    "elapsed_seconds": 16.86
+  },
+  "authentication": {
+    "source": "Approved CRATE_TOKEN binding parsed as data",
+    "delivery": "CARGO_REGISTRY_TOKEN in publishing child environment only",
+    "cargo_login_used": false,
+    "token_printed_or_logged": false,
+    "token_written_to_disk": false
+  },
+  "scanner": {
+    "dependency": "=0.3.0",
+    "published_version_unchanged": "0.3.0",
+    "registry_checksum_unchanged": "1f70d29f055a307476be41b8a42f2d2471dd721ec905fa6a297e4f398b1edc1e",
+    "wasm_sha256_unchanged": "e765bdca9f335bed3c26c2dee1bce39e9eb652e2af2552945c1818934d88e4fd",
+    "policy_id_unchanged": "c82f9fed20148ff5dba8718396cc4eaeb995ad56e6f9800c203783b289901952"
+  },
+  "clean_registry_install": {
+    "command": [
+      "cargo",
+      "install",
+      "idobata",
+      "--version",
+      "=0.4.0",
+      "--locked",
+      "--registry",
+      "crates-io"
+    ],
+    "fresh_cargo_home": true,
+    "fresh_target": true,
+    "fresh_install_root": true,
+    "authentication_supplied": false,
+    "exit_code": 0,
+    "elapsed_seconds": 610.433,
+    "registry_download_checksum_equal": true,
+    "no_credentials_files": true
+  },
+  "installed_binary_smoke": {
+    "status": "passed",
+    "version": "idobata 0.4.0",
+    "platform": "x86_64-unknown-linux-gnu",
+    "rustc": "rustc 1.96.0 (ac68faa20 2026-05-25)",
+    "cargo": "cargo 1.96.0 (30a34c682 2026-05-25)",
+    "binary_sha256": "7cc8b64108258c544334a9ecef61e8fcff7c58e5e738cdb6ca2037128f862d3c",
+    "binary_bytes": 29784608,
+    "profile_equal": true,
+    "ledger_commands": [
+      "status",
+      "balance",
+      "questions",
+      "get",
+      "ask",
+      "answer",
+      "vote",
+      "transfer",
+      "submit",
+      "tx",
+      "blocks",
+      "checkpoint",
+      "genesis",
+      "configure",
+      "export"
+    ],
+    "offline_plain_exit": 0,
+    "offline_blocked_exit": 20
+  },
+  "production_sdk_or_endpoint_changed_or_contacted": false,
+  "evidence_sha256": {
+    "cargo-package.stdout.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "cargo-package.stderr.log": "0fc1390e07f2e551b3c50b7b04c66536a82027f3f8f1cb1019905be4862b5030",
+    "cargo-package-content-verification.json": "9ef5d877b7dbdc8131818f8d290529051e1ad8105504775a437f1d22c325f868",
+    "cargo-publish-result.json": "d93453b03ec848f92295ad3467ac8f2516565c94c95ed9a6fac4de950caac924",
+    "cargo-publish.stdout.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "cargo-publish.stderr.log": "04c0dff3fff19a00f322c97b2d9d47702749ad8ba3360a522dfb09458e9c94a7",
+    "cargo-official-registry-verification.json": "6a288f6189b916ee705eddc63867bd7d2881c743460c14fa428f42a33d9ef00e",
+    "cargo-official-install-result.json": "ee0995fe5fc36d88d942e4c267bf63b2b89057d11e82d6fdb9021357e731ff00",
+    "cargo-official-install.stdout.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "cargo-official-install.stderr.log": "ab8078b89c663fa32dafc867d6243088093ae3251ed7c3ff316fda255b12e3c0",
+    "cargo-official-install-smoke.json": "28bf3dcca8da3f3385b4f274b84196147d1088fd4ae7369e35f0d796aeb14817"
+  },
+  "limitations": [
+    "The registry binary was compiled in a separate clean installation and is not claimed byte-identical to native release artifacts.",
+    "Only the SDK crate was published; the immutable scanner crate, WASM and policy profile were retained."
+  ]
+}

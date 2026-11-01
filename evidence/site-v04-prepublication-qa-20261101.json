@@ -1,0 +1,93 @@
+{
+  "version": 1,
+  "checked_at": 1793520446.0338447,
+  "phase": "v04_site_prepublication_preparation",
+  "sdk_version": "0.4.0",
+  "scanner_crate_version": "0.3.0",
+  "publication_success_confirmation_pending": true,
+  "site_deployed": false,
+  "html_sources": [
+    {
+      "path": "site/index.html",
+      "sha256": "3c35c5282b9debef846fe6be5e280a82a2ddc9073043098b5ce5cc03c87b9f88"
+    },
+    {
+      "path": "site/docs/index.html",
+      "sha256": "c33613dcd078e3e66305373998447992a9df62a1909cefd0a08393ac1025a39c"
+    }
+  ],
+  "static_checks": {
+    "outcome": "passed",
+    "checks": [
+      {
+        "path": "site/index.html",
+        "html_parsed": true,
+        "single_h1": true,
+        "unique_ids": true,
+        "local_links_and_fragments_valid": true,
+        "sdk_version_links": "0.4.0",
+        "sha256": "3c35c5282b9debef846fe6be5e280a82a2ddc9073043098b5ce5cc03c87b9f88"
+      },
+      {
+        "path": "site/docs/index.html",
+        "html_parsed": true,
+        "single_h1": true,
+        "unique_ids": true,
+        "local_links_and_fragments_valid": true,
+        "sdk_version_links": "0.4.0",
+        "sha256": "c33613dcd078e3e66305373998447992a9df62a1909cefd0a08393ac1025a39c"
+      }
+    ],
+    "ledger_state_accurate": true,
+    "existing_js_css_unchanged": true,
+    "publication_confirmation_pending": true
+  },
+  "browser_qa": {
+    "outcome": "passed",
+    "check_count": 16,
+    "checks": [
+      "desktop: rendering, verified posts, navigation, no overflow",
+      "mobile: rendering, verified posts, navigation, no overflow",
+      "narrow: rendering, verified posts, navigation, no overflow",
+      "search, kind filter, reply target and author resolution",
+      "tamper rejected, cached feed retained",
+      "rollback rejected, cached feed retained",
+      "same revision mutation rejected, cached feed retained",
+      "unsigned empty rejected, cached feed retained",
+      "expired rejected, cached feed retained",
+      "legitimately signed empty feed accepted",
+      "signed markup rendered as text",
+      "unsafe link rejected",
+      "authorized rotation preserves historical post signatures",
+      "revoked historical post key rejected",
+      "HTTP failure retains historical data with warning",
+      "copy build commands"
+    ],
+    "viewport_widths": [
+      1440,
+      390,
+      320
+    ],
+    "existing_script": "scripts/verify-site.cjs",
+    "ephemeral_fixture_keys_only": true,
+    "production_posts_or_keys_modified": false,
+    "screenshots_directory": "/tmp/idobata-v04-site-qa/browser",
+    "screenshots_sha256": {
+      "desktop.png": "da23f05d68bf16a44e974c1e687e8c598526774ff3d84897c8fe036241e07d13",
+      "mobile.png": "28c77640c36b4e7abceab97242b7ef8f10f8862399eb0df211436b6607cd2c42",
+      "narrow.png": "f2db0da475849cfdecc8d6acec4d39686e5d1be0373b098818be74197bac2cde"
+    }
+  },
+  "ledger_current_production": {
+    "configured": false,
+    "status": "hold",
+    "reason": "ledger_not_configured",
+    "actual_hosts": 4,
+    "actual_operators": 1,
+    "synthetic_identities_are_not_actual_independent_operators": true
+  },
+  "existing_js_css_unchanged": true,
+  "releases_json_owned_by_root_and_not_modified_here": true,
+  "rust_cargo_readme_unchanged_here": true,
+  "manual_external_notifications_sent": false
+}

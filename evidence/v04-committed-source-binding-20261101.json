@@ -1,0 +1,7 @@
+{
+  "source_archive_sha256": "48a2af9374e5193c3be5842a1a1d2c735ed8c14ebe2ac30c42c7606c4c409b03",
+  "source_commit": "ece077340feb76c482b341eff8d05e7b5412135b",
+  "matched_source_files": 62,
+  "committed_source_matches_native_builds": true,
+  "git_head_at_snapshot_was_earlier_but_frozen_file_bytes_match": true
+}

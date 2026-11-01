@@ -3,23 +3,24 @@
 配布元は `https://idobata.s21g.com/`、ソースと版固定の配布物は
 `https://github.com/genki/idobata`。ビルド・検査・配備は直接スクリプトを実行し、
 GitHub Actionsを使用しない。
-[v0.3.0の配布ファイル](https://github.com/genki/idobata/releases/tag/v0.3.0)を公開済み。
+[v0.4.0の配布ファイル](https://github.com/genki/idobata/releases/tag/v0.4.0)を公開済み。
 常設の新規ノード・ディスク・有料サービスは追加しない。
 
 ## crates.ioからCLIを導入する
 
 Rustの公式レジストリ[crates.io](https://crates.io/)で、CLI
-[`idobata 0.3.0`](https://crates.io/crates/idobata/0.3.0)と
+[`idobata 0.4.0`](https://crates.io/crates/idobata/0.4.0)と
 依存ライブラリー[`idobata-scanner 0.3.0`](https://crates.io/crates/idobata-scanner/0.3.0)を
 MITライセンスで公開した。所有者は`genki`。
 
-SDKはcommit `8fa4c9839439e88bf914a2573e9ebf1afb131879`のcleanなpackageで、公式crateのSHA-256は
-`1ab9e37118b818d34dd49e6688fa0f4dd5a940b45eba21240fdc6055d74fac92`。
-公式API・sparse index・配布crateのchecksumとbyte一致を検査した。
-38ファイルにMIT全文・README・固定WASMを同梱し、SDKのRust 31ファイルは実4ホストで検証したnative sourceと一致する。
-空の専用install rootからregistry版を実際にinstallし、version・profile・通常scanと遮断・
-既存共有IPCへの自動接続・明示した未作成homeの拒否を確認した。
-[実公開と取得installの記録](../evidence/cargo-published-v03-20261101.json)。
+SDKはcommit `ece077340feb76c482b341eff8d05e7b5412135b`のcleanなpackageで、公式crateのSHA-256は
+`3349c4ee781d29755a5deff9be6742868887cef5ce149007647840419623edf6`。
+公式配布crateと公開したpackageのbyte一致を検査した。
+52ファイルを同梱し、ソース・README・固定WASMを検証済みのnative sourceと照合した。
+空のCARGO_HOME・target・install rootを使い、資格情報なしでregistry版を実際にinstallし、
+version、固定profile、WASM、ledger CLI、通常scanと遮断を確認した。
+[実公開と取得installの記録](../evidence/crates-sdk-v04-publication-20261101.json)。
+scannerは0.3.0のまま維持し、再公開していない。
 
 scannerの公式checksumは`1f70d29f055a307476be41b8a42f2d2471dd721ec905fa6a297e4f398b1edc1e`、
 ソース記録はcommit `1fd8bd698ab408ce4d201934d3a348b9e56a9ab1`。
@@ -36,7 +37,7 @@ cargo install idobata --locked
 idobata --version
 ```
 
-版を固定する場合は`cargo install idobata --version 0.3.0 --locked`を使う。
+版を固定する場合は`cargo install idobata --version 0.4.0 --locked`を使う。
 Cargoは既定でcrates.ioから取得し、`--locked`で配布物に含まれる`Cargo.lock`を使う。
 [Cargo公式の導入仕様](https://doc.rust-lang.org/cargo/commands/cargo-install.html)を参照。
 Windowsでは選択したRust targetに対応するネイティブのビルド環境、macOSではCommand Line Tools等が別途必要となる。
@@ -95,12 +96,11 @@ normalized manifestにも`license = "MIT"`を記録する。ネイティブarchi
 dry-runの成功は、レジストリの認証や
 アップロード後のサーバー検査が完了したことを意味しない。
 
-認証を設定できたら、scannerを先に公開し、公式indexへ0.3.0が現れたことを確認する。
-続けてSDKのdry-runを再実行し、公開されたscannerのchecksumを使うロックファイルで検査してから公開する。
-公開操作は次の順序となる。
+scannerを先に公開するのは初回の手順であり、0.3.0は公開済みである。
+SDK 0.4.0ではscannerを再公開せず、既存のchecksumを使うロックファイルで検査する。
+現在のSDKの公開操作は次の順序となる。
 
 ```sh
-cargo publish --locked -p idobata-scanner --registry crates-io
 cargo publish --dry-run --locked -p idobata --registry crates-io
 cargo publish --locked -p idobata --registry crates-io
 ```
@@ -109,14 +109,14 @@ cargo publish --locked -p idobata --registry crates-io
 dotenvの指定キーを使う場合は実行可能なshellとしてsourceせず、データとして解釈し、
 公開用の子プロセスの`CARGO_REGISTRY_TOKEN`にだけ渡す。
 tokenを引数、ログ、証跡、リポジトリや新しい永続設定へ書かない。
-公開後に空のinstall rootから`cargo install idobata --version 0.3.0 --locked`を実行し、
+公開後に空のinstall rootから`cargo install idobata --version 0.4.0 --locked`を実行し、
 version、profileと基本CLIを確認して初めて導入経路を検証済みとする。
 一度公開した版は上書きできないため、試験目的の実公開はしない。
 [Cargo公式の公開手順](https://doc.rust-lang.org/cargo/reference/publishing.html)を参照。
 
-## バイナリの取得と検証（公開済みv0.2）
+## バイナリの取得と検証（公開済みv0.4）
 
-v0.2.0の対象はLinux x86_64、macOS arm64、Windows x86_64。
+v0.4.0の対象はLinux x86_64、macOS arm64、Windows x86_64。
 実機で動かしたバイナリをarchive化する。WASM検知器と固定profileは埋め込み済み。
 配布ファイル、長さ、SHA-256は`/releases.json`、信頼metadataは`/updates/`で配信する。
 archiveはGitHub Releaseへ保存し、サイトの`/releases/FILE`からHTTPSで転送する。
@@ -129,8 +129,8 @@ TUF rootはリポジトリの`site/updates/root.json`を取得し、別経路の
 
 ```sh
 idobata release download --root-file root.json \
-  --target idobata-0.2.0-linux-x86_64.tar.gz \
-  --state ./update-state --output ./idobata-0.2.0.tar.gz
+  --target idobata-0.4.0-linux-x86_64.tar.gz \
+  --state ./update-state --output ./idobata-0.4.0.tar.gz
 ```
 
 macOSは`idobata-0.2.0-macos-arm64.tar.gz`、Windowsは
