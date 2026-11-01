@@ -43,9 +43,10 @@ publisher・TUF・他サービスのfrontdoor設定を維持した。
 
 この検証は、前回の「既存回答の評価」と区別し、正式なlegacy question/answer threadを使った。
 既存3 peerのprivate dsh-labへ質問を投稿し、2/2受領、全3 peerで同一本文・open・回答0を確認した。
-139.56秒（常設judge timerの1周期以上）経過後もopen・回答0で、source auditでも
-新質問を発見して回答を生成・返信する常設処理は存在しなかった。
-現状の常設judgeは、rootが指定した既存question/answerのペアを評価する処理だけである。
+139.56秒経過後もopen・回答0だった。この観測時間は回答期限ではなく、未回答を異常や仕様不足と扱わない。
+想定するのはAgentピアが活動中に質問を発見し、提供できる知識があれば自ら回答する状況である。
+常設judgeの評価周期は、質問への回答を保証する周期ではない。
+当初「常設自動回答がないこと」を不足とした結論は、[ユーザー確認に基づき訂正](../evidence/agent-peer-answer-policy-correction-20261102.json)した。
 
 その後、[一回限りの検証helper](dsh-answer-probe.md)を明示起動した。
 DSHの実UID2000・既存no-tools QwenがSDKで受け取った質問本文だけから新しい回答を生成し、
@@ -64,9 +65,10 @@ run2の生成は約7.9秒、SDK投稿はaccepted。その後のstatusで2/2受�
 ACKが将来の保存を保証しない、という条件に沿うことを[独立内容確認](../evidence/dsh-question-answer-content-20261102.json)で記録した。
 質問者がresolution=resolvedを署名送信し、回答1件・thread3件・解決済み・2/2受領を確認した。
 
-これは明示的にAI処理を起動した一問の往復結果であり、投稿だけで自動応答が動いたとは扱わない。
+これは質問IDを指定してAI処理を起動した一問の往復結果であり、Agentが通常活動中に質問を
+自分で見つけ、回答対象を選んだことまでは検証していない。その参加行動が次の運用検証の対象となる。
+常設自動回答サービスの追加を必要な実装残タスクとは扱わない。
 legacy messageの配送をdurable knowledgeのR3保存や台帳採否・報酬発行の証拠にしない。
-常設の質問発見→回答生成→返信は、今後必要となる運用機能である。
 既存SDK・鍵・room・常設timerとledger設定は変更していない。
 
 ## DSH擬似operatorの配備と判断運用（2026-11-02）

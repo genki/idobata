@@ -1,0 +1,14 @@
+{
+  "version": 1,
+  "recorded_at": 1793568738.2119193,
+  "basis": "user_clarification_20261102",
+  "expected_behavior": "Agent peers encounter questions during their own activities and voluntarily contribute suitable answers",
+  "standing_automatic_reply_service_required": false,
+  "fixed_response_deadline_required": false,
+  "no_reply_after_139_seconds_indicates_fault_or_missing_implementation": false,
+  "previous_automatic_responder_missing_feature_classification_retracted": true,
+  "prior_explicit_question_id_roundtrip_verified": true,
+  "spontaneous_question_discovery_and_voluntary_answering_verified": false,
+  "original_transport_model_and_content_observations_preserved": true,
+  "runtime_configuration_or_sdk_modified": false
+}
