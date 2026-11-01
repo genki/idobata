@@ -1,0 +1,179 @@
+{
+  "version": 1,
+  "status": "passed",
+  "checked_at": "2026-11-01T10:15:53.277320+00:00",
+  "scope": "post-0.4 test-only validation of existing production logic; not a replacement release",
+  "repository_head_before_test_only_commit": "02518cfecafbeb0cfea6eb08b2aca0f7c8da674e",
+  "fixture": {
+    "temporary_peers": 4,
+    "registered_operator_labels": {
+      "s21g": 3,
+      "machinaai-test": 1
+    },
+    "actual_common_administrative_controllers": 1,
+    "independent_production_operators_proven": false,
+    "credit_per_registered_operator": 1000,
+    "real_machinaai_service_or_model_executed": false,
+    "fresh_temporary_keys_only": true
+  },
+  "results": {
+    "knowledge": {
+      "signed_reviews_retained_per_record": 3,
+      "effective_external_positive_groups_per_record": 1,
+      "positive_credit_per_record": 1000,
+      "required_external_groups": 3,
+      "required_credit": 3000,
+      "promoted": false,
+      "normal_search_hits": 0,
+      "explicit_explore_hits": 2
+    },
+    "consensus": {
+      "two_validators_f1_configuration": "rejected",
+      "two_validator_rejection_code": 30,
+      "four_validators_registered_operators": 2,
+      "quorum_unchanged": 3,
+      "runtime_status": "hold",
+      "runtime_reason": "insufficient_independent_operators",
+      "submission_code": 10,
+      "nonce_consumed": false,
+      "pending_transactions": 0,
+      "signed_votes": 0,
+      "signed_timeouts": 0,
+      "signing_wal_unchanged_after_rejected_sign_attempts": true,
+      "minted_units": 0
+    },
+    "acceptance": {
+      "application_fixture_commits_only_not_consensus_finality": true,
+      "asker_and_finder_operator": "s21g",
+      "original_author_operator": "machinaai-test",
+      "conflicted_candidate_judges_rejected": 4,
+      "conflict_rejection_code": 30,
+      "settlement_hold_code": 10,
+      "state_unchanged_by_rejected_votes": true,
+      "minted_units": 0
+    },
+    "keys_and_policy": {
+      "distinct_generated_peer_public_keys": 4,
+      "forged_peer_identity_using_another_peers_key": "rejected",
+      "same_daemon_multiple_llm_executors_are_separate_wallets": false,
+      "cli_endpoint_selection_reads_identity_or_storage_key": false,
+      "same_authority_cross_room_rebinding": "rejected",
+      "leave_rejoin_or_roster_removal_resets_binding": false,
+      "separate_authority_domains_remain_separate": true
+    }
+  },
+  "test_results": [
+    {
+      "suite": "new_isolated_fixture",
+      "passed": 4,
+      "failed": 0,
+      "elapsed_seconds": 2.86,
+      "tests": [
+        "signed_labels_do_not_attest_common_control_executor_or_allow_another_peers_signing_key",
+        "signed_two_operator_reviews_are_retained_but_never_become_three_external_supporters",
+        "two_operator_asker_finder_and_beneficiary_conflicts_leave_no_judges_or_mint",
+        "two_validator_genesis_is_rejected_and_four_validators_from_two_operators_hold_without_signing"
+      ],
+      "reproduce_command": "cargo test -p idobata --test pseudo_operator --locked --offline -- --test-threads=1"
+    },
+    {
+      "suite": "existing_operator_application_consensus_focus",
+      "passed": 11,
+      "failed": 0,
+      "elapsed_seconds": 9.4,
+      "tests": [
+        "knowledge_abuse::tests::author_and_two_friends_cannot_promote_with_reputation_farming",
+        "knowledge_abuse::tests::thirty_two_same_operator_keys_cannot_self_endorse_or_mint",
+        "ledger::tests::author_and_two_friends_or_three_weak_groups_cannot_mint",
+        "ledger::tests::finder_can_present_offline_authors_existing_answer_but_cannot_vote_or_take_reward",
+        "ledger::tests::one_operator_four_hosts_never_becomes_independent_support",
+        "ledger::tests::original_author_and_all_declared_conflict_operators_are_excluded",
+        "ledger::tests::same_operator_latest_committed_vote_wins_not_largest_peer_nonce",
+        "ledger::tests::signatures_chain_scope_and_useful_feedback_domain_are_not_interchangeable",
+        "ledger_consensus::tests::real_four_hosts_one_operator_hold_without_signatures_or_minting",
+        "ledger_consensus::tests::seven_independent_operators_need_five_votes_for_f_two",
+        "ledger_consensus::tests::two_byzantine_future_timeout_signatures_cannot_jump_f_two_round"
+      ],
+      "reproduce_equivalent_command": "cargo test -p idobata --lib --locked --offline -- --test-threads=1 knowledge_abuse::tests::author_and_two_friends_cannot_promote_with_reputation_farming knowledge_abuse::tests::thirty_two_same_operator_keys_cannot_self_endorse_or_mint ledger::tests::author_and_two_friends_or_three_weak_groups_cannot_mint ledger::tests::finder_can_present_offline_authors_existing_answer_but_cannot_vote_or_take_reward ledger::tests::one_operator_four_hosts_never_becomes_independent_support ledger::tests::original_author_and_all_declared_conflict_operators_are_excluded ledger::tests::same_operator_latest_committed_vote_wins_not_largest_peer_nonce ledger::tests::signatures_chain_scope_and_useful_feedback_domain_are_not_interchangeable ledger_consensus::tests::real_four_hosts_one_operator_hold_without_signatures_or_minting ledger_consensus::tests::seven_independent_operators_need_five_votes_for_f_two ledger_consensus::tests::two_byzantine_future_timeout_signatures_cannot_jump_f_two_round"
+    },
+    {
+      "suite": "existing_authority_and_issuer_binding_focus",
+      "passed": 4,
+      "failed": 0,
+      "elapsed_seconds": 0.9,
+      "tests": [
+        "config::operator_policy_tests::authority_wide_history_rejects_cross_room_rebinding_and_keeps_domains_separate",
+        "config::operator_policy_tests::leave_and_rejoin_cannot_rebind_omit_downgrade_or_fork_history",
+        "config::operator_policy_tests::operators_are_signed_v4_sticky_and_do_not_change_legacy_certificates",
+        "config::operator_policy_tests::roster_removal_retains_binding_and_renewal_prunes_only_current_claims"
+      ],
+      "reproduce_command": "cargo test -p idobata --lib --locked --offline -- --test-threads=1 config::operator_policy_tests::authority_wide_history_rejects_cross_room_rebinding_and_keeps_domains_separate config::operator_policy_tests::leave_and_rejoin_cannot_rebind_omit_downgrade_or_fork_history config::operator_policy_tests::operators_are_signed_v4_sticky_and_do_not_change_legacy_certificates config::operator_policy_tests::roster_removal_retains_binding_and_renewal_prunes_only_current_claims"
+    },
+    {
+      "suite": "existing_agent_ipc_key_and_admin_boundary_focus",
+      "passed": 3,
+      "failed": 0,
+      "elapsed_seconds": 0.15,
+      "tests": [
+        "tests::ledger_administration_requires_explicit_home_and_rejects_socket_routing",
+        "tests::ledger_agent_commands_accept_shared_ipc_and_json_stdin_without_admin_access",
+        "tests::local_endpoint_selection_does_not_read_node_keys"
+      ],
+      "reproduce_command": "cargo test -p idobata --bin idobata --locked --offline -- --test-threads=1 tests::ledger_administration_requires_explicit_home_and_rejects_socket_routing tests::ledger_agent_commands_accept_shared_ipc_and_json_stdin_without_admin_access tests::local_endpoint_selection_does_not_read_node_keys"
+    }
+  ],
+  "total_passed": 22,
+  "total_failed": 0,
+  "quality_checks": {
+    "integration_clippy": "passed",
+    "integration_clippy_command": "cargo clippy -p idobata --test pseudo_operator --locked --offline -- -D warnings",
+    "rustfmt_check": "passed",
+    "git_diff_check": "passed"
+  },
+  "known_implementation_limits": [
+    {
+      "property": "common_control_and_synthetic_identity",
+      "implemented": false,
+      "detail": "OperatorClaims authenticates bindings and credits only; it does not distinguish an actual independent operator from a synthetic label under the same controller. Unknown common_controller, synthetic and executor fields are rejected.",
+      "source": "crates/idobata/src/knowledge_abuse.rs:63"
+    },
+    {
+      "property": "llm_executor_verdict_attestation",
+      "implemented": false,
+      "detail": "The daemon signs the typed request with its own node key. A dsh or dsh5 process name is not an authenticated independent operator or proof of who computed the judgment. Multiple callers of one daemon share its peer wallet and binding.",
+      "source": "crates/idobata/src/ledger_runtime.rs:521"
+    },
+    {
+      "property": "rebind_existing_production_peer_into_pseudo_operator",
+      "implemented": false,
+      "detail": "Existing same-authority operator history is sticky across rooms, leave/rejoin and roster removal. An isolated pseudo-operator experiment needs fresh temporary identities; no production rebinding was attempted.",
+      "source": "crates/idobata/src/config.rs:668"
+    }
+  ],
+  "source_references": {
+    "promotion_threshold": "crates/idobata/src/knowledge_abuse.rs:390",
+    "group_deduplication": "crates/idobata/src/knowledge_abuse.rs:234",
+    "acceptance_conflicts": "crates/idobata/src/ledger.rs:1249",
+    "acceptance_threshold": "crates/idobata/src/ledger.rs:1328",
+    "validator_structure": "crates/idobata/src/ledger_consensus.rs:80",
+    "all_validator_operators_unique": "crates/idobata/src/ledger_consensus.rs:531",
+    "client_key_boundary": "crates/idobata/src/main.rs:337",
+    "ipc_uid_boundary": "crates/idobata/src/ipc.rs:101"
+  },
+  "fixture_setup_history": {
+    "first_attempt_rejected_invalid_port_zero_peer_addresses_before_behavior_checks": true,
+    "corrected_to_distinct_nonzero_temporary_peer_addresses": true,
+    "production_source_change_required": false
+  },
+  "test_only_source": {
+    "path": "crates/idobata/tests/pseudo_operator.rs",
+    "sha256": "6a0b99b63b0a0c1f70e0cf1af194437fd28a2bd824bb501f770662086b6a9307"
+  },
+  "production_rust_or_manifest_modified": false,
+  "production_configuration_or_genesis_modified": false,
+  "production_keys_read_or_exported": false,
+  "production_services_restarted": false,
+  "published_0_4_tag_or_package_rewritten": false,
+  "notifications_sent": false,
+  "committed_by_agent": false
+}

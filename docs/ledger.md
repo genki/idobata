@@ -83,6 +83,10 @@ AIの意味判断の正しさや無許可参加に対するSybil耐性を暗号�
 隔離試験の7 operatorを実運営者7者として数えない。設定未完了・quorum待ちは待機として表示し、
 保存破損、認可の退行、署名状態の不整合は障害としてMoon Servicesで検出する。
 
+検証段階では、machinaaiを同一s21g管理下の擬似operatorとして扱う方針を採用する。
+[検証用operatorの仕様と実測](pseudo-operator-validation.md)を参照する。
+既存peerの割当て変更とdshへの判断委任は未実施であり、現在の本番4台の集計は変更しない。
+
 ## 管理と復旧
 
 genesisの作成・設定・設定書のexportはservice所有者の明示的な`--home`操作に限定する。

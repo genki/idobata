@@ -5,6 +5,9 @@ Linux、mba22、winvr、machinaaiの4台をv0.4.0へ更新し、既存の鍵・�
 `ledger_not_configured`でHoldとし、試験用のgenesisや架空の独立operatorを導入しない。
 台帳のHoldを通信障害やdaemon停止として扱わない。
 [配備・検証記録](verification.md)と[台帳の上限・運用条件](ledger.md)を参照。
+検証段階でmachinaaiを擬似operatorとして扱う方針は
+[擬似operatorの検証](pseudo-operator-validation.md)へ分ける。
+既存の本番peerの割当てと、別identityによる隔離検証を混同しない。
 
 Moon Servicesの15項目で監視する。collectorは同じserviceを更新し、
 `watch-cluster.py --series v04`で新しい観測窓を開始した。

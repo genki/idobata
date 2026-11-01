@@ -39,6 +39,22 @@ component 13件と公開HTTP 2件の計15件UPを確認した。新版はv04の�
 [公開サイト](../evidence/site-v04-production-deploy-20261101.json)は両LBの18ルートと公開ブラウザ16項目を確認し、
 publisher・TUF・他サービスのfrontdoor設定を維持した。
 
+## 擬似operatorとdsh運用境界の検証（2026-11-01）
+
+[検証用operatorの仕様](pseudo-operator-validation.md)に沿って、常設peerを変更せず確認した。
+追加の隔離4 peer / 2 operator試験4件と、評価・台帳・合意・割当て履歴・IPCの既存焦点試験18件、
+合計22件が成功した。[試験の詳細](../evidence/pseudo-operator-validation-v04-20261101.json)に
+コマンドと結果を記録した。追加testのClippyは警告0、整形検査も成功した。
+公開済みv0.4.0の製品ソース・バイナリ・crate・タグは変更していない。
+
+[実機の読み取り検証](../evidence/machina-judgment-boundary-v04-20261101.json)では、
+machinaaiのSDK 0.4、Doctor、専用daemon、鍵ファイルの所有権・0600、既存認可が正常だった。
+両roomとも4 peer / 1 operator、台帳は未設定Holdであり、常設擬似operator化は未実施である。
+稼働中のdsh VMの実agentと同じ権限境界からはidobata CLI・ホスト共有IPCを使えなかった。
+推論を起動せず可用性を確認したもので、意味判断や継続運用の委任試験ではない。
+dsh5は別環境であり、今回その稼働状態は確認していない。
+本番の認可・genesis・鍵・サービス・VM境界を変更せず、投稿・投票・送金・通知は行っていない。
+
 ## v0.3の履歴
 
 2026-11-01に、監視のOK/NG往復の修正、operator単位の結託対策、常設4台への反映とv0.3.0の公開を完了した。

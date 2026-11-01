@@ -1,0 +1,139 @@
+{
+  "version": 1,
+  "checked_at": 1793528083.0551991,
+  "mode": "read_only_current_configuration_audit",
+  "host_label": "mac_b",
+  "production": {
+    "sdk_version": "0.4.0",
+    "sdk_sha256": "4685daf4672b7254c266c71930130360438b0297be137adccb458b4cd91a9e4e",
+    "doctor_healthy": true,
+    "info_ready": true,
+    "shared_daemon_normal_user_authorized": true,
+    "normal_user_is_different_from_service_owner": true,
+    "home_service_owned": true,
+    "home_mode": 448,
+    "key_file_count": 2,
+    "key_metadata_service_owned_0600_single_link": true,
+    "key_bytes_opened_hashed_or_copied": false,
+    "ipc_socket": true,
+    "ipc_mode": 432,
+    "launchdaemon_service_user_correct": true,
+    "launchdaemon_service_group_correct": true,
+    "run_at_load": true,
+    "keep_alive": true,
+    "launchdaemon_running": true,
+    "dedicated_service_process_count": 1,
+    "rooms": [
+      {
+        "room_index": 0,
+        "certificate_version": 4,
+        "member_count": 4,
+        "public": true,
+        "automation_required": true,
+        "operators_registered": true,
+        "own_is_member": true,
+        "registered_member_count": 4,
+        "registered_operator_count": 1,
+        "own_operator_registered": true,
+        "own_credit": 1000
+      },
+      {
+        "room_index": 1,
+        "certificate_version": 4,
+        "member_count": 4,
+        "public": false,
+        "automation_required": true,
+        "operators_registered": true,
+        "own_is_member": true,
+        "registered_member_count": 4,
+        "registered_operator_count": 1,
+        "own_operator_registered": true,
+        "own_credit": 1000
+      }
+    ],
+    "all_rooms_currently_authorized": true,
+    "own_registered_operator_domains": 1,
+    "current_claims_match_local_binding_history": true,
+    "ledger_status": "hold",
+    "ledger_reason": "ledger_not_configured",
+    "ledger_experiment_only": true,
+    "ledger_settings_file_exists": false,
+    "public_cache_available": true,
+    "public_cache_write_failed": false,
+    "knowledge_objects": 0,
+    "config_has_dsh_delegation_field": false,
+    "service_arguments_are_idobata_daemon": true
+  },
+  "dsh_existing_vm_boundary": {
+    "uid": 2000,
+    "gid": 2000,
+    "workspace_expected": true,
+    "no_new_privileges": true,
+    "seccomp_filter": true,
+    "capabilities_zero": true,
+    "idobata_on_path": false,
+    "dsh5_on_path": false,
+    "paths": {
+      "mac_shared_ipc": {
+        "exists": false,
+        "errno": 2
+      },
+      "linux_shared_ipc": {
+        "exists": false,
+        "errno": 2
+      },
+      "mac_sdk": {
+        "exists": false,
+        "errno": 2
+      },
+      "host_workspace": {
+        "exists": false,
+        "errno": 2
+      }
+    },
+    "dsh_runtime_exists": true,
+    "inference_invoked": false,
+    "mutations_requested": false,
+    "mac_ipc_connect": "unavailable",
+    "mac_ipc_errno": 2,
+    "status": "probed_existing_agent_boundary",
+    "vm_started": false
+  },
+  "dsh_launcher_availability": {
+    "ordinary_host_path_available": false,
+    "explicit_native_launcher_exists": true,
+    "native_launcher_uses_seatbelt": true,
+    "native_launcher_inference_or_cli_access_tested": false,
+    "vm_starting_wrapper_not_invoked": true
+  },
+  "dsh5": {
+    "documented_location": "sweethome5",
+    "documented_environment": "separate_incus_vm",
+    "is_machina_command": false,
+    "live_remote_operational_state": "not_tested",
+    "source": "/home/vagrant/websh/ops/dsh5/README.md:1"
+  },
+  "policy_conclusions": {
+    "current_production_is_one_operator": true,
+    "different_model_or_host_is_not_independent_operator_evidence": true,
+    "same_authority_existing_peer_operator_rebinding_rejected": true,
+    "immutable_history_or_authority_not_deleted": true,
+    "pseudo_independent_testing_requires_separate_isolated_identity_and_test_room": true,
+    "production_peer_rebinding_or_test_identity_creation_performed": false,
+    "current_dsh_vm_can_use_host_idobata_cli_or_ipc": false,
+    "idobata_builtin_dsh_automatic_judgment_delegation": false,
+    "other_external_automation_not_audited": true
+  },
+  "source_references": [
+    "crates/idobata/src/config.rs:82",
+    "crates/idobata/src/config.rs:668",
+    "docs/ledger.md:76",
+    "/home/vagrant/head/tools/machinaai-agent/dsh-sandbox/README.md:1",
+    "/home/vagrant/websh/ops/dsh5/README.md:1"
+  ],
+  "inference_model_invocation_performed": false,
+  "production_genesis_or_authorization_changes": false,
+  "vm_or_service_start_stop_or_configuration_changes": false,
+  "key_bytes_read_hashed_copied_or_saved": false,
+  "record_review_vote_transfer_or_notification_sent": false
+}
