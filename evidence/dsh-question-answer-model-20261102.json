@@ -1,0 +1,193 @@
+{
+  "version": 1,
+  "status": "passed",
+  "checked_at_utc": "2026-11-01T21:02:52.934368+00:00",
+  "scope": "One explicitly invoked private legacy question/answer thread, not a standing automatic answer service.",
+  "governance": {
+    "synthetic": true,
+    "common_controller": "s21g",
+    "operator_label": "machinaai-test",
+    "actual_independent_operator_count": 1,
+    "actual_operator_contribution": 0,
+    "executor": "one-shot Qwen answer probe in existing DSH VM",
+    "dsh_headless_or_dsh5_launched": false,
+    "new_model_or_provider": false
+  },
+  "capability_audit": {
+    "standing_automatic_question_discovery": false,
+    "standing_automatic_answer_generation": false,
+    "standing_automatic_answer_posting": false,
+    "existing_judge_only_evaluates_explicit_existing_question_answer_pairs": true,
+    "source_paths": [
+      "scripts/idobata_judge.py",
+      "scripts/setup-idobata-judge.py",
+      "docs/dsh-judge-runner.md"
+    ],
+    "unassisted_observation": {
+      "observed_at": 1793566297.3908327,
+      "elapsed_since_submission": 139.559,
+      "question_state": "open",
+      "answer_count": 0
+    }
+  },
+  "boundary": {
+    "uid": 2000,
+    "no_new_privileges": true,
+    "seccomp_mode": 2,
+    "effective_capabilities": 0,
+    "fixed_authorized_sdk_ipc": true,
+    "model_tools": false,
+    "daemon_keys_or_admin_api_passed_to_model": false,
+    "expected_answer_or_rubric_given_to_model": false,
+    "question_body_untrusted": true,
+    "room_private": true,
+    "room_epoch": 2,
+    "shared_renewal_lock_and_pending_guard": true,
+    "maximum_run_seconds": 180,
+    "target_title_kind_reply_to_public_and_references_chosen_locally": true
+  },
+  "real_model_executions": {
+    "count": 2,
+    "run_1": {
+      "result": "schema_rejected_before_post",
+      "schema": "version/status/body",
+      "rejection_stage": "answer_schema",
+      "observed_keys": [
+        "",
+        "body",
+        "status"
+      ],
+      "finish_reason": "stop",
+      "tool_calls": false,
+      "post_attempts": 0,
+      "response_sha256": "957df00fdc28b7f401547f4a6b254e3b5ea54c2aa4fd3a660e7ce54e88aa0096",
+      "private_wal_and_response_preserved": true,
+      "executed_helper_sha256": "2662c8e74c897cf96c630fc43fab62d3effc62bb7371a8e7dd9c846f61dd1d95"
+    },
+    "run_2": {
+      "explicit_management_permission": true,
+      "previous_run_proven_post_attempts_zero": true,
+      "model_output_schema": [
+        "body"
+      ],
+      "version_and_status_constructed_locally": true,
+      "empty_body_abstains_without_post": true,
+      "raw_response_sha256": "c2f9034b973e5b5c1f4e73be9f4676b7bf6d65fc419afae11dd15ff20cf5f7ad",
+      "answer_body_sha256": "59c3a0de26051b748da3733fcfa15fa90cb6378b16bc56bb194e7387b48c5ad8",
+      "inference_attempts": 1,
+      "post_attempts": 1,
+      "post_status": "accepted",
+      "executed_helper_sha256": "9f22a1a2a253d6ea9e3fe4b1c0cd0d3f6559c24ddbb251e129c0312bb51f95e4"
+    }
+  },
+  "timing": {
+    "question_retrieved_at": 1793566562.1065354,
+    "model_round_trip_started_at": 1793566562.1065354,
+    "model_round_trip_completed_at": 1793566570.0087185,
+    "model_round_trip_seconds": 7.902,
+    "source_post_started_at": 1793566570.0096467,
+    "source_post_accepted_at": 1793566570.0168471,
+    "question_retrieval_to_source_accept_seconds": 7.91,
+    "source_two_acks_observed_at": 1793566635.4959733,
+    "retrieval_to_two_acks_observation_seconds": 73.389,
+    "receiver_answer_record_saved_at": 1793566656.92355,
+    "retrieval_to_receiver_record_observation_seconds": 94.817,
+    "observation_latency_note": "ACK and receiver timestamps include manual handoff and polling delays; they are observation upper bounds, not measured one-way network latency. Model timing is provider HTTP round trip, not separately measured internal thinking time."
+  },
+  "transport": {
+    "kind": "legacy_signed_thread_messages",
+    "participants": 3,
+    "answer_posts": 1,
+    "sender_scoped_receipts": {
+      "delivered_count": 2,
+      "recipient_count": 2
+    },
+    "all_three_peers_read_exact_private_reply": true,
+    "question_state_before": "open",
+    "question_state_after_answer": "answered",
+    "question_state_after_owner_resolution": "resolved",
+    "final_answer_count": 1,
+    "final_thread_messages": 3,
+    "question_owner_resolution_posts": 1,
+    "durable_knowledge_r3_or_automation_admission_claimed": false,
+    "future_retention_guarantee_claimed": false
+  },
+  "independent_content_review": {
+    "method": "Question-author peer fetched actual reply; root read full body against a separately held rubric.",
+    "technical_items_required": 5,
+    "technical_items_passed": 5,
+    "additional_no_unrequested_mutation_check_passed": true,
+    "total_checks_passed": 6,
+    "received_body_equals_sender_generated_body": true,
+    "general_model_accuracy_or_injection_resistance_claimed": false,
+    "source_evidence": "evidence/dsh-question-answer-content-20261102.json"
+  },
+  "replay_and_history": {
+    "durable_reservation_before_sdk_post": true,
+    "unknown_or_crash_is_not_automatically_retried": true,
+    "previous_wals_and_raw_responses_preserved": true,
+    "new_run_requires_root_owned_manifest": true,
+    "maximum_explicit_run_number": 4,
+    "final_helper_blocks_new_run_after_posting_unknown_or_accepted": true,
+    "guard_provenance": "The measured run 2 was admitted by an administrator precheck of run-1 failed/post_attempts=0; the same precondition was then enforced inside the final reusable helper and covered by focused tests. No extra model/post was performed."
+  },
+  "focused_tests": {
+    "command": "python3 scripts/test-dsh-answer-probe.py",
+    "passed": 13,
+    "failed": 0,
+    "real_model_or_sdk_called_by_unit_tests": false,
+    "py_compile": "passed",
+    "git_diff_check": "passed"
+  },
+  "final_existing_runner_and_sdk": {
+    "checked_at": 1793566892.002194,
+    "judge_counts": {
+      "attempts": 5,
+      "failures": 1,
+      "holds": 0,
+      "successes": 4
+    },
+    "judge_status": {
+      "state": "hold",
+      "reason": "no_eligible_answer"
+    },
+    "judge_timer_active": true,
+    "judge_timer_enabled": true,
+    "judge_runtime_sha256": "bd6f51bf3c1a3705e3dc0d8200508ee586958f39f15630bccc63e1f656cdbb03",
+    "sdk_sha256": "b054e8d0b60c9907687a35b3ff093abf74a13c863e2522da891a3c4d8b7e2bb6",
+    "sdk_version": "idobata 0.4.0",
+    "run1_phase": "failed",
+    "run1_post_attempts": 0,
+    "run2_phase": "accepted",
+    "run2_post_attempts": 1
+  },
+  "privacy": {
+    "record_message_peer_ids_prompts_bodies_and_model_output_in_this_evidence": false,
+    "private_wal_and_raw_response_mode": "0600",
+    "private_handoff_file_modes": "0600",
+    "public_collector_updated_by_this_probe": false
+  },
+  "changes": {
+    "standing_responder_added": false,
+    "existing_timer_or_judge_counter_changed": false,
+    "sdk_rust_cargo_scanner_profiles_changed": false,
+    "keys_rooms_permissions_or_ledger_changed": false,
+    "new_services_or_recurring_resources": false,
+    "github_actions_used": false,
+    "notifications_sent": false
+  },
+  "source_sha256": {
+    "scripts/verify-dsh-answer.py": "253550c3a1eefa750189914d37250bf5a5cfcc56cf0b86c4a66442fdb9b18de9",
+    "scripts/test-dsh-answer-probe.py": "2bb0885c40af08e0071d702db1197656c126596198fb9d81931a6ff3dedc234f",
+    "docs/dsh-answer-probe.md": "995f4c81e98573ce182f708ea2b09628c7ec1ec271811eb4fbb03128f67e16e2"
+  },
+  "related_evidence": [
+    "evidence/dsh-question-answer-content-20261102.json",
+    "evidence/dsh-question-answer-transport-20261102.json"
+  ],
+  "limitations": [
+    "One synthetic problem demonstrates a manually triggered peer round trip, not automatic ongoing answering or general accuracy.",
+    "Answered/resolved are thread state and owner action, not financial reward or independent-operator consensus.",
+    "The answer discusses a hypothetical replication case; no actual replica-repair operation was performed by the model."
+  ]
+}

@@ -39,6 +39,36 @@ component 13件と公開HTTP 2件の計15件UPを確認した。新版はv04の�
 [公開サイト](../evidence/site-v04-production-deploy-20261101.json)は両LBの18ルートと公開ブラウザ16項目を確認し、
 publisher・TUF・他サービスのfrontdoor設定を維持した。
 
+## 質問投稿と別peerの回答生成の検証（2026-11-02）
+
+この検証は、前回の「既存回答の評価」と区別し、正式なlegacy question/answer threadを使った。
+既存3 peerのprivate dsh-labへ質問を投稿し、2/2受領、全3 peerで同一本文・open・回答0を確認した。
+139.56秒（常設judge timerの1周期以上）経過後もopen・回答0で、source auditでも
+新質問を発見して回答を生成・返信する常設処理は存在しなかった。
+現状の常設judgeは、rootが指定した既存question/answerのペアを評価する処理だけである。
+
+その後、[一回限りの検証helper](dsh-answer-probe.md)を明示起動した。
+DSHの実UID2000・既存no-tools QwenがSDKで受け取った質問本文だけから新しい回答を生成し、
+同じpeerのSDKからkind=answer・private・固定reply_toで一度だけ返信した。
+期待解はモデルへ与えず、対象ID・公開範囲・署名はモデルへ制御させていない。
+
+初回は生成bodyがあったが補助metadataの形式不正で投稿前に拒否した。
+旧WAL/応答を保持し、bodyだけをモデルへ要求・metadataをローカル構築する方式へ修正した。
+既知のpost0 failedに対してのみ明示run2を許可し、unknown/posting/acceptedから別runへの迂回は禁止した。
+[モデル実行の証跡](../evidence/dsh-question-answer-model-20261102.json)では、
+run2の生成は約7.9秒、SDK投稿はaccepted。その後のstatusで2/2受領を確認した。
+
+[通信の証跡](../evidence/dsh-question-answer-transport-20261102.json)では、
+全3 peerで同じanswer本文・reply_to/thread・private/untrusted・question_state=answeredを確認した。
+質問者側の別peerから実際の返答を読み、コピー先D・新規1件・利用可能集合B/C/D・重複回避・
+ACKが将来の保存を保証しない、という条件に沿うことを[独立内容確認](../evidence/dsh-question-answer-content-20261102.json)で記録した。
+質問者がresolution=resolvedを署名送信し、回答1件・thread3件・解決済み・2/2受領を確認した。
+
+これは明示的にAI処理を起動した一問の往復結果であり、投稿だけで自動応答が動いたとは扱わない。
+legacy messageの配送をdurable knowledgeのR3保存や台帳採否・報酬発行の証拠にしない。
+常設の質問発見→回答生成→返信は、今後必要となる運用機能である。
+既存SDK・鍵・room・常設timerとledger設定は変更していない。
+
 ## DSH擬似operatorの配備と判断運用（2026-11-02）
 
 [反映した構成](pseudo-operator-validation.md)は、既存4 peerを維持し、DSH VM内に

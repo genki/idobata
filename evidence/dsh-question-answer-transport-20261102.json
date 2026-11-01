@@ -1,0 +1,253 @@
+{
+  "version": 1,
+  "checked_at": 1793566753.8373528,
+  "status": "passed",
+  "scope": "read_only_independent_three_peer_question_answer_transport",
+  "governance": {
+    "common_controller": "s21g",
+    "guest_operator": "machinaai-test",
+    "executor": "dsh",
+    "model_provider": "qwen",
+    "synthetic": true,
+    "actual_independent_operator_count": 1
+  },
+  "transport": {
+    "kind": "legacy_signed_messages",
+    "participants": 3,
+    "public": false,
+    "durable_knowledge_r3_claimed": false,
+    "future_availability_guaranteed": false
+  },
+  "baseline": {
+    "checked_at": 1793566159.1150498,
+    "peers": {
+      "hub": {
+        "transport_exit": 0,
+        "connected_peers": 5,
+        "doctor_healthy": true,
+        "info_ready": true,
+        "knowledge_ready": true,
+        "lab_authorized": true,
+        "lab_automation_required": true,
+        "lab_epoch": 2,
+        "lab_expires_in_seconds": 598410,
+        "lab_objects": 6,
+        "lab_private": true,
+        "lab_staging": 0,
+        "ledger_hold_not_configured": true,
+        "operator_policy_version": 1,
+        "sdk_version": "0.4.0"
+      },
+      "native": {
+        "transport_exit": 0,
+        "connected_peers": 4,
+        "doctor_healthy": true,
+        "info_ready": true,
+        "knowledge_ready": true,
+        "lab_authorized": true,
+        "lab_automation_required": true,
+        "lab_epoch": 2,
+        "lab_expires_in_seconds": 598409,
+        "lab_objects": 6,
+        "lab_private": true,
+        "lab_staging": 0,
+        "ledger_hold_not_configured": true,
+        "operator_policy_version": 1,
+        "sdk_version": "0.4.0"
+      },
+      "guest": {
+        "transport_exit": 0,
+        "connected_peers": 2,
+        "doctor_healthy": true,
+        "host_ipc_absent": true,
+        "info_ready": true,
+        "knowledge_ready": true,
+        "lab_authorized": true,
+        "lab_automation_required": true,
+        "lab_epoch": 2,
+        "lab_expires_in_seconds": 598408,
+        "lab_objects": 6,
+        "lab_private": true,
+        "lab_staging": 0,
+        "ledger_hold_not_configured": true,
+        "operator_policy_version": 1,
+        "ordinary_path_cli": true,
+        "sdk_version": "0.4.0",
+        "service_home_accessible": false,
+        "uid": 2000
+      }
+    },
+    "read_only": true,
+    "inference_invoked": false
+  },
+  "question_before_explicit_model_run": {
+    "checked_at": 1793566266.9680862,
+    "seconds_since_submission": 109.13652467727661,
+    "transport": "legacy_signed_messages",
+    "durable_knowledge_r3_claimed": false,
+    "peers": {
+      "hub": {
+        "exit": 0,
+        "read_success": true,
+        "thread_messages": 1,
+        "question_present_once": true,
+        "answer_count": 0,
+        "all_messages_private": true,
+        "all_untrusted": true,
+        "exact_draft_match": true,
+        "correct_thread": true,
+        "question_open": true
+      },
+      "native": {
+        "exit": 0,
+        "read_success": true,
+        "thread_messages": 1,
+        "question_present_once": true,
+        "answer_count": 0,
+        "all_messages_private": true,
+        "all_untrusted": true,
+        "exact_draft_match": true,
+        "correct_thread": true,
+        "question_open": true
+      },
+      "guest": {
+        "exit": 0,
+        "read_success": true,
+        "thread_messages": 1,
+        "question_present_once": true,
+        "answer_count": 0,
+        "all_messages_private": true,
+        "all_untrusted": true,
+        "exact_draft_match": true,
+        "correct_thread": true,
+        "question_open": true
+      }
+    },
+    "sender_status": {
+      "exit": 0,
+      "delivered": true,
+      "recipient_count": 2,
+      "delivered_count": 2
+    },
+    "raw_bodies_or_ids_saved": false,
+    "inference_invoked": false
+  },
+  "answer_after_explicit_model_run": {
+    "checked_at": 1793566713.7590349,
+    "status": "passed",
+    "transport": "legacy_signed_messages",
+    "durable_knowledge_r3_claimed": false,
+    "peers": {
+      "hub": {
+        "exit": 0,
+        "read_success": true,
+        "thread_messages": 2,
+        "question_present_once": true,
+        "answer_present_once": true,
+        "answer_count": 1,
+        "all_messages_private": true,
+        "all_untrusted": true,
+        "question_draft_unchanged": true,
+        "question_answered": true,
+        "question_thread_correct": true,
+        "answer_draft_exact": true,
+        "answer_reply_to_correct": true,
+        "answer_thread_correct": true,
+        "answer_kind_correct": true,
+        "answer_resolution_absent": true
+      },
+      "native": {
+        "exit": 0,
+        "read_success": true,
+        "thread_messages": 2,
+        "question_present_once": true,
+        "answer_present_once": true,
+        "answer_count": 1,
+        "all_messages_private": true,
+        "all_untrusted": true,
+        "question_draft_unchanged": true,
+        "question_answered": true,
+        "question_thread_correct": true,
+        "answer_draft_exact": true,
+        "answer_reply_to_correct": true,
+        "answer_thread_correct": true,
+        "answer_kind_correct": true,
+        "answer_resolution_absent": true
+      },
+      "guest": {
+        "exit": 0,
+        "read_success": true,
+        "thread_messages": 2,
+        "question_present_once": true,
+        "answer_present_once": true,
+        "answer_count": 1,
+        "all_messages_private": true,
+        "all_untrusted": true,
+        "question_draft_unchanged": true,
+        "question_answered": true,
+        "question_thread_correct": true,
+        "answer_draft_exact": true,
+        "answer_reply_to_correct": true,
+        "answer_thread_correct": true,
+        "answer_kind_correct": true,
+        "answer_resolution_absent": true
+      }
+    },
+    "guest_sender_status": {
+      "exit": 0,
+      "delivered": true,
+      "recipient_count": 2,
+      "delivered_count": 2
+    },
+    "raw_bodies_or_ids_saved": false,
+    "additional_inference_invoked": false
+  },
+  "authorization_and_privacy": {
+    "room_current_authorized_on_all_three": true,
+    "room_private_on_all_three": true,
+    "room_epoch_equal": true,
+    "minimum_room_remaining_seconds_at_baseline": 598408,
+    "guest_ordinary_cli_inside_uid2000_boundary": true,
+    "guest_service_home_inaccessible": true,
+    "guest_host_ipc_absent": true,
+    "all_observed_messages_private": true,
+    "all_observed_messages_untrusted": true,
+    "signature_evidence": "SDK validates member signature and transport identity at ingress; sender verifies scoped signed receipts before counting delivery; raw signatures were not independently exported",
+    "validation_paths_reviewed": [
+      "crates/idobata/src/daemon.rs:receive",
+      "crates/idobata/src/daemon.rs:acknowledge",
+      "crates/idobata/src/crypto.rs:verify_message",
+      "crates/idobata/src/discussion.rs:validate"
+    ],
+    "raw_bodies_original_peer_ids_and_message_ids_in_this_evidence": false,
+    "service_key_bytes_read_or_exported": false
+  },
+  "explicit_model_test_reported_by_runner_owner": {
+    "attempts": 2,
+    "first_attempt": "schema_rejected_without_post",
+    "second_attempt": "accepted_one_answer_post",
+    "second_inference_seconds": 7.902,
+    "standing_autoresponder_added": false,
+    "additional_inference_by_transport_validator": false
+  },
+  "answer_quality_assessment_reported_by_root": {
+    "separate_receiver_read": true,
+    "required_rubric_items": 5,
+    "items_satisfied": 5,
+    "general_model_accuracy_claimed": false
+  },
+  "changes_by_transport_validator": {
+    "source": false,
+    "configuration": false,
+    "services": false,
+    "rooms": false,
+    "sdk": false,
+    "ledger": false,
+    "posts": false,
+    "notifications": false
+  },
+  "limits": [
+    "Read-only verification of one finite legacy thread exchange; this is not durable knowledge replication proof or a general answer-quality guarantee.",
+    "No evidence of independent real operators is asserted."
+  ]
+}

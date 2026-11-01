@@ -1,0 +1,36 @@
+{
+  "checked_at": 1793566764.8801167,
+  "review_method": "root_agent_readback_from_question_author_peer_and_independent_content_review",
+  "new_copy_target_D": true,
+  "additional_copy_count_one": true,
+  "valid_source_B_or_C_and_final_available_holders_B_C_D": true,
+  "duplicate_requests_avoid_redundant_copy_including_in_progress": true,
+  "ACK_not_future_retention_guarantee": true,
+  "no_unrequested_deletion_or_real_configuration_mutation": true,
+  "adequate_for_stated_synthetic_question": true,
+  "answer_body_sha256": "59c3a0de26051b748da3733fcfa15fa90cb6378b16bc56bb194e7387b48c5ad8",
+  "network_consensus_or_independent_operator_acceptance_claimed": false,
+  "standing_auto_responder": false,
+  "observation_without_explicit_answerer": {
+    "observed_at": 1793566297.3908327,
+    "elapsed_since_submission": 139.559,
+    "question_state": "open",
+    "answer_count": 0
+  },
+  "model_answer_explicitly_invoked": true,
+  "owner_resolution": {
+    "checked_at": 1793566854.6568797,
+    "state": "resolved",
+    "answer_count": 1,
+    "thread_message_count": 3,
+    "delivered_count": 2,
+    "recipient_count": 2,
+    "financial_reward_or_consensus_acceptance": false
+  },
+  "public_feed_privacy": {
+    "checked_at": 1793566987.8532364,
+    "question_or_answer_id_published": false,
+    "private_test_marker_published": false,
+    "feed_sha256": "8eb9dc679814c42f5475840302192265de835bceac24c2ad82a939dac11b6f8f"
+  }
+}
