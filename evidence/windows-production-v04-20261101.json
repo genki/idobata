@@ -1,0 +1,73 @@
+{
+  "version": 1,
+  "status": "production_verified",
+  "host": "windows-x86_64",
+  "verified_at_utc": "2026-11-01T07:47:48.394405+00:00",
+  "previous_sdk_version": "0.3.0",
+  "previous_sdk_sha256": "77d0b8a3d8099f176137eb98c7e36a5cc2a3c7ad95354f96dbe7a474221fd187",
+  "sdk_version": "0.4.0",
+  "sdk_sha256": "30a03ab8a6b46157fe1db0adfd5496925da7e3173356bedcf6c1069b6d615344",
+  "source_archive_sha256": "48a2af9374e5193c3be5842a1a1d2c735ed8c14ebe2ac30c42c7606c4c409b03",
+  "reviewed_helper_sha256": "de754b65bd718d9183aa530368cca7484cf4c95e9ea4e59ee618750eecd4f4f2",
+  "execution": {
+    "protected_stage_hash_and_version_verified": true,
+    "old_sdk_protected_backup_verified": true,
+    "dedicated_task_only_stop_start": true,
+    "replacement_preserved_destination_acl": true,
+    "replacement_null_binding": "PowerShell NullString.Value",
+    "protected_journal_status": "verified",
+    "rollback_performed": false
+  },
+  "health": {
+    "ordinary_path_doctor": "healthy",
+    "daemon_version": "0.4.0",
+    "authorized_rooms": 2,
+    "rooms": 2,
+    "task_running": true,
+    "exact_dedicated_processes": 1,
+    "operator_policy_version": 1,
+    "public_projection_version": 1,
+    "public_cache_available": true,
+    "public_cache_write_failed": false
+  },
+  "preservation": {
+    "local_service_principal_matches": true,
+    "task_definition": true,
+    "config_bytes": true,
+    "client_sid_verified_field_hash_equal": true,
+    "home_install_binary_acls": true,
+    "key_metadata_and_acls": true,
+    "launcher_and_locator": true,
+    "key_bytes_opened_hashed_or_copied": false
+  },
+  "ledger": {
+    "status": "hold",
+    "reason": "ledger_not_configured",
+    "exit_code": 10,
+    "experiment_only": true,
+    "genesis_installed": false,
+    "consensus_initialized": false,
+    "actual_production_hosts_are_one_operator": true
+  },
+  "rollback": {
+    "mutable_paths": 12,
+    "stopped_snapshot_equal_at_postcheck": false,
+    "old_binary_only_rollback_permitted": false,
+    "mutable_data_restored": false,
+    "policy": "Refuse old binary if any stopped-state mutable bytes or existence changed; never restore mutable data."
+  },
+  "evidence_sha256": {
+    "windows-production-readonly-plan.json": "fea5bf4b88ae02bbe31082dbe42d7c196cbb0ec09bd2ae4eb4b28bbe9526653d",
+    "windows-production-readonly-audit.json": "18ed8c50942f7cda04b71cef0c89751cf1d37fcbe60eec463b63b438ac996b05",
+    "windows-production-upgrade-session.log": "c0ef06d4da1df71bc8b0c5f62173d2adf83ce0e3b63e27bf9154c5158e477306",
+    "windows-production-upgrade-result-private.json": "e97731070f8725260c9336fb8871c39024a5e745a047f1c1d12ea9bbf9181999",
+    "windows-production-upgrade-protected-journal.json": "fdd0e657ac68cfad752d0910a953d02e449d5ad3f0578e70872653a24b943e27",
+    "windows-production-upgrade-postcheck.json": "3e19116079b65d4775376322d8dfb9f3af171c86d2c40a87f8a1e7d95f8a3bda"
+  },
+  "scope": "Root-authorized production SDK replacement only. Existing identity, authorization, task, directories, launcher and endpoint settings retained. No experiment genesis or synthetic operator identity was placed in production.",
+  "limitations": [
+    "Key preservation checks inspect metadata and ACLs without opening key bytes.",
+    "Client SID equality is checked from the actual Config field before and after this upgrade; its value and hash are not public.",
+    "A current healthy daemon and passing isolated consensus tests do not establish independent production operators or a formal BFT proof."
+  ]
+}

@@ -1,0 +1,207 @@
+{
+  "version": 1,
+  "status": "focused_acceptance_passed_full_workspace_stability_pending",
+  "scope": "Isolated synthetic seven-operator production-daemon/CLI processes. Production hosts remain one actual operator; no production state, services or keys changed.",
+  "fault_bound": 2,
+  "reward_commit_votes": 5,
+  "bootstrap_units": 0,
+  "question_bounty": 0,
+  "automatically_minted_units": 1,
+  "final_original_author_balance": 0,
+  "final_finder_balance": 1,
+  "product_timers_or_assertions_relaxed": false,
+  "explicit_visibility_condition": true,
+  "fixes": [
+    "Retain all pending/current/preferred transaction record references, including question-source proof, before durable save.",
+    "Evaluate timeout quorum even when the final own signed timeout is already durably present.",
+    "Broadcast a locally formed timeout certificate and periodically relay the current durable certificate for restart/Head-learned recovery."
+  ],
+  "cases": [
+    {
+      "case": "complete_pending_proof_gc",
+      "status": "passed",
+      "body_seconds": 43.45,
+      "artifact_sha256": "3a5f994e3cf1f30e65a62b22f94417452d4b0f5c675ed4f8e041456b7c7eddd2",
+      "phase_labels": [
+        "authorized full-mesh readiness",
+        "three real keeper copies and nonkeeper handoff",
+        "question commit with zero wallet and bounty",
+        "question known before author goes offline",
+        "nonkeeper finder answer commit while original author offline",
+        "three judges observe committed answer before voting",
+        "three satisfaction votes auto settle without a separate settle command",
+        "returning author's authenticated reward sync",
+        "earned unit transfer commit",
+        "finder receives transferred unit"
+      ],
+      "log_sha256": "619c4176cfadbb407a0d90a7724c20f6b307b4c352fe431402addf1e3fc202f9",
+      "judge_views_before": [
+        {
+          "answer_count": 1,
+          "closed_outcome": null,
+          "deadline_height": 50,
+          "local_height": 9,
+          "node": 3,
+          "question_status": "open",
+          "reply_code": 0,
+          "target_answer_visible": true
+        },
+        {
+          "answer_count": 1,
+          "closed_outcome": null,
+          "deadline_height": 50,
+          "local_height": 9,
+          "node": 4,
+          "question_status": "open",
+          "reply_code": 0,
+          "target_answer_visible": true
+        },
+        {
+          "answer_count": 1,
+          "closed_outcome": null,
+          "deadline_height": 50,
+          "local_height": 9,
+          "node": 5,
+          "question_status": "open",
+          "reply_code": 0,
+          "target_answer_visible": true
+        }
+      ],
+      "judge_views_after": [
+        {
+          "answer_count": 1,
+          "closed_outcome": null,
+          "deadline_height": 50,
+          "local_height": 9,
+          "node": 3,
+          "question_status": "open",
+          "reply_code": 0,
+          "target_answer_visible": true
+        },
+        {
+          "answer_count": 1,
+          "closed_outcome": null,
+          "deadline_height": 50,
+          "local_height": 9,
+          "node": 4,
+          "question_status": "open",
+          "reply_code": 0,
+          "target_answer_visible": true
+        },
+        {
+          "answer_count": 1,
+          "closed_outcome": null,
+          "deadline_height": 50,
+          "local_height": 9,
+          "node": 5,
+          "question_status": "open",
+          "reply_code": 0,
+          "target_answer_visible": true
+        }
+      ]
+    },
+    {
+      "case": "local_final_timeout_and_durable_certificate_relay",
+      "status": "passed",
+      "body_seconds": 45.86,
+      "artifact_sha256": "1d3e21e2835f60f05a5b460a7f8d612be00c9acb6e2ffefbd7f2d4a657500229",
+      "phase_labels": [
+        "authorized full-mesh readiness",
+        "three real keeper copies and nonkeeper handoff",
+        "question commit with zero wallet and bounty",
+        "question known before author goes offline",
+        "nonkeeper finder answer commit while original author offline",
+        "three judges observe committed answer before voting",
+        "three satisfaction votes auto settle without a separate settle command",
+        "returning author's authenticated reward sync",
+        "earned unit transfer commit",
+        "finder receives transferred unit"
+      ],
+      "log_sha256": "49a3248d3df3d8e66d4578382b35f0729d57b1a85cda44071e2afd6695080021",
+      "judge_views_before": [
+        {
+          "answer_count": 1,
+          "closed_outcome": null,
+          "deadline_height": 46,
+          "local_height": 7,
+          "node": 3,
+          "question_status": "open",
+          "reply_code": 0,
+          "target_answer_visible": true
+        },
+        {
+          "answer_count": 1,
+          "closed_outcome": null,
+          "deadline_height": 46,
+          "local_height": 7,
+          "node": 4,
+          "question_status": "open",
+          "reply_code": 0,
+          "target_answer_visible": true
+        },
+        {
+          "answer_count": 1,
+          "closed_outcome": null,
+          "deadline_height": 46,
+          "local_height": 7,
+          "node": 5,
+          "question_status": "open",
+          "reply_code": 0,
+          "target_answer_visible": true
+        }
+      ],
+      "judge_views_after": [
+        {
+          "answer_count": 1,
+          "closed_outcome": null,
+          "deadline_height": 46,
+          "local_height": 7,
+          "node": 3,
+          "question_status": "open",
+          "reply_code": 0,
+          "target_answer_visible": true
+        },
+        {
+          "answer_count": 1,
+          "closed_outcome": null,
+          "deadline_height": 46,
+          "local_height": 7,
+          "node": 4,
+          "question_status": "open",
+          "reply_code": 0,
+          "target_answer_visible": true
+        },
+        {
+          "answer_count": 1,
+          "closed_outcome": null,
+          "deadline_height": 46,
+          "local_height": 7,
+          "node": 5,
+          "question_status": "open",
+          "reply_code": 0,
+          "target_answer_visible": true
+        }
+      ]
+    }
+  ],
+  "read_only_propagation_review": [
+    "Own-final prevote/precommit duplicates still evaluate PoLC and commit quorum.",
+    "Head timeout certificate checks application/consensus height and round scope before durable advancement.",
+    "Signature validity cache does not replace authorization, expiry, nonce or admission checks."
+  ],
+  "source_sha256": {
+    "crates/idobata/src/ledger_consensus.rs": "f2ad1ad314d5351bc53cc5027bd0e1bbcabc4f3ce7668cc485b6fd8730f05bf5",
+    "crates/idobata/src/ledger_runtime.rs": "e38d73441bf07c04226189304837d0d07e08debe8a9cade1622774a250a7ba1f",
+    "crates/idobata/tests/ledger_acceptance.rs": "706d82233b92c85ccf2e6b8b71f790249b95d9df7746ce874d515c11b9b62035"
+  },
+  "native_pre_fix_artifacts_not_adopted": [
+    "1ef62f137b25",
+    "57314eda1b75"
+  ],
+  "cleanup_mode": "Fixture Drop kills/waits generated daemon children and removes all synthetic temporary homes/keys.",
+  "limitations": [
+    "Synthetic identities do not prove independent production operators.",
+    "The source-path review and tests are not a formal BFT proof.",
+    "Final same-source full workspace stability checks and new native builds are still required."
+  ]
+}

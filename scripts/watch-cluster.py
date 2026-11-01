@@ -43,10 +43,121 @@ def summarize_knowledge(value):
     return result
 
 
+def safe_count(value):
+    return type(value) is int and 0 <= value <= MAX_SAFE_INTEGER
+
+
+def summarize_public_projection(value):
+    """公開cacheの数値と既知状態だけを保存する。source本文やIDは捨てる。"""
+    if not isinstance(value, dict):
+        return {'status': 'unavailable', 'reason': 'public_metrics_missing'}
+    fields = ['version', 'sources', 'bytes', 'partial_snapshots', 'active_queries']
+    if (any(not safe_count(value.get(name)) for name in fields)
+            or type(value.get('cache_available')) is not bool
+            or type(value.get('cache_write_failed')) is not bool
+            or value['version'] != 1
+            or value['sources'] > 256 or value['bytes'] > 4 * 1024 * 1024
+            or value['active_queries'] > 16
+            or (value['sources'] > 0 and value['bytes'] == 0)):
+        return {'status': 'invalid', 'reason': 'public_metrics_invalid'}
+    result = {name: value[name] for name in fields}
+    result['cache_available'] = value['cache_available']
+    result['cache_write_failed'] = value['cache_write_failed']
+    result['status'] = 'healthy' if value['cache_available'] and not value['cache_write_failed'] else 'fault'
+    if not value['cache_available']:
+        result['reason'] = 'public_cache_unavailable'
+    elif value['cache_write_failed']:
+        result['reason'] = 'public_cache_write_failed'
+    return result
+
+
+LEDGER_HOLD_REASONS = {
+    'ledger_not_configured', 'application_checkpoint_required',
+    'insufficient_independent_operators', 'ledger_room_authorization_changed',
+}
+LEDGER_FAULT_REASONS = {
+    'protected_storage_failed': 'storage_fault',
+    'invalid_input_or_configuration': 'configuration_or_signature_fault',
+    'scanner_failed_closed': 'validation_fault',
+    'ledger_storage_or_replay_failed': 'storage_or_replay_fault',
+    'ledger_signer_already_running': 'signer_conflict',
+}
+
+
+def summarize_ledger(value):
+    """台帳の識別子・取引・nonce・自由なerror文字列を監視へ残さない。"""
+    if not isinstance(value, dict):
+        return {'status': 'unavailable', 'reason': 'ledger_metrics_missing'}
+    status = value.get('status')
+    if status not in ['ready', 'hold', 'fault'] or value.get('experiment_only') is not True:
+        return {'status': 'invalid', 'reason': 'ledger_metrics_invalid'}
+    if status == 'fault':
+        # 未知のerrorも本文として通さず、静的な故障分類へまとめる。
+        return {'status': 'fault', 'experiment_only': True,
+                'reason': LEDGER_FAULT_REASONS.get(value.get('reason'), 'ledger_fault')
+                if isinstance(value.get('reason'), str) else 'ledger_fault'}
+    reason = value.get('reason')
+    if ((status == 'hold' and (not isinstance(reason, str)
+                                   or reason not in LEDGER_HOLD_REASONS))
+            or (status == 'ready' and reason is not None)):
+        return {'status': 'invalid', 'reason': 'ledger_metrics_invalid'}
+    result = {'status': status, 'experiment_only': True, 'reason': reason}
+    if reason == 'ledger_not_configured':
+        return result
+    source = value.get('consensus')
+    required = ['height', 'round', 'independent_operators', 'quorum',
+                'committed_blocks', 'double_vote_evidence', 'prevotes', 'precommits']
+    application = ['application_height', 'active_questions', 'closed_questions',
+                   'total_minted', 'pending_transactions', 'queued_requests',
+                   'seconds_since_commit', 'pending_requests']
+    if (not isinstance(source, dict)
+            or any(not safe_count(source.get(name)) for name in required)
+            or any(not safe_count(value.get(name)) for name in application)
+            or source.get('experiment_only') is not True
+            or source.get('status') not in ['awaiting_quorum', 'hold_independent_operators']
+            or type(source.get('locked')) is not bool
+            or source['independent_operators'] > 31 or not 0 < source['quorum'] <= 31
+            or source['height'] == 0 or source['committed_blocks'] > 4096
+            or source['prevotes'] > 31 or source['precommits'] > 31
+            or value['pending_transactions'] > 64 or value['queued_requests'] > 64
+            or value['pending_requests'] > 16):
+        return {'status': 'invalid', 'reason': 'ledger_metrics_invalid'}
+    if ((status == 'ready' and (source['status'] != 'awaiting_quorum'
+                               or source['independent_operators'] < source['quorum']
+                               or source['height'] != value['application_height'] + 1))
+            or (reason == 'insufficient_independent_operators'
+                and source['status'] != 'hold_independent_operators')):
+        return {'status': 'invalid', 'reason': 'ledger_metrics_inconsistent'}
+    consensus = {name: source[name] for name in required}
+    consensus.update(status=source['status'], locked=source['locked'])
+    for name in ['lock_round', 'valid_round']:
+        if source.get(name) is not None and not safe_count(source[name]):
+            return {'status': 'invalid', 'reason': 'ledger_metrics_invalid'}
+        consensus[name] = source.get(name)
+    result['consensus'] = consensus
+    result.update({name: value[name] for name in application})
+    return result
+
+
+def observation_healthy(observation, series, required_rooms):
+    if observation.get('status') != 'up':
+        return False
+    if series in ['v03', 'v04'] and (
+            observation.get('knowledge', {}).get('status') != 'healthy'
+            or not automation_rooms_healthy(observation, required_rooms)):
+        return False
+    if series == 'v04' and (
+            observation.get('public_projection', {}).get('status') != 'healthy'
+            or observation.get('ledger', {}).get('status') not in ['ready', 'hold']
+            or observation.get('ledger', {}).get('reason') == 'ledger_room_authorization_changed'):
+        return False
+    return True
+
+
 def history_path(root, series):
-    if series not in ['v02', 'v03']:
+    if series not in ['v02', 'v03', 'v04']:
         raise ValueError('unsupported_observation_series')
-    return root / ('stability.json' if series == 'v02' else 'stability-v03.json')
+    return root / ('stability.json' if series == 'v02' else f'stability-{series}.json')
 
 
 def load_history(root, series, now):
@@ -79,11 +190,12 @@ def call(node, args, data=None):
         encoded=subprocess.list2cmdline(command) if node['platform']=='windows' else shlex.join(command)
         command=['ssh','-o','BatchMode=yes','-o','ConnectTimeout=10',node['ssh'],encoded]
     p=subprocess.run(command,input=data,capture_output=True,text=True,timeout=18)
-    if p.returncode not in [0,10]:raise RuntimeError('node_unavailable')
+    if p.returncode not in [0,10] and not (args == ['doctor'] and p.returncode == 30):
+        raise RuntimeError('node_unavailable')
     return json.loads(p.stdout)
 
 
-def observe(node):
+def observe(node, series='v02'):
     at=time.time()
     try:
         result=call(node,['doctor']);info=result['daemon']
@@ -91,13 +203,26 @@ def observe(node):
                 'knowledge_automation_required': r.get('knowledge_automation_required')
                     if type(r.get('knowledge_automation_required')) is bool else None}
                for r in info['rooms']]
-        return {'label':node.get('label',node['platform']),'status':'up' if result['status']=='healthy' else 'down',
+        knowledge = summarize_knowledge(info.get('knowledge'))
+        ledger = summarize_ledger(info.get('ledger'))
+        ledger_only_degraded = (series == 'v04' and result['status'] == 'degraded'
+                                and info.get('status') == 'ready'
+                                and knowledge['status'] == 'healthy'
+                                and ledger['status'] == 'fault'
+                                and all(room['authorized'] is True for room in rooms))
+        observation = {'label':node.get('label',node['platform']),'status':'up' if result['status']=='healthy' or ledger_only_degraded else 'down',
                 'checked_at':at,'version':info['version'],'uptime_seconds':info['uptime_seconds'],
                 'policy_id':info['policy_id'],'connected_peers':info['connected_peers'],
                 'pending_count':info['pending_count'],'held_count':info['held_count'],
                 'delivered_count':info['delivered_count'],'rooms':rooms,
-                'knowledge':summarize_knowledge(info.get('knowledge'))}
-    except (OSError,ValueError,KeyError,subprocess.SubprocessError,RuntimeError):
+                'knowledge':knowledge}
+        if series == 'v04':
+            observation['ledger'] = ledger
+            observation['public_projection'] = summarize_public_projection(
+                info['knowledge'].get('public_projection')
+                if isinstance(info.get('knowledge'), dict) else None)
+        return observation
+    except (OSError,ValueError,KeyError,TypeError,AttributeError,subprocess.SubprocessError,RuntimeError):
         return {'label':node.get('label',node['platform']),'status':'down','checked_at':at,'reason':'node_unavailable'}
 
 
@@ -148,8 +273,8 @@ def advance_canary(nodes, previous, now, invoke=call):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--series', choices=['v02', 'v03'], default='v02',
-                        help='v03は旧stability.jsonを保持して別の観測窓を開始する')
+    parser.add_argument('--series', choices=['v02', 'v03', 'v04'], default='v02',
+                        help='v03/v04は旧系列を保持して別の観測窓を開始する')
     parser.add_argument('--require-automation-room', action='append', default=[],
                         help='指定roomの必須flagを監視する。認可設定自体は変更しない')
     args = parser.parse_args()
@@ -168,14 +293,10 @@ def main():
         now=time.time();max_gap=max(max_gap,now-last);last=now
         # inventoryの変更は管理者による次回service起動時に読み込む。
         with ThreadPoolExecutor(max_workers=4) as pool:
-            observations=list(pool.map(observe,nodes))
+            observations=list(pool.map(lambda node: observe(node, args.series), nodes))
         samples+=1
-        unhealthy = any(n['status']!='up' for n in observations)
-        if args.series == 'v03':
-            unhealthy = unhealthy or any(
-                n.get('knowledge', {}).get('status') != 'healthy'
-                or not automation_rooms_healthy(n, args.require_automation_room)
-                for n in observations)
+        unhealthy = any(not observation_healthy(n, args.series, args.require_automation_room)
+                        for n in observations)
         if unhealthy:failed_samples+=1
         for i,node in enumerate(observations):
             if 'uptime_seconds' not in node:continue

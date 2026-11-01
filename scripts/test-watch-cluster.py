@@ -24,6 +24,25 @@ def knowledge():
     }
 
 
+def ledger(reason):
+    value = {'status': 'hold', 'reason': reason, 'experiment_only': True,
+             'chain_id': 'private-chain-sentinel', 'peer_id': 'private-peer-sentinel',
+             'pending': [{'transaction_id': 'private-tx-sentinel'}]}
+    if reason == 'ledger_not_configured':
+        return value
+    value['consensus'] = {'height': 1, 'round': 0,
+                          'status': 'hold_independent_operators',
+                          'independent_operators': 1, 'quorum': 3,
+                          'committed_blocks': 0, 'double_vote_evidence': 0,
+                          'prevotes': 0, 'precommits': 0, 'locked': False,
+                          'lock_round': None, 'valid_round': None,
+                          'experiment_only': True, 'block_id': 'private-block-sentinel'}
+    value.update(application_height=0, active_questions=0, closed_questions=0,
+                 total_minted=0, pending_transactions=0, queued_requests=0,
+                 seconds_since_commit=30, pending_requests=0)
+    return value
+
+
 class WatchClusterTests(unittest.TestCase):
     def test_new_canary_keeps_previous_receipts_while_waiting(self):
         previous = {'request_id': 'old-private-id', 'created_at': 100,
@@ -139,7 +158,7 @@ class WatchClusterTests(unittest.TestCase):
     def test_series_path_traversal_and_wrong_version_are_rejected(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
-            for label in ['../v02', '/tmp/other', 'v03/../../history', 'v04']:
+            for label in ['../v02', '/tmp/other', 'v03/../../history', 'v05']:
                 with self.assertRaises(ValueError):
                     WATCH.history_path(root, label)
             for previous in [
@@ -157,6 +176,101 @@ class WatchClusterTests(unittest.TestCase):
         self.assertTrue(WATCH.automation_rooms_healthy(observation, ['engineering']))
         self.assertFalse(WATCH.automation_rooms_healthy(observation, ['commons']))
         self.assertEqual(observation['rooms'][0]['name'], 'engineering')
+
+    def test_v04_does_not_reuse_or_overwrite_v03_history(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            old = {'version': 2, 'series': 'v03', 'started_at': 1,
+                   'checked_at': 500_000, 'samples': 10_000}
+            path = WATCH.history_path(root, 'v03')
+            path.write_text(json.dumps(old))
+            before = path.read_bytes()
+            self.assertEqual(WATCH.load_history(root, 'v04', 500_100), {})
+            WATCH.save(WATCH.history_path(root, 'v04'),
+                       {'version': 2, 'series': 'v04', 'started_at': 500_100,
+                        'checked_at': 500_100, 'samples': 1})
+            self.assertEqual(path.read_bytes(), before)
+            self.assertEqual(WATCH.load_history(root, 'v04', 500_130)['samples'], 1)
+
+    def test_public_cache_empty_is_healthy_failure_is_distinct_and_unknown_fields_drop(self):
+        value = {'version': 1, 'cache_available': True, 'cache_write_failed': False, 'sources': 0, 'bytes': 0,
+                 'partial_snapshots': 200, 'active_queries': 0,
+                 'body': 'private-sentinel', 'peer_id': 'private-sentinel'}
+        self.assertEqual(WATCH.summarize_public_projection(value)['status'], 'healthy')
+        self.assertNotIn('sentinel', json.dumps(WATCH.summarize_public_projection(value)))
+        value['cache_write_failed'] = True
+        self.assertEqual(WATCH.summarize_public_projection(value)['reason'],
+                         'public_cache_write_failed')
+        value['cache_write_failed'] = False
+        self.assertEqual(WATCH.summarize_public_projection(value)['status'], 'healthy')
+        value['cache_available'] = False
+        self.assertEqual(WATCH.summarize_public_projection(value)['status'], 'fault')
+        for key, invalid in [('version', True), ('sources', 257),
+                             ('bytes', 4 * 1024 * 1024 + 1), ('active_queries', -1)]:
+            value = {'version': 1, 'cache_available': True, 'cache_write_failed': False, 'sources': 0, 'bytes': 0,
+                     'partial_snapshots': 0, 'active_queries': 0}
+            value[key] = invalid
+            self.assertEqual(WATCH.summarize_public_projection(value)['status'], 'invalid')
+
+    def test_ledger_hold_fault_and_numeric_allowlist(self):
+        for reason in ['ledger_not_configured', 'insufficient_independent_operators']:
+            value = ledger(reason)
+            result = WATCH.summarize_ledger(value)
+            self.assertEqual(result['status'], 'hold')
+            self.assertEqual(result['reason'], reason)
+            self.assertNotIn('sentinel', json.dumps(result))
+        value = {'status': 'fault', 'reason': 'private-error-sentinel',
+                 'experiment_only': True, 'peer_id': 'private-peer-sentinel'}
+        result = WATCH.summarize_ledger(value)
+        self.assertEqual(result, {'status': 'fault', 'reason': 'ledger_fault',
+                                  'experiment_only': True})
+        for malformed in [[], {}, 123]:
+            self.assertEqual(WATCH.summarize_ledger(
+                {'status': 'fault', 'reason': malformed,
+                 'experiment_only': True})['reason'], 'ledger_fault')
+            self.assertEqual(WATCH.summarize_ledger(
+                {'status': 'hold', 'reason': malformed,
+                 'experiment_only': True})['status'], 'invalid')
+        value = ledger('insufficient_independent_operators')
+        value.update(status='ready', reason=None)
+        self.assertEqual(WATCH.summarize_ledger(value)['status'], 'invalid')
+        value = ledger('insufficient_independent_operators')
+        value['consensus']['height'] = True
+        self.assertEqual(WATCH.summarize_ledger(value)['status'], 'invalid')
+
+    def test_authorization_regression_hold_fails_stability_but_normal_hold_does_not(self):
+        observation = {'status': 'up', 'knowledge': {'status': 'healthy'},
+                       'public_projection': {'status': 'healthy'},
+                       'ledger': {'status': 'hold', 'reason': 'ledger_not_configured'},
+                       'rooms': []}
+        self.assertTrue(WATCH.observation_healthy(observation, 'v04', []))
+        observation['ledger']['reason'] = 'ledger_room_authorization_changed'
+        self.assertFalse(WATCH.observation_healthy(observation, 'v04', []))
+
+    def test_v04_ledger_fault_does_not_make_live_healthy_knowledge_peer_look_stopped(self):
+        info = {'status': 'ready', 'version': '0.4.0', 'uptime_seconds': 10,
+                'policy_id': 'public-profile', 'connected_peers': 3,
+                'pending_count': 0, 'held_count': 0, 'delivered_count': 3,
+                'knowledge': knowledge(),
+                'ledger': {'status': 'fault', 'reason': 'protected_storage_failed',
+                           'experiment_only': True},
+                'rooms': [{'name': 'engineering', 'authorized': True,
+                           'expires_at': 20_000, 'epoch': 2,
+                           'knowledge_automation_required': True}]}
+        info['knowledge']['public_projection'] = {
+            'version': 1, 'cache_available': True, 'cache_write_failed': False, 'sources': 0, 'bytes': 0,
+            'partial_snapshots': 0, 'active_queries': 0}
+        with patch.object(WATCH, 'call', return_value={'status': 'degraded', 'daemon': info}):
+            result = WATCH.observe({'label': 'fixture', 'platform': 'linux'}, 'v04')
+        self.assertEqual(result['status'], 'up')
+        self.assertEqual(result['knowledge']['status'], 'healthy')
+        self.assertEqual(result['ledger']['status'], 'fault')
+        self.assertFalse(WATCH.observation_healthy(result, 'v04', ['engineering']))
+        with patch.object(WATCH, 'call', return_value={'status': 'degraded', 'daemon': info}):
+            self.assertEqual(WATCH.observe({'label': 'fixture', 'platform': 'linux'}, 'v03')['status'], 'down')
+        info['rooms'][0]['authorized'] = False
+        with patch.object(WATCH, 'call', return_value={'status': 'degraded', 'daemon': info}):
+            self.assertEqual(WATCH.observe({'label': 'fixture', 'platform': 'linux'}, 'v04')['status'], 'down')
 
 
 if __name__ == '__main__':

@@ -10,7 +10,7 @@ use crate::{
         self, CandidatePool, ExposureLimits, OperatorGroup, PoolLimits, SearchMode,
         VerifiedEvidence,
     },
-    knowledge_rating, network,
+    knowledge_publication as kp, knowledge_rating, network,
     scanner::Scanner,
     types::{Config, OperatorBindingHistory, Reply, Request, Signed, TrustedRoom},
     util,
@@ -77,6 +77,10 @@ pub enum WireRequest {
         room_id: String,
         after: Option<String>,
     },
+    PublicBrowse {
+        room_id: String,
+        after: Option<kp::Cursor>,
+    },
 }
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -112,6 +116,11 @@ pub enum WireReply {
         ids: Vec<String>,
         next: Option<String>,
     },
+    PublicRecords {
+        hits: Vec<KnowledgeHit>,
+        next: Option<kp::Cursor>,
+        truncated: bool,
+    },
     Rejected {
         code: i32,
     },
@@ -143,6 +152,7 @@ struct Query {
     deadline: Instant,
 }
 enum Work {
+    PublicBrowse(u64, PeerId),
     GateChallenge(u64, PeerId),
     GateCertify(u64, PeerId),
     Query(u64, PeerId),
@@ -395,6 +405,36 @@ pub struct Runtime {
     inventory_cursor: usize,
     inventory_pages: VecDeque<(PeerId, String, Option<String>)>,
     repairs: VecDeque<(PeerId, String, String)>,
+    public_cache: Option<kp::Cache>,
+    public_queries: BTreeMap<u64, PublicQuery>,
+    public_pages: BTreeMap<String, PublicPage>,
+    public_partial: u64,
+    public_cache_write_failed: bool,
+}
+struct PublicQuery {
+    owner: String,
+    verification_work: usize,
+    response: tokio::sync::oneshot::Sender<Reply>,
+    room: TrustedRoom,
+    sources: Vec<kp::Verified>,
+    queue: VecDeque<(PeerId, Option<kp::Cursor>)>,
+    pages: BTreeMap<PeerId, usize>,
+    inflight: usize,
+    partial: bool,
+    omitted: BTreeSet<String>,
+    observed_at: u64,
+    deadline: Instant,
+}
+struct PublicPage {
+    owner: String,
+    room: TrustedRoom,
+    entries: Vec<crate::publication::PublicEntry>,
+    partial: bool,
+    omitted: usize,
+    retrieval_started_at: u64,
+    observed_at: u64,
+    oldest_observation: u64,
+    until: Instant,
 }
 #[cfg(test)]
 fn transfer_digest(packet: &RecordPacket, reviews: &[ReviewPacket]) -> Result<String> {
@@ -489,13 +529,6 @@ fn evidence_for<'a>(
     })
     .collect()
 }
-fn truncate_utf8(text: &str, max: usize) -> String {
-    let mut end = text.len().min(max);
-    while !text.is_char_boundary(end) {
-        end -= 1;
-    }
-    text[..end].to_owned()
-}
 
 impl Runtime {
     pub fn open(home: &Path, key: identity::Keypair) -> Result<Self> {
@@ -550,6 +583,11 @@ impl Runtime {
             inventory_cursor: 0,
             inventory_pages: VecDeque::new(),
             repairs: VecDeque::new(),
+            public_cache: kp::Cache::open(home).ok(),
+            public_queries: BTreeMap::new(),
+            public_pages: BTreeMap::new(),
+            public_partial: 0,
+            public_cache_write_failed: false,
         })
     }
     pub fn handles(request: &Request) -> bool {
@@ -561,6 +599,7 @@ impl Runtime {
                 | Request::KnowledgeEvaluate { .. }
                 | Request::KnowledgePeers { .. }
                 | Request::KnowledgeStatus { .. }
+                | Request::KnowledgePublicSnapshot { .. }
         )
     }
     fn room(&self, config: &Config, alias: &str) -> Result<TrustedRoom> {
@@ -709,6 +748,12 @@ impl Runtime {
                 .map(|c| c.hit.clone())
         })
     }
+    /// Return an already verified local/short-lived cached body for a ledger
+    /// proof. The ledger caller must reauthorize and validate it for its current
+    /// room; this accessor never treats cache presence as consensus admission.
+    pub fn ledger_record(&self, room_id: &str, id: &str) -> Option<RecordPacket> {
+        self.cached_hit(room_id, id).map(|hit| hit.packet)
+    }
     fn remember(&mut self, hit: KnowledgeHit) {
         let id = hit.packet.record.signed.id.clone();
         let bytes = hit_bytes(&hit).saturating_add(id.len());
@@ -747,6 +792,11 @@ impl Runtime {
     pub fn metrics(&self) -> Value {
         let mut metrics = json!({"storage": self.store.metrics(), "pending_replications": self.pending.values().filter(|v| matches!(v, Work::Store { .. })).count(), "pending_repairs": self.repairs.len() + self.pending.values().filter(|work| matches!(work, Work::Repair { .. })).count(), "pending_inventory_pages": self.inventory_pages.len() + self.pending.values().filter(|work| matches!(work, Work::Inventory { .. })).count(), "expired_background_requests": self.expired_background_requests, "staging_records": self.store.state.records.iter().filter(|s| s.staging).count(), "active_queries": self.queries.len(), "pending_automation": self.gates.len(), "query_bytes": self.queries.values().map(query_bytes).sum::<usize>(), "cache_bytes": self.cache.values().map(|c| c.bytes).sum::<usize>(), "replication_factor": knowledge::REPLICAS, "receipt_claims_are_availability_proofs": false});
         metrics["operator_rate_buckets"] = self.operator_rates.len().into();
+        let (sources, bytes) = self
+            .public_cache
+            .as_ref()
+            .map_or((0, 0), kp::Cache::metrics);
+        metrics["public_projection"] = json!({"version":1,"cache_available":self.public_cache.is_some(),"cache_write_failed":self.public_cache_write_failed,"sources":sources,"bytes":bytes,"partial_snapshots":self.public_partial,"active_queries":self.public_queries.len()});
         metrics["operator_policy_version"] = 1.into();
         metrics["operator_rate_rejections"] = self.operator_rate_rejections.into();
         metrics["nonce_capacity_per_operator"] = NONCE_BUCKET_CAPACITY.into();
@@ -767,80 +817,37 @@ impl Runtime {
         metrics["operator_remote_refill_per_second"] = 4.into();
         metrics
     }
-    /// This is only this keeper's recent public subset, never a whole-room feed.
+    /// This keeper's validated subset only. Distributed publication uses the
+    /// public-only browse command; this accessor never claims room completeness.
     pub fn public_entries(&self, room: &TrustedRoom) -> Vec<crate::publication::PublicEntry> {
-        let at = util::now();
-        if !room.certificate.signed.public
-            || crypto::validate_room(room, &Scanner::policy_id(), at).is_err()
-        {
+        let Ok(config) = config::load(&self.home) else {
             return vec![];
-        }
-        let mut records = self
+        };
+        let Ok(current) = self.current_room(&config, &room.certificate.signed.room_id) else {
+            return vec![];
+        };
+        let room = &current;
+        let candidates = self
             .store
             .state
             .records
             .iter()
-            .filter(|s| {
-                let record = &s.packet.record.signed;
-                record.room_id == room.certificate.signed.room_id
-                    && record.public
-                    && record.created_at <= at.saturating_add(300)
-                    && record.created_at.saturating_add(30 * 86400) >= at
+            .filter(|s| s.packet.record.signed.room_id == room.certificate.signed.room_id)
+            .filter_map(|s| {
+                let hit =
+                    self.local_hit(&room.certificate.signed.room_id, &s.packet.record.signed.id)?;
+                kp::verify_and_project(
+                    kp::Source::Knowledge { hit: Box::new(hit) },
+                    room,
+                    &config.knowledge_operator_history,
+                    util::now(),
+                )
+                .ok()
             })
-            .collect::<Vec<_>>();
-        records.sort_by(|a, b| {
-            b.packet
-                .record
-                .signed
-                .created_at
-                .cmp(&a.packet.record.signed.created_at)
-                .then_with(|| a.packet.record.signed.id.cmp(&b.packet.record.signed.id))
-        });
-        let Ok(scanner) = Scanner::new() else {
-            return vec![];
-        };
-        records
+            .collect();
+        kp::select(candidates, 50)
             .into_iter()
-            .take(50)
-            .filter_map(|stored| {
-                knowledge::validate_record(&stored.packet, room, at).ok()?;
-                let record = &stored.packet.record.signed;
-                let draft = crate::types::Draft {
-                    kind: "answer".into(),
-                    title: truncate_utf8(&record.problem, 256),
-                    body: truncate_utf8(
-                        &format!(
-                            "{}{}{}",
-                            record.solution,
-                            if record.context.is_empty() {
-                                ""
-                            } else {
-                                "\n\n"
-                            },
-                            record.context
-                        ),
-                        8192,
-                    ),
-                    references: record.references.clone(),
-                };
-                crypto::validate_draft(&draft).ok()?;
-                if scanner.scan(&draft, false).ok()?.code != 0 {
-                    return None;
-                }
-                Some(crate::publication::PublicEntry {
-                    content: draft,
-                    published_at: record.created_at,
-                    origin: crate::publication::Origin {
-                        message_id: record.id.clone(),
-                        author: format!(
-                            "agent-{}",
-                            &util::hash(record.author_peer_id.as_bytes())[..8]
-                        ),
-                        reply_to: None,
-                        resolution: None,
-                    },
-                })
-            })
+            .map(|v| v.entry().clone())
             .collect()
     }
     fn replica_state(
@@ -1381,6 +1388,7 @@ impl Runtime {
             WireRequest::Store { room_id, .. }
             | WireRequest::Search { room_id, .. }
             | WireRequest::Get { room_id, .. }
+            | WireRequest::PublicBrowse { room_id, .. }
             | WireRequest::Inventory { room_id, .. } => room_id,
         };
         let room = self.authorized(&config, id, &peer)?;
@@ -1393,6 +1401,7 @@ impl Runtime {
             return Err(Error::new(30, "knowledge_peer_rate_limited"));
         }
         match request {
+            WireRequest::PublicBrowse { after, .. } => self.public_browse(&room, after, &config),
             WireRequest::Challenge {
                 action_digest,
                 purpose,
@@ -1664,6 +1673,7 @@ impl Runtime {
                 if let Some(work) = self.pending.remove(&request_id) {
                     let peer = match &work {
                         Work::Query(_, peer)
+                        | Work::PublicBrowse(_, peer)
                         | Work::GateChallenge(_, peer)
                         | Work::GateCertify(_, peer)
                         | Work::Store { peer, .. }
@@ -1932,6 +1942,9 @@ impl Runtime {
         self.store
             .set_operator_history(&config.knowledge_operator_history);
         match work {
+            Work::PublicBrowse(id, expected) => {
+                self.complete_public(id, expected, peer, reply, &config)
+            }
             Work::GateChallenge(id, expected) => self.complete_gate(
                 id,
                 peer,
@@ -2635,6 +2648,9 @@ impl Runtime {
         let config = match config::load(&self.home) {
             Ok(config) => config,
             Err(_) => {
+                for (_, query) in std::mem::take(&mut self.public_queries) {
+                    let _=query.response.send(Reply::new(30,json!({"status":"failed","error":"current_authorization_unavailable","partial":true})));
+                }
                 for (_, query) in std::mem::take(&mut self.queries) {
                     let _ = query.response.send(Reply::new(30, json!({"status": "failed", "error": "current_authorization_unavailable", "partial": true, "untrusted": true})));
                 }
@@ -2644,7 +2660,10 @@ impl Runtime {
                 self.pending.retain(|_, work| {
                     !matches!(
                         work,
-                        Work::Query(..) | Work::GateChallenge(..) | Work::GateCertify(..)
+                        Work::Query(..)
+                            | Work::PublicBrowse(..)
+                            | Work::GateChallenge(..)
+                            | Work::GateCertify(..)
                     )
                 });
                 return;
@@ -2653,6 +2672,7 @@ impl Runtime {
         self.store.set_rooms(config.rooms.values().cloned());
         self.store
             .set_operator_history(&config.knowledge_operator_history);
+        self.poll_public(&config, swarm);
         self.prune_metadata(&config);
         self.resume_deferred_gates(&config, util::now());
         self.retry_gates(&config, swarm);
@@ -3037,6 +3057,696 @@ impl Runtime {
             break;
         }
         let _ = query.response.send(Reply::new(0, result));
+    }
+}
+
+impl Runtime {
+    /// Dedicated publication IPC. Raw source proofs never enter the IPC reply.
+    pub fn public_command(
+        &mut self,
+        command: ipc::Command,
+        legacy: Vec<kp::Source>,
+        swarm: &mut Swarm<network::Behaviour>,
+    ) {
+        let ipc::Command {
+            owner,
+            request,
+            response,
+        } = command;
+        let Request::KnowledgePublicSnapshot {
+            room: alias,
+            scope,
+            cursor,
+            withdrawn,
+            reset_withdrawn,
+            forget_only,
+        } = request
+        else {
+            let _ = response.send(Reply::new(
+                30,
+                json!({"status":"failed","error":"invalid_public_request"}),
+            ));
+            return;
+        };
+        let setup = (|| -> Result<(Config, TrustedRoom, String)> {
+            if !util::valid_id(&scope)
+                || owner.contains('|')
+                || owner.len() > 160
+                || withdrawn.len() > 256
+            {
+                return Err(INVALID);
+            }
+            let config = config::load(&self.home)?;
+            if let Some(cache) = self.public_cache.as_mut() {
+                let rooms = config
+                    .rooms
+                    .values()
+                    .filter(|room| {
+                        network::room_for(&config, &room.certificate.signed.room_id, &self.own)
+                            .is_some()
+                    })
+                    .cloned()
+                    .collect::<Vec<_>>();
+                let before = cache.write_generation();
+                let result = cache.reconcile_rooms(&rooms, util::now());
+                self.track_public_cache_write(result, before)?;
+            }
+            let room = self.room(&config, &alias)?;
+            if !room.certificate.signed.public {
+                return Err(INVALID);
+            }
+            let cache_owner = format!("{owner}|{scope}");
+            if cursor.is_some() && (!withdrawn.is_empty() || reset_withdrawn || forget_only) {
+                return Err(INVALID);
+            }
+            if !withdrawn.is_empty() || reset_withdrawn {
+                let cache = self.public_cache.as_mut().ok_or(STORAGE)?;
+                let before = cache.write_generation();
+                let result = cache.forget(
+                    &cache_owner,
+                    &room,
+                    &withdrawn,
+                    reset_withdrawn,
+                    util::now(),
+                );
+                self.track_public_cache_write(result, before)?;
+            }
+            Ok((config, room, cache_owner))
+        })();
+        let (config, room, owner) = match setup {
+            Ok(v) => v,
+            Err(e) => {
+                let _ = response.send(Reply::new(
+                    e.code,
+                    json!({"status":"failed","error":e.error}),
+                ));
+                return;
+            }
+        };
+        if forget_only {
+            let _ = response.send(Reply::new(0, json!({"status":"ok"})));
+            return;
+        }
+        if let Some(cursor) = cursor {
+            let page = if self
+                .public_pages
+                .get(&cursor)
+                .is_some_and(|page| page.owner == owner)
+            {
+                self.public_pages.remove(&cursor)
+            } else {
+                None
+            };
+            match page {
+                Some(page)
+                    if page.owner == owner
+                        && page.until > Instant::now()
+                        && util::canonical(&page.room.certificate).ok()
+                            == util::canonical(&room.certificate).ok() =>
+                {
+                    self.public_page(page, response)
+                }
+                _ => {
+                    let _ = response.send(Reply::new(
+                        30,
+                        json!({"status":"failed","error":"public_cursor_invalid"}),
+                    ));
+                }
+            }
+            return;
+        }
+        if self.queries.len() + self.public_queries.len() >= MAX_QUERIES
+            || self
+                .public_queries
+                .values()
+                .filter(|q| q.owner.split('|').next() == owner.split('|').next())
+                .count()
+                >= 2
+            || self.public_cache.is_none()
+        {
+            let _ = response.send(Reply::new(
+                30,
+                json!({"status":"failed","error":"public_projection_unavailable"}),
+            ));
+            return;
+        }
+        let queue = room
+            .certificate
+            .signed
+            .members
+            .iter()
+            .filter(|m| m.peer_id != self.own)
+            .filter_map(|m| m.peer_id.parse().ok())
+            .map(|peer| (peer, None))
+            .collect();
+        let mut query = PublicQuery {
+            owner,
+            verification_work: 0,
+            response,
+            room: room.clone(),
+            sources: vec![],
+            queue,
+            pages: BTreeMap::new(),
+            inflight: 0,
+            partial: false,
+            omitted: BTreeSet::new(),
+            observed_at: util::now(),
+            deadline: Instant::now() + Duration::from_secs(7),
+        };
+        let cached = self
+            .public_cache
+            .as_ref()
+            .map(|cache| cache.sources(&query.owner, &room.certificate.signed.room_id))
+            .unwrap_or_default();
+        for (source, observed_at) in cached {
+            Self::offer_public(&mut query, source, observed_at, &config);
+        }
+        for source in legacy {
+            Self::offer_public(&mut query, source, util::now(), &config);
+        }
+        let mut after = None;
+        for page in 0..4 {
+            match self.public_browse(&room, after, &config) {
+                Ok(WireReply::PublicRecords {
+                    hits,
+                    next,
+                    truncated,
+                }) => {
+                    query.partial |= truncated;
+                    for hit in hits {
+                        Self::offer_public(
+                            &mut query,
+                            kp::Source::Knowledge { hit: Box::new(hit) },
+                            util::now(),
+                            &config,
+                        );
+                    }
+                    if next.is_none() {
+                        break;
+                    }
+                    if page == 3 {
+                        query.partial = true;
+                        break;
+                    }
+                    after = next;
+                }
+                _ => {
+                    query.partial = true;
+                    break;
+                }
+            }
+        }
+        self.next_query = self.next_query.wrapping_add(1);
+        self.public_queries.insert(self.next_query, query);
+        self.poll_public(&config, swarm);
+    }
+    fn public_browse(
+        &self,
+        room: &TrustedRoom,
+        after: Option<kp::Cursor>,
+        config: &Config,
+    ) -> Result<WireReply> {
+        if !room.certificate.signed.public {
+            return Err(INVALID);
+        }
+        if let Some(after) = &after {
+            after.validate()?;
+        }
+        let at = util::now();
+        // Filter explicit visibility before any top-k cap. A private record can
+        // never crowd public candidates out of this authenticated browse route.
+        let mut rows = self
+            .store
+            .state
+            .records
+            .iter()
+            .filter(|s| {
+                let r = &s.packet.record.signed;
+                r.room_id == room.certificate.signed.room_id
+                    && r.public
+                    && s.packet.certificate.certificate.signed.public
+                    && r.created_at <= at
+                    && r.created_at.saturating_add(kp::WINDOW_SECONDS) >= at
+                    && same_pin(&s.packet.certificate, room)
+            })
+            .map(|s| {
+                let evidence = knowledge::verified_evidence_with_conflicts(
+                    &s.packet,
+                    &s.reviews,
+                    &s.review_conflicts,
+                    room,
+                );
+                let promoted = knowledge::assess_evidence_with_history(
+                    &s.packet,
+                    room,
+                    &evidence,
+                    config
+                        .knowledge_operator_history
+                        .get(&room.certificate.signed.room_id),
+                )
+                .promoted;
+                (promoted, s)
+            })
+            .collect::<Vec<_>>();
+        rows.sort_by(|(ap, a), (bp, b)| {
+            bp.cmp(ap)
+                .then_with(|| {
+                    b.packet
+                        .record
+                        .signed
+                        .created_at
+                        .cmp(&a.packet.record.signed.created_at)
+                })
+                .then_with(|| a.packet.record.signed.id.cmp(&b.packet.record.signed.id))
+        });
+        let mut unconfirmed_groups = BTreeMap::new();
+        rows.retain(|(promoted, stored)| {
+            if *promoted {
+                return true;
+            }
+            let group = knowledge::resource_group(
+                room,
+                &stored.packet.record.signed.author_peer_id,
+                &config.knowledge_operator_history,
+            );
+            let count = unconfirmed_groups.entry(group).or_insert(0);
+            *count += 1;
+            *count <= 4
+        });
+        rows.retain(|(promoted, s)| {
+            after.as_ref().is_none_or(|after| {
+                after.contains_after(
+                    *promoted,
+                    s.packet.record.signed.created_at,
+                    &s.packet.record.signed.id,
+                )
+            })
+        });
+        let mut more = rows.len() > 4;
+        rows.truncate(4);
+        let mut next = None;
+        let mut truncated = false;
+        let mut hits = Vec::new();
+        for (promoted, s) in rows {
+            let cursor = kp::Cursor {
+                promoted,
+                created_at: s.packet.record.signed.created_at,
+                id: s.packet.record.signed.id.clone(),
+            };
+            let Some(hit) =
+                self.local_hit(&room.certificate.signed.room_id, &s.packet.record.signed.id)
+            else {
+                truncated = true;
+                next = Some(cursor);
+                continue;
+            };
+            if !self.known_hit_current(&hit, room) {
+                truncated = true;
+                next = Some(cursor);
+                continue;
+            }
+            let mut candidate = hits.clone();
+            candidate.push(hit);
+            if util::canonical(&candidate)?.len() > RESPONSE_BYTES - 4096 {
+                if hits.is_empty() {
+                    truncated = true;
+                    next = Some(cursor);
+                    continue;
+                }
+                // The byte boundary is a page boundary, not permission to move
+                // the cursor past records that were never transferred.
+                more = true;
+                break;
+            }
+            hits = candidate;
+            next = Some(cursor);
+        }
+        Ok(WireReply::PublicRecords {
+            hits,
+            next: if more { next } else { None },
+            truncated,
+        })
+    }
+    fn offer_public(
+        query: &mut PublicQuery,
+        mut source: kp::Source,
+        observed_at: u64,
+        config: &Config,
+    ) {
+        let units = match &source {
+            kp::Source::Knowledge { hit } => 1 + hit.reviews.len() + 2 * hit.review_conflicts.len(),
+            kp::Source::Legacy { .. } => 1,
+        };
+        if query.verification_work.saturating_add(units) > 128 {
+            query.partial = true;
+            return;
+        }
+        query.verification_work += units;
+        let at = util::now();
+        let room = &query.room;
+        let verified =
+            kp::verify_and_project(source.clone(), room, &config.knowledge_operator_history, at);
+        let mut verified = match verified {
+            Ok(v) => v.with_observed_at(observed_at),
+            Err(e) => {
+                if e.error == "public_projection_oversize" {
+                    query.omitted.insert(source.public_id());
+                } else {
+                    query.partial = true;
+                }
+                return;
+            }
+        };
+        if let Some(index) = query
+            .sources
+            .iter()
+            .position(|s| s.entry().origin.message_id == verified.entry().origin.message_id)
+        {
+            let old = query.sources.remove(index);
+            if let (kp::Source::Knowledge { hit: new }, kp::Source::Knowledge { hit: oldhit }) =
+                (&mut source, old.source())
+            {
+                let mut reviews = oldhit.reviews.clone();
+                reviews.extend(new.reviews.clone());
+                let mut conflicts = oldhit.review_conflicts.clone();
+                conflicts.extend(new.review_conflicts.clone());
+                if oldhit.packet.record.signed.created_at < new.packet.record.signed.created_at {
+                    new.packet = oldhit.packet.clone();
+                }
+                match knowledge::canonical_review_state(&new.packet, room, reviews, conflicts) {
+                    Ok((reviews, conflicts)) => {
+                        new.reviews = reviews;
+                        new.review_conflicts = conflicts;
+                    }
+                    Err(_) => {
+                        query.partial = true;
+                        query.sources.push(old);
+                        return;
+                    }
+                }
+                match kp::verify_and_project(source, room, &config.knowledge_operator_history, at) {
+                    Ok(v) => verified = v.with_observed_at(observed_at.max(old.observed_at())),
+                    Err(_) => {
+                        query.partial = true;
+                        query.sources.push(old);
+                        return;
+                    }
+                }
+            } else if old.observed_at() > verified.observed_at() {
+                verified = old;
+            }
+        }
+        query.sources.push(verified);
+        query.sources.sort_by(|a, b| {
+            b.promoted()
+                .cmp(&a.promoted())
+                .then_with(|| match (a.kind(), b.kind()) {
+                    (kp::Kind::Knowledge, kp::Kind::Legacy) => std::cmp::Ordering::Less,
+                    (kp::Kind::Legacy, kp::Kind::Knowledge) => std::cmp::Ordering::Greater,
+                    _ => std::cmp::Ordering::Equal,
+                })
+                .then_with(|| b.entry().published_at.cmp(&a.entry().published_at))
+                .then_with(|| {
+                    a.entry()
+                        .origin
+                        .message_id
+                        .cmp(&b.entry().origin.message_id)
+                })
+        });
+        let mut groups = BTreeMap::new();
+        let mut unconfirmed = 0;
+        query.sources.retain(|s| {
+            if s.promoted() {
+                return true;
+            }
+            let count = groups.entry(s.group().clone()).or_insert(0);
+            *count += 1;
+            unconfirmed += 1;
+            *count <= 4 && unconfirmed <= 16
+        });
+        while query.sources.len() > 64
+            || util::canonical(
+                &query
+                    .sources
+                    .iter()
+                    .map(kp::Verified::source)
+                    .collect::<Vec<_>>(),
+            )
+            .map_or(usize::MAX, |v| v.len())
+                > QUERY_BYTES
+        {
+            query.sources.pop();
+            query.partial = true;
+        }
+    }
+    fn complete_public(
+        &mut self,
+        id: u64,
+        expected: PeerId,
+        peer: PeerId,
+        reply: Option<WireReply>,
+        config: &Config,
+    ) {
+        let Some(mut query) = self.public_queries.remove(&id) else {
+            return;
+        };
+        query.inflight = query.inflight.saturating_sub(1);
+        let authorized = peer == expected
+            && self
+                .authorized(config, &query.room.certificate.signed.room_id, &peer)
+                .is_ok_and(|room| room.certificate.signed.public && same_pin(&query.room, &room));
+        if !authorized || query.deadline <= Instant::now() {
+            query.partial = true;
+        } else if let Some(WireReply::PublicRecords {
+            hits,
+            next,
+            truncated,
+        }) = reply
+        {
+            if hits.len() > 4 || next.as_ref().is_some_and(|c| c.validate().is_err()) {
+                query.partial = true;
+            } else {
+                query.partial |= truncated;
+                for hit in hits {
+                    Self::offer_public(
+                        &mut query,
+                        kp::Source::Knowledge { hit: Box::new(hit) },
+                        util::now(),
+                        config,
+                    );
+                }
+                if let Some(next) = next {
+                    let count = query.pages.get(&peer).copied().unwrap_or(0);
+                    if count < 16 {
+                        query.queue.push_back((peer, Some(next)));
+                    } else {
+                        query.partial = true;
+                    }
+                }
+            }
+        } else {
+            query.partial = true;
+        }
+        self.public_queries.insert(id, query);
+    }
+    fn poll_public(&mut self, config: &Config, swarm: &mut Swarm<network::Behaviour>) {
+        self.public_pages.retain(|_, p| p.until > Instant::now());
+        let ids = self.public_queries.keys().copied().collect::<Vec<_>>();
+        for id in ids {
+            let finished = self.public_queries.get(&id).is_some_and(|q| {
+                q.deadline <= Instant::now() || (q.queue.is_empty() && q.inflight == 0)
+            });
+            if finished {
+                if let Some(q) = self.public_queries.remove(&id) {
+                    self.finish_public(q, config);
+                }
+                self.pending
+                    .retain(|_, work| !matches!(work,Work::PublicBrowse(q,_) if *q==id));
+                continue;
+            }
+            while self.pending.len() < 8 {
+                let Some(mut q) = self.public_queries.remove(&id) else {
+                    break;
+                };
+                let Some((peer, after)) = q.queue.pop_front() else {
+                    self.public_queries.insert(id, q);
+                    break;
+                };
+                let current = self
+                    .authorized(config, &q.room.certificate.signed.room_id, &peer)
+                    .and_then(|r| {
+                        if r.certificate.signed.public && same_pin(&q.room, &r) {
+                            Ok(r)
+                        } else {
+                            Err(INVALID)
+                        }
+                    });
+                if current.is_err() {
+                    q.partial = true;
+                    self.public_queries.insert(id, q);
+                    continue;
+                }
+                let request = WireRequest::PublicBrowse {
+                    room_id: q.room.certificate.signed.room_id.clone(),
+                    after,
+                };
+                *q.pages.entry(peer).or_default() += 1;
+                q.inflight += 1;
+                if !self.send(swarm, peer, &request, Work::PublicBrowse(id, peer)) {
+                    q.inflight -= 1;
+                    q.partial = true;
+                }
+                self.public_queries.insert(id, q);
+            }
+        }
+    }
+    fn finish_public(&mut self, mut q: PublicQuery, config: &Config) {
+        let room = self
+            .current_room(config, &q.room.certificate.signed.room_id)
+            .and_then(|r| {
+                if r.certificate.signed.public && same_pin(&q.room, &r) {
+                    Ok(r)
+                } else {
+                    Err(INVALID)
+                }
+            });
+        let Ok(room) = room else {
+            let _=q.response.send(Reply::new(30,json!({"status":"failed","error":"current_public_authorization_unavailable","partial":true})));
+            return;
+        };
+        q.partial |= q.inflight != 0 || !q.queue.is_empty();
+        let mut valid = Vec::new();
+        for old in q.sources {
+            match kp::verify_and_project(
+                old.source().clone(),
+                &room,
+                &config.knowledge_operator_history,
+                util::now(),
+            ) {
+                Ok(v) => valid.push(v.with_observed_at(old.observed_at())),
+                Err(_) => q.partial = true,
+            }
+        }
+        let withdrawn = self
+            .public_cache
+            .as_ref()
+            .map(|c| c.withdrawn(&q.owner, &room.certificate.signed.room_id))
+            .unwrap_or_default();
+        valid.retain(|s| !withdrawn.contains(&s.entry().origin.message_id));
+        if let Some(cache) = self.public_cache.as_mut() {
+            let before = cache.write_generation();
+            let result = cache.replace_room(&q.owner, &room, &valid, util::now());
+            match self.track_public_cache_write(result, before) {
+                Ok(complete) => q.partial |= !complete,
+                Err(_) => q.partial = true,
+            }
+        }
+        let selected = kp::select(valid, 50);
+        let oldest_observation = selected
+            .iter()
+            .map(kp::Verified::observed_at)
+            .min()
+            .unwrap_or(0);
+        let observed_at = selected
+            .iter()
+            .map(kp::Verified::observed_at)
+            .max()
+            .unwrap_or(0);
+        let mut entries = selected
+            .into_iter()
+            .map(|v| v.entry().clone())
+            .collect::<Vec<_>>();
+        if q.partial {
+            entries.retain_mut(|entry| {
+                entry.content.body=format!("今回は取得または保持の一部が完了していない部分表示です。保存済みの公開情報を含む場合があります。\n\n{}",entry.content.body);
+                if entry.content.body.len()>8192 {q.omitted.insert(entry.origin.message_id.clone());false}else{true}
+            });
+        }
+        while util::canonical(&entries).map_or(usize::MAX, |b| b.len())
+            > crate::publication::MAX_FEED_BYTES as usize - 4096
+        {
+            if entries.pop().is_none() {
+                break;
+            }
+            q.partial = true;
+        }
+        if q.partial {
+            self.public_partial = self.public_partial.saturating_add(1);
+        }
+        let page = PublicPage {
+            owner: q.owner,
+            room,
+            entries,
+            partial: q.partial,
+            omitted: q.omitted.len(),
+            retrieval_started_at: q.observed_at,
+            observed_at,
+            oldest_observation,
+            until: Instant::now() + Duration::from_secs(10),
+        };
+        self.public_page(page, q.response);
+    }
+    fn track_public_cache_write<T>(&mut self, result: Result<T>, before: u64) -> Result<T> {
+        if result
+            .as_ref()
+            .is_err_and(|error| error.code == STORAGE.code)
+        {
+            self.public_cache_write_failed = true;
+        } else if result.is_ok()
+            && self
+                .public_cache
+                .as_ref()
+                .is_some_and(|cache| cache.write_generation() != before)
+        {
+            self.public_cache_write_failed = false;
+        }
+        result
+    }
+    fn public_page(&mut self, mut page: PublicPage, response: tokio::sync::oneshot::Sender<Reply>) {
+        let mut entries = Vec::new();
+        while !page.entries.is_empty() {
+            entries.push(page.entries.remove(0));
+            if util::canonical(&entries).map_or(usize::MAX, |b| b.len()) > IPC_BYTES - 2048 {
+                if let Some(last) = entries.pop() {
+                    page.entries.insert(0, last);
+                }
+                break;
+            }
+        }
+        let cursor = if page.entries.is_empty() {
+            None
+        } else {
+            Some(util::random_id())
+        };
+        let reply = Reply::new(
+            0,
+            json!({"status":"ok","entries":entries,"cursor":cursor,"partial":page.partial,"omitted_oversize":page.omitted,"retrieval_started_at":page.retrieval_started_at,"observed_at":page.observed_at,"oldest_source_observed_at":page.oldest_observation,"scope":"authorized_public_subset","signature_is_truth_proof":false}),
+        );
+        if let Some(cursor) = cursor {
+            if self.public_pages.len() >= 16
+                || self
+                    .public_pages
+                    .values()
+                    .filter(|p| p.owner.split('|').next() == page.owner.split('|').next())
+                    .count()
+                    >= 4
+                || self
+                    .public_pages
+                    .values()
+                    .map(|page| util::canonical(&page.entries).map_or(QUERY_BYTES, |b| b.len()))
+                    .sum::<usize>()
+                    .saturating_add(util::canonical(&page.entries).map_or(QUERY_BYTES, |b| b.len()))
+                    > QUERY_BYTES
+            {
+                let _ = response.send(Reply::new(
+                    30,
+                    json!({"status":"failed","error":"public_page_capacity"}),
+                ));
+                return;
+            }
+            self.public_pages.insert(cursor, page);
+        }
+        let _ = response.send(reply);
     }
 }
 
@@ -5843,5 +6553,307 @@ mod tests {
         assert_eq!(runtime.pending.len(), 1);
         assert!(runtime.pending.values().all(|work|matches!(work,Work::GateChallenge(1,peer) if peer==&fixture.keys[2].public().to_peer_id())));
         assert!(runtime.store.state.records.is_empty());
+    }
+    fn public_projection_query(
+        room: &TrustedRoom,
+    ) -> (PublicQuery, tokio::sync::oneshot::Receiver<Reply>) {
+        let (response, receiver) = tokio::sync::oneshot::channel();
+        (
+            PublicQuery {
+                owner: format!("uid:7|{}", util::hash(b"public test scope")),
+                verification_work: 0,
+                response,
+                room: room.clone(),
+                sources: vec![],
+                queue: VecDeque::new(),
+                pages: BTreeMap::new(),
+                inflight: 1,
+                partial: false,
+                omitted: BTreeSet::new(),
+                observed_at: util::now(),
+                deadline: Instant::now() + Duration::from_secs(7),
+            },
+            receiver,
+        )
+    }
+    fn public_projection_fixture() -> (Fixture, TrustedRoom) {
+        let fixture = Fixture::new(4);
+        let room = Fixture::certificate(
+            &fixture.authority,
+            &fixture.keys.iter().collect::<Vec<_>>(),
+            2,
+            true,
+            util::now(),
+        );
+        fixture.install(&room);
+        (fixture, room)
+    }
+    fn public_projection_record(
+        fixture: &Fixture,
+        room: &TrustedRoom,
+        public: bool,
+        label: &str,
+    ) -> RecordPacket {
+        knowledge::create_record(
+            &fixture.keys[1],
+            room,
+            KnowledgeInput {
+                problem: format!("How should public projection handle {label}?"),
+                solution: "Use the complete documented procedure.".into(),
+                context: "Only explicitly public records may leave the protected daemon.".into(),
+                references: vec![],
+                kind: "answer".into(),
+            },
+            public,
+            util::now(),
+        )
+        .unwrap()
+    }
+    #[test]
+    fn public_projection_filters_private_records_before_candidate_limits_and_ignores_remote_scores()
+    {
+        let (fixture, room) = public_projection_fixture();
+        let mut runtime = fixture.runtime();
+        let public = public_projection_record(&fixture, &room, true, "the public answer");
+        runtime
+            .store
+            .insert(public.clone(), false, util::now())
+            .unwrap();
+        for i in 0..5 {
+            runtime
+                .store
+                .insert(
+                    public_projection_record(
+                        &fixture,
+                        &room,
+                        false,
+                        &format!("private candidate {i}"),
+                    ),
+                    false,
+                    util::now(),
+                )
+                .unwrap();
+        }
+        let config = config::load(&fixture.home).unwrap();
+        let WireReply::PublicRecords { hits, .. } =
+            runtime.public_browse(&room, None, &config).unwrap()
+        else {
+            panic!("wrong public reply");
+        };
+        assert_eq!(hits.len(), 1);
+        assert_eq!(hits[0].packet.record.signed.id, public.record.signed.id);
+        let (mut query, _) = public_projection_query(&room);
+        let mut fake = fixture.hit(public, vec![]);
+        fake.score = 1e200;
+        fake.quality.value = 1.0;
+        fake.quality.confidence = 1.0;
+        Runtime::offer_public(
+            &mut query,
+            kp::Source::Knowledge {
+                hit: Box::new(fake),
+            },
+            util::now(),
+            &config,
+        );
+        assert_eq!(query.sources.len(), 1);
+        assert!(!query.sources[0].promoted());
+        let private = fixture.hit(
+            public_projection_record(&fixture, &room, false, "a forged visibility claim"),
+            vec![],
+        );
+        Runtime::offer_public(
+            &mut query,
+            kp::Source::Knowledge {
+                hit: Box::new(private),
+            },
+            util::now(),
+            &config,
+        );
+        assert_eq!(query.sources.len(), 1);
+        assert!(query.partial);
+    }
+    #[test]
+    fn public_projection_rechecks_transport_authorization_deadline_and_does_not_save_rejected_hits()
+    {
+        let (fixture, room) = public_projection_fixture();
+        let mut runtime = fixture.runtime();
+        let packet = public_projection_record(&fixture, &room, true, "transport revocation");
+        let peer = fixture.keys[2].public().to_peer_id();
+        let (query, mut receiver) = public_projection_query(&room);
+        runtime.public_queries.insert(1, query);
+        let renewed = Fixture::certificate(
+            &fixture.authority,
+            &[&fixture.keys[0], &fixture.keys[1], &fixture.keys[3]],
+            3,
+            true,
+            util::now(),
+        );
+        fixture.install(&renewed);
+        let config = config::load(&fixture.home).unwrap();
+        runtime.complete_public(
+            1,
+            peer,
+            peer,
+            Some(WireReply::PublicRecords {
+                hits: vec![fixture.hit(packet.clone(), vec![])],
+                next: None,
+                truncated: false,
+            }),
+            &config,
+        );
+        assert!(runtime.public_queries[&1].sources.is_empty());
+        assert!(runtime.public_queries[&1].partial);
+        let query = runtime.public_queries.remove(&1).unwrap();
+        runtime.finish_public(query, &config);
+        let reply = receiver.try_recv().unwrap();
+        assert_eq!(reply.code, 0);
+        assert_eq!(reply.result["partial"], true);
+        assert!(reply.result["entries"].as_array().unwrap().is_empty());
+        let (mut query, _) = public_projection_query(&renewed);
+        query.deadline = Instant::now() - Duration::from_millis(1);
+        runtime.public_queries.insert(2, query);
+        let authorized = fixture.keys[1].public().to_peer_id();
+        runtime.complete_public(
+            2,
+            authorized,
+            authorized,
+            Some(WireReply::PublicRecords {
+                hits: vec![fixture.hit(packet, vec![])],
+                next: None,
+                truncated: false,
+            }),
+            &config,
+        );
+        assert!(runtime.public_queries[&2].sources.is_empty());
+        assert!(runtime.public_queries[&2].partial);
+        assert_eq!(runtime.public_cache.as_ref().unwrap().metrics().0, 0);
+    }
+    #[tokio::test]
+    async fn public_projection_pages_are_owner_and_current_certificate_scoped() {
+        let (fixture, room) = public_projection_fixture();
+        let mut runtime = fixture.runtime();
+        let config = config::load(&fixture.home).unwrap();
+        let mut swarm = network::build(fixture.keys[0].clone(), &config)
+            .await
+            .unwrap();
+        let scope = util::hash(b"public test scope");
+        let entry = crate::publication::PublicEntry {
+            content: crate::types::Draft {
+                kind: "answer".into(),
+                title: "A public answer".into(),
+                body: "a".repeat(8192),
+                references: vec![],
+            },
+            published_at: util::now(),
+            origin: crate::publication::Origin {
+                message_id: util::hash(b"a public ID"),
+                author: "agent-12345678".into(),
+                reply_to: None,
+                resolution: None,
+            },
+        };
+        let page = PublicPage {
+            owner: format!("uid:7|{scope}"),
+            room: room.clone(),
+            entries: vec![entry; 8],
+            partial: false,
+            omitted: 0,
+            retrieval_started_at: util::now(),
+            observed_at: util::now(),
+            oldest_observation: util::now(),
+            until: Instant::now() + Duration::from_secs(10),
+        };
+        let (response, mut receiver) = tokio::sync::oneshot::channel();
+        runtime.public_page(page, response);
+        let reply = receiver.try_recv().unwrap();
+        let cursor = reply.result["cursor"].as_str().unwrap().to_owned();
+        let request = || Request::KnowledgePublicSnapshot {
+            room: "room".into(),
+            scope: scope.clone(),
+            cursor: Some(cursor.clone()),
+            withdrawn: vec![],
+            reset_withdrawn: false,
+            forget_only: false,
+        };
+        let (response, mut receiver) = tokio::sync::oneshot::channel();
+        runtime.public_command(
+            ipc::Command {
+                owner: "uid:8".into(),
+                request: request(),
+                response,
+            },
+            vec![],
+            &mut swarm,
+        );
+        assert_eq!(receiver.try_recv().unwrap().code, 30);
+        assert!(runtime.public_pages.contains_key(&cursor));
+        let renewed = Fixture::certificate(
+            &fixture.authority,
+            &fixture.keys.iter().collect::<Vec<_>>(),
+            3,
+            true,
+            util::now(),
+        );
+        fixture.install(&renewed);
+        let (response, mut receiver) = tokio::sync::oneshot::channel();
+        runtime.public_command(
+            ipc::Command {
+                owner: "uid:7".into(),
+                request: request(),
+                response,
+            },
+            vec![],
+            &mut swarm,
+        );
+        assert_eq!(receiver.try_recv().unwrap().code, 30);
+        assert!(!runtime.public_pages.contains_key(&cursor));
+    }
+    #[test]
+    fn public_projection_cache_io_failure_is_active_fault_then_clears_after_success() {
+        let (fixture, room) = public_projection_fixture();
+        let config = config::load(&fixture.home).unwrap();
+        let mut runtime = fixture.runtime();
+        let packet =
+            public_projection_record(&fixture, &room, true, "a recoverable cache write failure");
+        let source = kp::Source::Knowledge {
+            hit: Box::new(fixture.hit(packet, vec![])),
+        };
+        assert_eq!(
+            runtime.metrics()["public_projection"]["cache_write_failed"],
+            false
+        );
+        let original = fixture.home.join("public-projection.enc");
+        runtime
+            .public_cache
+            .as_mut()
+            .unwrap()
+            .test_destination(fixture.home.join("absent-parent/cache.enc"));
+        let (mut q, mut receiver) = public_projection_query(&room);
+        q.inflight = 0;
+        Runtime::offer_public(&mut q, source.clone(), util::now(), &config);
+        runtime.finish_public(q, &config);
+        let reply = receiver.try_recv().unwrap();
+        assert_eq!(reply.code, 0);
+        assert_eq!(reply.result["entries"].as_array().unwrap().len(), 1);
+        assert_eq!(reply.result["partial"], true);
+        assert_eq!(
+            runtime.metrics()["public_projection"]["cache_write_failed"],
+            true
+        );
+        runtime
+            .public_cache
+            .as_mut()
+            .unwrap()
+            .test_destination(original);
+        let (mut q, mut receiver) = public_projection_query(&room);
+        q.inflight = 0;
+        Runtime::offer_public(&mut q, source, util::now(), &config);
+        runtime.finish_public(q, &config);
+        assert_eq!(receiver.try_recv().unwrap().code, 0);
+        assert_eq!(
+            runtime.metrics()["public_projection"]["cache_write_failed"],
+            false
+        );
+        assert_eq!(runtime.public_cache.as_ref().unwrap().metrics().0, 1);
     }
 }

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""既存ホストへ専用アカウントのノードだけを導入する。秘密鍵は各ホストで生成。"""
+"""未導入ホストへのbootstrap専用。既存home/serviceは監査済みupgrade手順へ回す。"""
 import argparse
 import base64
 import json
@@ -10,15 +10,18 @@ import shlex
 import subprocess
 import tomllib
 
+from deployment_state import MUTABLE_FILES
+
 ROOT = Path(__file__).resolve().parents[1]
 VERSION = tomllib.loads((ROOT / 'Cargo.toml').read_text())['workspace']['package']['version']
+GUARDED_MUTABLE_FILES = MUTABLE_FILES
 SSH = ['ssh', '-o', 'BatchMode=yes', '-o', 'ConnectTimeout=15']
 
 
 def run(argv, data=None, timeout=90):
     p = subprocess.run(argv, input=data, text=True, capture_output=True, timeout=timeout)
     if p.returncode:
-        raise RuntimeError('ノード導入に失敗: ' + argv[0] + ': ' + p.stderr[-500:])
+        raise RuntimeError('node bootstrap operation failed: ' + argv[0])
     return p.stdout
 
 
@@ -26,6 +29,12 @@ def mac(host, port):
     home = '/Library/Application Support/idobata'
     binary = '/usr/local/lib/idobata/idobata'
     endpoint = '/Library/Caches/idobata-runtime/ipc.sock'
+    run(SSH + [host, "sudo -n python3 -c " + shlex.quote(
+        "import os,subprocess; "
+        "paths=['/Library/Application Support/idobata','/usr/local/lib/idobata/idobata',"
+        "'/Library/LaunchDaemons/com.s21g.idobata.plist']; "
+        "loaded=subprocess.run(['launchctl','print','system/com.s21g.idobata'],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL).returncode==0; "
+        "\nif loaded or any(os.path.lexists(p) for p in paths): raise RuntimeError('existing_installation_requires_guarded_upgrade')")])
     run(SSH + [host, '''set -eu
 if ! id -u _idobata >/dev/null 2>&1; then
   idobata_uid=450
@@ -75,6 +84,11 @@ def linux(binary_source,expected_sha256):
     home = '/var/lib/idobata'
     binary = '/usr/local/lib/idobata/idobata'
     endpoint = '/run/idobata/ipc.sock'
+    run(['sudo','-n','python3','-c',
+         "import os,subprocess; "
+         "paths=['/var/lib/idobata','/usr/local/lib/idobata/idobata','/etc/systemd/system/idobata.service']; "
+         "state=subprocess.run(['systemctl','show','idobata.service','-p','LoadState','--value'],capture_output=True,text=True); "
+         "\nif state.returncode!=0 or state.stdout.strip()!='not-found' or any(os.path.lexists(p) for p in paths): raise RuntimeError('existing_installation_requires_guarded_upgrade')"])
     uid = int(run(['id','-u']).strip()); group = run(['id','-gn']).strip(); gid = int(run(['id','-g']).strip())
     subprocess.run(['sudo','-n','useradd','--system','--user-group','--home-dir',home,'--shell','/usr/sbin/nologin','idobata'],capture_output=True)
     run(['sudo','-n','install','-d','-m','755','/usr/local/lib/idobata'])
@@ -123,7 +137,7 @@ def windows():
 $ErrorActionPreference='Stop';[Console]::OutputEncoding=[System.Text.UTF8Encoding]::new()
 $bin='C:\Program Files\idobata\idobata.exe';$homeDir='C:\ProgramData\idobata'
 $old=Get-ScheduledTask -TaskName 'idobata-node' -ErrorAction SilentlyContinue
-if ($old) {Stop-ScheduledTask -TaskName 'idobata-node';Start-Sleep -Seconds 2}
+if ($old -or (Get-Item -LiteralPath $homeDir -Force -ErrorAction SilentlyContinue) -or (Get-Item -LiteralPath $bin -Force -ErrorAction SilentlyContinue)) {throw 'existing_installation_requires_guarded_upgrade'}
 New-Item -ItemType Directory -Force 'C:\Program Files\idobata',$homeDir | Out-Null
 Copy-Item 'C:\Users\genta\AppData\Local\Temp\idobata-20261031-v1\target\release\idobata.exe' $bin -Force
 

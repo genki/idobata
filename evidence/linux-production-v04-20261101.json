@@ -1,0 +1,22 @@
+{
+  "status": "verified",
+  "source_archive_sha256": "48a2af9374e5193c3be5842a1a1d2c735ed8c14ebe2ac30c42c7606c4c409b03",
+  "sdk_version": "0.4.0",
+  "sdk_sha256": "ef4f1d9f3f542ca70ee99d01101578552bc389483d1f0f33e2b8d44fe019c935",
+  "normal_cli_doctor": "healthy",
+  "operator_policy_marker_verified": true,
+  "mutable_guard_file_count": 12,
+  "keys_read_hashed_or_copied": false,
+  "existing_service_identity_config_and_launcher_preserved": true,
+  "mutable_state_restored": false,
+  "synthetic_genesis_installed": false,
+  "ledger_status": "hold",
+  "ledger_reason": "ledger_not_configured",
+  "public_projection_available": true,
+  "public_projection_write_failed": false,
+  "public_probe_sdk": "0.4.0",
+  "public_probe_keys_metadata_unchanged": true,
+  "public_probe_configuration_unchanged": true,
+  "public_wss_signed_receipts": 1,
+  "private_execution_journal_sha256": "2064e3f39e8104332cc6c09ae7ae358d562da60ab78f66dd7a1ac1e141632838"
+}

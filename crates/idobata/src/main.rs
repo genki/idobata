@@ -32,6 +32,11 @@ struct Cli {
 }
 #[derive(Subcommand)]
 enum Command {
+    /// Explicit private experimental reward ledger; no automatic configuration.
+    Ledger {
+        #[command(subcommand)]
+        command: LedgerCommand,
+    },
     Knowledge {
         #[command(subcommand)]
         command: KnowledgeCommand,
@@ -136,6 +141,100 @@ enum Command {
         limit: usize,
     },
 }
+#[derive(Subcommand)]
+enum LedgerCommand {
+    Status,
+    Balance {
+        #[arg(long)]
+        peer_id: Option<String>,
+    },
+    Questions {
+        #[arg(long, default_value_t = 10)]
+        limit: usize,
+        #[arg(long)]
+        cursor: Option<String>,
+    },
+    Get {
+        #[arg(long)]
+        question: String,
+    },
+    /// JSON QuestionTerms; bounty may be zero. Source/criteria IDs are fetched automatically.
+    Ask {
+        #[arg(long)]
+        stdin: bool,
+    },
+    /// JSON AnswerSubmission; an inspected offline author's answer may be presented by a finder.
+    Answer {
+        #[arg(long)]
+        stdin: bool,
+    },
+    /// JSON operation for advanced callers. Signing and nonce allocation stay inside the daemon.
+    Submit {
+        #[arg(long)]
+        stdin: bool,
+    },
+    /// JSON {question,answer,verdict}; this is separate from knowledge usefulness feedback.
+    Vote {
+        #[arg(long)]
+        stdin: bool,
+    },
+    /// JSON {to_peer_id,amount}; only the daemon's own wallet can authorize spending.
+    Transfer {
+        #[arg(long)]
+        stdin: bool,
+    },
+    Tx {
+        #[arg(long)]
+        id: String,
+    },
+    Blocks {
+        #[arg(long, default_value_t = 1)]
+        from: u64,
+        #[arg(long, default_value_t = 8)]
+        limit: usize,
+    },
+    /// Metadata and authenticated head only; no private state export over agent IPC.
+    Checkpoint,
+    /// Service-owner operation; signs complete fixed-genesis experimental settings.
+    Genesis {
+        #[arg(long)]
+        input: PathBuf,
+        #[arg(long)]
+        validators_file: PathBuf,
+        #[arg(long)]
+        room: String,
+        #[arg(long, default_value_t = 2)]
+        fault_bound: usize,
+        #[arg(long, default_value_t = 3000)]
+        timeout_ms: u64,
+        #[arg(long)]
+        output: PathBuf,
+    },
+    /// Service-owner operation; validates immutable settings against the current private room.
+    Configure {
+        #[arg(long)]
+        settings_file: PathBuf,
+    },
+    /// Service-owner operation; exports the protected signed settings, never secret keys/state.
+    Export {
+        #[arg(long)]
+        output: PathBuf,
+    },
+}
+#[derive(serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+struct LedgerVoteInput {
+    question: String,
+    answer: String,
+    verdict: idobata::ledger::Verdict,
+}
+#[derive(serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+struct LedgerTransferInput {
+    to_peer_id: String,
+    amount: u64,
+}
+
 #[derive(Subcommand)]
 enum KnowledgeCommand {
     Publish {
@@ -523,6 +622,146 @@ async fn execute(cli: Cli) -> Result<i32> {
     let endpoint =
         || resolve_endpoint(cli.socket.as_deref(), &home, home_explicit, shared_endpoint);
     let request = match cli.command {
+        Command::Ledger { command } => match command {
+            LedgerCommand::Status => Request::LedgerStatus,
+            LedgerCommand::Balance { peer_id } => Request::LedgerBalance { peer_id },
+            LedgerCommand::Questions { limit, cursor } => {
+                Request::LedgerQuestions { limit, cursor }
+            }
+            LedgerCommand::Get { question } => Request::LedgerQuestion { id: question },
+            LedgerCommand::Ask { stdin } => Request::LedgerSubmit {
+                operation: idobata::ledger::Operation::RegisterQuestion {
+                    question: stdin_json(stdin)?,
+                },
+            },
+            LedgerCommand::Answer { stdin } => Request::LedgerSubmit {
+                operation: idobata::ledger::Operation::SubmitAnswer {
+                    answer: stdin_json(stdin)?,
+                },
+            },
+            LedgerCommand::Submit { stdin } => Request::LedgerSubmit {
+                operation: stdin_json(stdin)?,
+            },
+            LedgerCommand::Vote { stdin } => {
+                let input: LedgerVoteInput = stdin_json(stdin)?;
+                Request::LedgerVote {
+                    question: input.question,
+                    answer: input.answer,
+                    verdict: input.verdict,
+                }
+            }
+            LedgerCommand::Transfer { stdin } => {
+                let input: LedgerTransferInput = stdin_json(stdin)?;
+                Request::LedgerSubmit {
+                    operation: idobata::ledger::Operation::Transfer {
+                        to_peer_id: input.to_peer_id,
+                        amount: input.amount,
+                    },
+                }
+            }
+            LedgerCommand::Tx { id } => Request::LedgerTransaction { id },
+            LedgerCommand::Blocks { from, limit } => Request::LedgerBlocks { from, limit },
+            LedgerCommand::Checkpoint => Request::LedgerCheckpoint,
+            command => {
+                // Administrative filesystem operations never follow a shared IPC locator.
+                if !home_explicit || cli.socket.is_some() {
+                    return Err(INVALID);
+                }
+                util::protected(&home)?;
+                match command {
+                    LedgerCommand::Genesis {
+                        input,
+                        validators_file,
+                        room,
+                        fault_bound,
+                        timeout_ms,
+                        output,
+                    } => {
+                        if output.exists() || !util::valid_alias(&room) {
+                            return Err(INVALID);
+                        }
+                        let genesis: idobata::ledger::Genesis =
+                            serde_json::from_slice(&util::read_bounded(&input, 65536)?)
+                                .map_err(|_| INVALID)?;
+                        let key = crypto::load_key(&home)?;
+                        let signed = idobata::ledger::sign_genesis(&key, genesis)?;
+                        let authority_peer_id = key.public().to_peer_id().to_string();
+                        let verified =
+                            idobata::ledger::verify_genesis(signed.clone(), &authority_peer_id)?;
+                        let machine = idobata::ledger::Machine::new(verified)?;
+                        let validators: Vec<idobata::ledger_consensus::Validator> =
+                            serde_json::from_slice(&util::read_bounded(&validators_file, 65536)?)
+                                .map_err(|_| INVALID)?;
+                        for validator in &validators {
+                            let participant = signed
+                                .signed
+                                .participants
+                                .get(&validator.peer_id)
+                                .ok_or(INVALID)?;
+                            if participant.public_key != validator.public_key
+                                || participant.operator != validator.operator
+                            {
+                                return Err(INVALID);
+                            }
+                        }
+                        let consensus = idobata::ledger_consensus::sign_genesis(
+                            &key,
+                            idobata::ledger_consensus::Genesis {
+                                version: 1,
+                                chain_id: machine.genesis().chain_id().into(),
+                                application_genesis_hash: machine.genesis().genesis_hash().into(),
+                                initial_application_hash: machine.state_root()?,
+                                validators,
+                                fault_bound,
+                                quorum: fault_bound
+                                    .checked_mul(2)
+                                    .and_then(|n| n.checked_add(1))
+                                    .ok_or(INVALID)?,
+                                timeout_ms,
+                                experiment_only: true,
+                            },
+                        )?;
+                        let settings = idobata::ledger_runtime::Settings {
+                            version: 1,
+                            room_alias: room,
+                            authority_peer_id,
+                            application: signed,
+                            consensus,
+                        };
+                        export(&output, &settings)?;
+                        print(
+                            &json!({"status":"signed","chain_id":machine.genesis().chain_id(),"experiment_only":true,"bootstrap_units":machine.genesis().document().signed.bootstrap_balances.values().sum::<u64>(),"configured":false}),
+                        );
+                    }
+                    LedgerCommand::Configure { settings_file } => {
+                        util::protected(&settings_file)?;
+                        let settings: idobata::ledger_runtime::Settings =
+                            serde_json::from_slice(&util::read_bounded(&settings_file, 131072)?)
+                                .map_err(|_| INVALID)?;
+                        idobata::ledger_runtime::configure(&home, &settings)?;
+                        print(
+                            &json!({"status":"configured","experiment_only":true,"restart_required":true}),
+                        );
+                    }
+                    LedgerCommand::Export { output } => {
+                        if output.exists() {
+                            return Err(INVALID);
+                        }
+                        let input = home.join("ledger-settings.json");
+                        util::protected(&input)?;
+                        let settings: idobata::ledger_runtime::Settings =
+                            serde_json::from_slice(&util::read_bounded(&input, 131072)?)
+                                .map_err(|_| INVALID)?;
+                        export(&output, &settings)?;
+                        print(
+                            &json!({"status":"exported","experiment_only":true,"private_state_exported":false}),
+                        );
+                    }
+                    _ => unreachable!(),
+                }
+                return Ok(0);
+            }
+        },
         Command::Bootstrap { command } => {
             match command {
                 BootstrapCommand::Create {
@@ -767,17 +1006,60 @@ async fn execute(cli: Cli) -> Result<i32> {
                     fs2::FileExt::try_lock_exclusive(&lock).map_err(|_| INVALID)?;
                     let key = crypto::load_key(&home)?;
                     let (mut f, mut w, r, keys) = publication_state(&home, &feed, &key)?;
-                    if let Some(room) = room {
-                        let mut before = None;
+                    let previously_published_ids = f
+                        .posts
+                        .iter()
+                        .map(|p| p.signed.id.clone())
+                        .collect::<std::collections::BTreeSet<_>>();
+                    let mut projection_partial = false;
+                    let mut projection_omitted = 0u64;
+                    let mut projected_ids = std::collections::BTreeSet::new();
+                    let mut projection_scope = None;
+                    if let Some(room) = &room {
+                        let scope = util::hash(&util::canonical(&(
+                            crypto::public(&key),
+                            feed.to_string_lossy(),
+                        ))?);
+                        let socket = endpoint()?;
+                        // Reset to the last committed manifest before synchronizing
+                        // moderation. A failed previous refresh cannot permanently
+                        // blacklist an ID that was never published as withdrawn.
+                        let batches = if w.is_empty() {
+                            vec![&w[..]]
+                        } else {
+                            w.chunks(256).collect::<Vec<_>>()
+                        };
+                        for (index, ids) in batches.into_iter().enumerate() {
+                            let reply = ipc::call(
+                                &socket,
+                                &Request::KnowledgePublicSnapshot {
+                                    room: room.clone(),
+                                    scope: scope.clone(),
+                                    cursor: None,
+                                    withdrawn: ids.to_vec(),
+                                    reset_withdrawn: index == 0,
+                                    forget_only: true,
+                                },
+                            )
+                            .await?;
+                            if reply.code != 0 {
+                                print(&reply.result);
+                                return Ok(reply.code);
+                            }
+                        }
+                        let mut cursor = None;
                         let mut all = Vec::new();
                         let mut cursors = std::collections::BTreeSet::new();
-                        // ID cursorなので、途中に新着があっても既読の境界は変わらない。
                         loop {
                             let result = ipc::call(
-                                &endpoint()?,
-                                &Request::PublicSnapshot {
+                                &socket,
+                                &Request::KnowledgePublicSnapshot {
                                     room: room.clone(),
-                                    before,
+                                    scope: scope.clone(),
+                                    cursor,
+                                    withdrawn: vec![],
+                                    reset_withdrawn: false,
+                                    forget_only: false,
                                 },
                             )
                             .await?;
@@ -788,25 +1070,65 @@ async fn execute(cli: Cli) -> Result<i32> {
                             let entries: Vec<publication::PublicEntry> =
                                 serde_json::from_value(result.result["entries"].clone())
                                     .map_err(|_| INVALID)?;
+                            if all.len().saturating_add(entries.len()) > 50 {
+                                return Err(INVALID);
+                            }
+                            projection_partial |=
+                                result.result["partial"].as_bool().ok_or(INVALID)?;
+                            projection_omitted = projection_omitted
+                                .max(result.result["omitted_oversize"].as_u64().ok_or(INVALID)?);
                             all.extend(entries);
-                            all.truncate(50);
-                            before = result.result["next_before"].as_str().map(str::to_owned);
-                            if all.len() >= 50 || before.is_none() {
+                            cursor = result.result["cursor"].as_str().map(str::to_owned);
+                            if cursor.is_none() {
                                 break;
                             }
-                            if !cursors.insert(before.clone()) {
+                            if !cursors.insert(cursor.clone()) || cursors.len() > 50 {
                                 return Err(INVALID);
                             }
                         }
-                        all.retain(|e| !w.contains(&e.origin.message_id));
-                        publication::import_with_keys(&mut f, &key, all, util::now(), &keys)?;
+                        projected_ids
+                            .extend(all.iter().map(|entry| entry.origin.message_id.clone()));
+                        all.retain(|entry| !w.contains(&entry.origin.message_id));
+                        f = idobata::knowledge_publication::refresh_imported(
+                            f,
+                            &key,
+                            all,
+                            &w,
+                            projection_partial,
+                            util::now(),
+                            &keys,
+                        )?;
+                        projection_scope = Some((room.clone(), scope));
                     }
                     if let Some(id) = withdraw {
-                        if !util::valid_id(&id) {
+                        // ID-shaped user text is not automatically publication
+                        // data. Only already-public or freshly verified projected
+                        // IDs can enter the signed public withdrawal array.
+                        if !util::valid_id(&id)
+                            || (!f.posts.iter().any(|p| p.signed.id == id)
+                                && !w.contains(&id)
+                                && !projected_ids.contains(&id)
+                                && !previously_published_ids.contains(&id))
+                        {
                             return Err(INVALID);
                         }
-                        if !f.posts.iter().any(|p| p.signed.id == id) && !w.contains(&id) {
-                            return Err(INVALID);
+                        if let Some((room, scope)) = projection_scope {
+                            let reply = ipc::call(
+                                &endpoint()?,
+                                &Request::KnowledgePublicSnapshot {
+                                    room,
+                                    scope,
+                                    cursor: None,
+                                    withdrawn: vec![id.clone()],
+                                    reset_withdrawn: false,
+                                    forget_only: true,
+                                },
+                            )
+                            .await?;
+                            if reply.code != 0 {
+                                print(&reply.result);
+                                return Ok(reply.code);
+                            }
                         }
                         f.posts.retain(|p| p.signed.id != id);
                         if !w.contains(&id) {
@@ -824,7 +1146,7 @@ async fn execute(cli: Cli) -> Result<i32> {
                     )?;
                     util::atomic_write(&feed, &util::canonical(&sealed)?)?;
                     print(
-                        &json!({"status":"refreshed","count":sealed.signed.count,"revision":sealed.signed.revision}),
+                        &json!({"status":"refreshed","count":sealed.signed.count,"revision":sealed.signed.revision,"projection_partial":projection_partial,"projection_omitted_oversize":projection_omitted}),
                     );
                 }
             }
@@ -950,7 +1272,8 @@ async fn execute(cli: Cli) -> Result<i32> {
         Command::Doctor => {
             let reply = ipc::call(&endpoint()?, &Request::Info).await?;
             let rooms = reply.result["rooms"].as_array().ok_or(INVALID)?;
-            let ok = rooms.iter().all(|r| r["authorized"] == true);
+            let ok = rooms.iter().all(|r| r["authorized"] == true)
+                && reply.result["ledger"]["status"] != "fault";
             print(
                 &json!({"status":if ok {"healthy"} else {"degraded"},"daemon":reply.result,
                 "checked_at":util::now(),"scope":"local-authorized-configuration","untrusted":false}),
@@ -1099,7 +1422,23 @@ async fn execute(cli: Cli) -> Result<i32> {
             return Ok(reply.code);
         }
     };
-    let reply = ipc::call(&endpoint()?, &request).await?;
+    let ledger_mutation = matches!(
+        &request,
+        Request::LedgerSubmit { .. } | Request::LedgerVote { .. }
+    );
+    let reply = match ipc::call(&endpoint()?, &request).await {
+        Ok(reply) => reply,
+        Err(error) if ledger_mutation => {
+            // A lost response is not evidence that the signed transaction was
+            // never queued or committed. Retrying a transfer with a fresh nonce
+            // can spend twice, so preserve this uncertainty for agent callers.
+            print(
+                &json!({"status":"unknown","error":error.error,"enqueued":null,"finalized":null,"retry_policy":"inspect_ledger_status_recent_submissions_and_wallet_nonce_before_resubmitting","experiment_only":true}),
+            );
+            return Ok(error.code);
+        }
+        Err(error) => return Err(error),
+    };
     print(&reply.result);
     Ok(reply.code)
 }
@@ -1138,6 +1477,70 @@ async fn main() {
 mod tests {
     use super::*;
     use idobata::knowledge::{KnowledgeInput, ReviewInput};
+
+    #[test]
+    fn ledger_agent_commands_accept_shared_ipc_and_json_stdin_without_admin_access() {
+        let operations = [
+            vec!["status"],
+            vec!["balance"],
+            vec!["questions", "--limit", "20"],
+            vec!["get", "--question", "id"],
+            vec!["ask", "--stdin"],
+            vec!["answer", "--stdin"],
+            vec!["vote", "--stdin"],
+            vec!["transfer", "--stdin"],
+            vec!["submit", "--stdin"],
+            vec!["tx", "--id", "id"],
+            vec!["blocks", "--from", "1"],
+            vec!["checkpoint"],
+        ];
+        for operation in operations {
+            let mut args = vec!["idobata", "ledger"];
+            args.extend(operation);
+            args.extend(["--socket", "/run/idobata/ipc.sock", "--json"]);
+            let cli = Cli::try_parse_from(args).unwrap();
+            assert!(matches!(cli.command, Command::Ledger { .. }));
+            assert_eq!(cli.socket.as_deref(), Some("/run/idobata/ipc.sock"));
+        }
+        assert!(
+            serde_json::from_str::<LedgerTransferInput>(
+                r#"{"to_peer_id":"peer","amount":1,"signer":"victim"}"#
+            )
+            .is_err()
+        );
+        assert!(
+            serde_json::from_str::<LedgerVoteInput>(
+                r#"{"question":"q","answer":"a","verdict":"satisfied","useful":true}"#
+            )
+            .is_err()
+        );
+    }
+
+    #[tokio::test]
+    async fn ledger_administration_requires_explicit_home_and_rejects_socket_routing() {
+        let cli = Cli::try_parse_from([
+            "idobata",
+            "ledger",
+            "configure",
+            "--settings-file",
+            "absent",
+        ])
+        .unwrap();
+        assert_eq!(execute(cli).await.unwrap_err().code, 30);
+        let cli = Cli::try_parse_from([
+            "idobata",
+            "--home",
+            "absent",
+            "--socket",
+            "/run/idobata/ipc.sock",
+            "ledger",
+            "export",
+            "--output",
+            "absent-out",
+        ])
+        .unwrap();
+        assert_eq!(execute(cli).await.unwrap_err().code, 30);
+    }
 
     #[test]
     fn knowledge_cli_accepts_all_agent_operations_and_global_endpoint_flags() {

@@ -1,0 +1,108 @@
+{
+  "version": 1,
+  "status": "passed_isolated_acceptance_final_workspace_checks_pending",
+  "scope": "Seven freshly generated synthetic registered operators in separate local production daemons and actual CLI/IPC; four production hosts remain one actual operator and are unchanged.",
+  "artifact_sha256": "a774153abda05a36a1d00caf244a60430143b2e46a5a59b2cd585d4b89f1ce9d",
+  "artifact_mode": "Private pinned debug SDK copy; no mixed executable during run",
+  "body_duration_seconds": 67.66,
+  "phase_labels": [
+    "authorized full-mesh readiness",
+    "three real keeper copies and nonkeeper handoff",
+    "question commit with zero wallet and bounty",
+    "question known before author goes offline",
+    "nonkeeper finder answer commit while original author offline",
+    "three judges observe committed answer before voting",
+    "three satisfaction votes auto settle without a separate settle command",
+    "returning author's authenticated reward sync",
+    "earned unit transfer commit",
+    "finder receives transferred unit"
+  ],
+  "operator_count": 7,
+  "fault_bound": 2,
+  "reward_commit_quorum": 5,
+  "offline_roles": [
+    "asker",
+    "distinct original author"
+  ],
+  "finder_is_nonkeeper": true,
+  "bootstrap_units": 0,
+  "question_bounty": 0,
+  "automatically_minted_units": 1,
+  "final_original_author_balance": 0,
+  "final_finder_balance": 1,
+  "explicit_settlement_command_required": false,
+  "judge_views_before": [
+    {
+      "answer_count": 1,
+      "closed_outcome": null,
+      "deadline_height": 45,
+      "local_height": 6,
+      "node": 3,
+      "question_status": "open",
+      "reply_code": 0,
+      "target_answer_visible": true
+    },
+    {
+      "answer_count": 1,
+      "closed_outcome": null,
+      "deadline_height": 45,
+      "local_height": 6,
+      "node": 4,
+      "question_status": "open",
+      "reply_code": 0,
+      "target_answer_visible": true
+    },
+    {
+      "answer_count": 1,
+      "closed_outcome": null,
+      "deadline_height": 45,
+      "local_height": 6,
+      "node": 5,
+      "question_status": "open",
+      "reply_code": 0,
+      "target_answer_visible": true
+    }
+  ],
+  "judge_views_after": [
+    {
+      "answer_count": 1,
+      "closed_outcome": null,
+      "deadline_height": 45,
+      "local_height": 6,
+      "node": 3,
+      "question_status": "open",
+      "reply_code": 0,
+      "target_answer_visible": true
+    },
+    {
+      "answer_count": 1,
+      "closed_outcome": null,
+      "deadline_height": 45,
+      "local_height": 6,
+      "node": 4,
+      "question_status": "open",
+      "reply_code": 0,
+      "target_answer_visible": true
+    },
+    {
+      "answer_count": 1,
+      "closed_outcome": null,
+      "deadline_height": 45,
+      "local_height": 6,
+      "node": 5,
+      "question_status": "open",
+      "reply_code": 0,
+      "target_answer_visible": true
+    }
+  ],
+  "known_closed_question_would_fail_immediately": true,
+  "missing_wellformed_question_or_answer_returns_hold_without_signing": true,
+  "previous_fullsuite_vote_failure_exact_state_not_captured": true,
+  "previous_failure_retrospective_cause": "Unconfirmed; this run showed open questions at height6/deadline45 and all answers visible. Explicit visibility dependency prevents missing-input races, while known expiry remains an immediate failure.",
+  "product_timers_and_acceptance_assertions_relaxed": false,
+  "production_mutations": false,
+  "log_sha256": "b7f0b98cbc563e85bc8614d3868d3059fbd5c1c697f17e919d644f166d06e935",
+  "fixture_source_sha256": "706d82233b92c85ccf2e6b8b71f790249b95d9df7746ce874d515c11b9b62035",
+  "cleanup_mode": "Fixture Drop kills and waits for all generated daemon processes and TempDir removes all synthetic homes/keys.",
+  "remaining": "Parent final same-source fmt/strict clippy/full workspace and optimized stress checks; native builds await common source and explicit GO."
+}

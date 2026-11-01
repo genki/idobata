@@ -9,6 +9,8 @@ import shlex
 import subprocess
 import tempfile
 
+from deployment_state import assert_cli_targets
+
 ROOT = Path(__file__).resolve().parents[1]
 INVENTORY = Path('/home/vagrant/.local/state/idobata/nodes.json')
 
@@ -40,6 +42,7 @@ with tempfile.TemporaryDirectory(prefix='idobata-agent-cli-') as temporary:
  src.write_text(source)
  run([compiler,'--edition=2024','-C','opt-level=s','-C','strip=symbols','-D','warnings',str(src),'-o',str(binary)])
  target=pathlib.Path('/usr/local/bin/idobata')
+ if str(target) not in payload['allowed_targets'] or str(target)+'.new' not in payload['allowed_targets']:raise RuntimeError('cli_target_outside_launcher_scope')
  if target.exists() or target.is_symlink():
   if target.is_symlink() or not target.is_file():raise RuntimeError('existing CLI entry is not managed')
   data=target.read_bytes()
@@ -88,6 +91,7 @@ print(json.dumps({'status':'installed','cli':'/usr/local/bin/idobata','profile_u
 
 def install_unix(node, source):
     label = node['label']
+    assert_cli_targets(node['platform'], ['/usr/local/bin/idobata', '/usr/local/bin/idobata.new'])
     if node['platform'] == 'linux':
         with tempfile.TemporaryDirectory(prefix='idobata-agent-cli-') as temporary:
             binary = Path(temporary)/'idobata'
@@ -102,12 +106,16 @@ def install_unix(node, source):
                 raise RuntimeError('CLI transfer checksum mismatch')
             run(['sudo','-n','mv',str(target)+'.new',str(target)])
         return {'host':label,'status':'installed','cli':str(target),'daemon_restarted':False}
-    payload={'source':source,'source_sha256':hashlib.sha256(source.encode()).hexdigest()}
+    payload={'source':source,'source_sha256':hashlib.sha256(source.encode()).hexdigest(),
+             'allowed_targets':['/usr/local/bin/idobata','/usr/local/bin/idobata.new']}
     result=run(['ssh','-o','BatchMode=yes',node['ssh'],'python3 -c '+shlex.quote(UNIX_REMOTE)],json.dumps(payload))
     return {'host':label,**json.loads(result)}
 
 
 def install_windows(node, source):
+    assert_cli_targets('windows', ['C:/Program Files/idobata/bin/idobata.exe',
+                                   'C:/Program Files/idobata/bin/idobata.new.exe',
+                                   'C:/Program Files/idobata/agent.socket'])
     import base64
     # 内容は公開されたRust sourceとIPCアドレスだけ。秘密鍵・tokenを渡さない。
     remote_source='C:/Users/genta/AppData/Local/Temp/idobata-agent-cli-source.rs'
@@ -117,6 +125,8 @@ def install_windows(node, source):
     script=r'''
 $ErrorActionPreference='Stop';$ProgressPreference='SilentlyContinue';[Console]::OutputEncoding=[Text.UTF8Encoding]::new()
 $root='C:\Program Files\idobata';$bin=Join-Path $root 'bin';$target=Join-Path $bin 'idobata.exe'
+$allowed=@('C:\Program Files\idobata\bin\idobata.exe','C:\Program Files\idobata\bin\idobata.new.exe','C:\Program Files\idobata\agent.socket')
+foreach($path in @($target,(Join-Path $bin 'idobata.new.exe'),(Join-Path $root 'agent.socket'))){if($allowed -notcontains $path){throw 'cli_target_outside_launcher_scope'}}
 $compiler='C:\Program Files\Rust stable LLVM 1.96\bin\rustc.exe'
 $temporary=Join-Path ([IO.Path]::GetTempPath()) ('idobata-agent-cli-'+[Guid]::NewGuid().ToString('N'))
 New-Item -ItemType Directory -Path $temporary | Out-Null

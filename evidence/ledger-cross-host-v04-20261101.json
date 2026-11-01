@@ -1,0 +1,119 @@
+{
+  "version": 1,
+  "test": "real-four-host-synthetic-seven-operator-ledger",
+  "started_at": "2026-11-01T07:40:15Z",
+  "status": "passed",
+  "checks": {
+    "fixture_guards": {
+      "expanded_temporary_nodes": 7,
+      "physical_hosts": 4,
+      "directed_routes_checked": 42,
+      "rejected_unsafe_inventories": 3,
+      "body_free_diagnostic_projection": true
+    },
+    "verified_native_artifacts": [
+      {
+        "physical_host_index": 0,
+        "platform": "linux",
+        "sha256": "ef4f1d9f3f542ca70ee99d01101578552bc389483d1f0f33e2b8d44fe019c935"
+      },
+      {
+        "physical_host_index": 1,
+        "platform": "macos",
+        "sha256": "4685daf4672b7254c266c71930130360438b0297be137adccb458b4cd91a9e4e"
+      },
+      {
+        "physical_host_index": 2,
+        "platform": "windows",
+        "sha256": "30a03ab8a6b46157fe1db0adfd5496925da7e3173356bedcf6c1069b6d615344"
+      },
+      {
+        "physical_host_index": 3,
+        "platform": "macos",
+        "sha256": "4685daf4672b7254c266c71930130360438b0297be137adccb458b4cd91a9e4e"
+      }
+    ],
+    "distinct_private_fixture_identities": 7,
+    "fixed_f2_seven_validator_zero_bootstrap_genesis": true,
+    "authorized_full_mesh_seven_nodes": {
+      "passed": true,
+      "elapsed_seconds": 5.79
+    },
+    "published_reference_candidates": 4,
+    "three_keeper_copies_without_finder_copy": {
+      "passed": true,
+      "elapsed_seconds": 2.843
+    },
+    "same_epoch_question_window": {
+      "passed": true,
+      "elapsed_seconds": 0.008
+    },
+    "zero_wallet_zero_bounty_question_committed": {
+      "passed": true,
+      "elapsed_seconds": 2.631
+    },
+    "question_known_by_future_five_live_validators": {
+      "passed": true,
+      "elapsed_seconds": 2.248
+    },
+    "nonkeeper_finder_answer_committed_with_exactly_five_live_nodes": {
+      "passed": true,
+      "elapsed_seconds": 4.766
+    },
+    "answer_visible_to_all_three_judges": {
+      "passed": true,
+      "elapsed_seconds": 1.9
+    },
+    "three_satisfaction_votes_auto_settle": {
+      "passed": true,
+      "elapsed_seconds": 5.969
+    },
+    "automatic_reward": {
+      "minted_units": 1,
+      "offline_author_units": 1,
+      "finder_units": 0,
+      "commit_votes": 5,
+      "live_nodes": 5,
+      "judge_operators": 3
+    },
+    "returning_author_recovers_earned_unit": {
+      "passed": true,
+      "elapsed_seconds": 3.011
+    },
+    "earned_unit_transfer_committed": {
+      "passed": true,
+      "elapsed_seconds": 4.868
+    },
+    "finder_receives_transferred_unit": {
+      "passed": true,
+      "elapsed_seconds": 0.393
+    },
+    "final_balances_and_supply": {
+      "original_author": 0,
+      "finder": 1,
+      "total_minted": 1
+    }
+  },
+  "production_services_changed": false,
+  "source_archive_sha256": "48a2af9374e5193c3be5842a1a1d2c735ed8c14ebe2ac30c42c7606c4c409b03",
+  "source_provenance": "manager_build_evidence_label_not_cli_attestation",
+  "physical_host_count": 4,
+  "native_platform_count": 3,
+  "actual_operator_count": 1,
+  "synthetic_operator_count": 7,
+  "independent_production_operators_proven": false,
+  "genesis": {
+    "experiment_only": true,
+    "fault_bound": 2,
+    "quorum": 5,
+    "timeout_ms": 3000,
+    "bootstrap_units": 0,
+    "question_bounty": 0
+  },
+  "unchanged_native_artifact_count": 4,
+  "cleanup_errors": [],
+  "cleanup_error_count": 0,
+  "private_fixture_keys_removed": true,
+  "removed_fixture_home_count": 7,
+  "finished_at": "2026-11-01T07:41:56Z"
+}

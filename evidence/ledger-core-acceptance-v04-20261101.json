@@ -1,0 +1,115 @@
+{
+  "version": 1,
+  "status": "passed_isolated_acceptance_final_workspace_checks_pending",
+  "scope": "Seven freshly generated synthetic registered operators in separate local production-daemon processes and actual CLI/IPC. No production state, real identities, or live currency issuance.",
+  "actual_production_operator_count": 1,
+  "actual_production_hosts": 4,
+  "production_mutations": false,
+  "sdk_version": "0.4.0",
+  "scanner_version": "0.3.0",
+  "fixture": {
+    "operators": 7,
+    "fault_bound": 2,
+    "commit_quorum": 5,
+    "question_bounty": 0,
+    "bootstrap_units": 0,
+    "question_fee": 0,
+    "minimum_system_reward": 1,
+    "epoch_blocks": 100,
+    "epoch_mint_cap": 32,
+    "operator_attempts_per_epoch": 8,
+    "operator_active_questions": 4,
+    "operator_lifetime_metadata_bytes": 262144
+  },
+  "artifact_sha256": "58d5503c343535e883b9b4972863953604f8b8a3c8c924ad105ee9e90d98e812",
+  "artifact_mode": "Pinned private copy of the compiled debug SDK used for every daemon and CLI launch in this run; final release artifact is built separately from frozen common source.",
+  "phases": [
+    "authorized full-mesh readiness",
+    "three real keeper copies and nonkeeper handoff",
+    "question commit with zero wallet and bounty",
+    "question known before author goes offline",
+    "nonkeeper finder answer commit while original author offline",
+    "three satisfaction votes auto settle without a separate settle command",
+    "returning author's authenticated reward sync",
+    "earned unit transfer commit",
+    "finder receives transferred unit"
+  ],
+  "body_duration_seconds": 41.2,
+  "assertions": {
+    "all_seven_zero_initial_wallets": true,
+    "all_seven_full_mesh_connections": true,
+    "three_actual_keeper_copies_per_reference": true,
+    "finder_not_keeper_of_any_required_reference": true,
+    "question_committed_with_zero_bounty_and_zero_balance": true,
+    "distinct_asker_and_original_author_processes_offline_before_answer": true,
+    "finder_uses_ids_only_and_broker_fetches_signed_knowledge": true,
+    "three_external_satisfaction_judges": true,
+    "no_explicit_settlement_transaction_or_manual_payout": true,
+    "reward_block_exactly_five_of_seven_commit_votes": true,
+    "minted_one_to_original_author_not_finder": true,
+    "returning_original_author_recovers_via_certified_sync": true,
+    "earned_one_unit_transfer_confirmed": true,
+    "final_total_minted_one": true,
+    "assertions_and_product_deadlines_unchanged": true
+  },
+  "focused_history": [
+    {
+      "name": "application_core",
+      "passed": 15,
+      "ignored": 1,
+      "log_sha256": "7d6dff60136a85bb6882f9e48aecc8358f462982f8356a2e6a98273ce0dbcad4",
+      "note": "Focused development history; final same-source full workspace checks follow."
+    },
+    {
+      "name": "signature_cache",
+      "passed": 3,
+      "ignored": 0,
+      "log_sha256": "1b80c116c5dd0f87a02b22afc831746f159e16a0a420e834ed3d1d0319155426",
+      "note": "Focused development history; final same-source full workspace checks follow."
+    },
+    {
+      "name": "ledger_ipc",
+      "passed": 4,
+      "ignored": 0,
+      "log_sha256": "60ed9768ebe88b277537b0dfcdb33d7a9463f452746bd1ac311bd56864e8dac8",
+      "note": "Focused development history; final same-source full workspace checks follow."
+    },
+    {
+      "name": "cli_unit",
+      "passed": 2,
+      "ignored": 0,
+      "log_sha256": "21f97ada48b08a44ee364c375e3fd3abd122d429b73fe1da1b89bf14f314794b",
+      "note": "Focused development history; final same-source full workspace checks follow."
+    },
+    {
+      "name": "actual_cli",
+      "passed": 2,
+      "ignored": 0,
+      "log_sha256": "f0c79adcbf44f6bff5fb44a2669346ed9513eeb494e20daca4d3113346c53c92",
+      "note": "Focused development history; final same-source full workspace checks follow."
+    }
+  ],
+  "cleanup_mode": "Fixture Drop kills and waits for every generated daemon child, then TempDir removes all synthetic home/key directories. No production service is stopped or reconfigured.",
+  "log_sha256": "c4222f48b4bc809286293755581cf10fd3b49477afc47d95439628f015ed43b1",
+  "source_after_formatting": {
+    "Cargo.toml": "c02c4be5dc83af8d32424a40eb09993e595cd55baf8cc32a1b5b5ad63aeba11e",
+    "Cargo.lock": "71b2d87883f027fe64e23747cacc29540fd088ac3062130d2eb80dd3b267842c",
+    "crates/scanner/Cargo.toml": "a3c73c8cb3d1c658d5a41c1fd68ce29d658cc8fedc6672341bae28bc52faac3f",
+    "crates/idobata/src/lib.rs": "7d7ca07d1326d0f9cc876e8274fff89624b64459e1b3e5a6ab46e5787f140824",
+    "crates/idobata/src/ledger.rs": "4e7bb2df3c32fa874476e563adc05dd7cfa172dad038e5ede3b6a96806d456f9",
+    "crates/idobata/src/ledger_tests.rs": "af7d3558ba2737dc1c22ccbb67ca6c1a990bfa282c7bb68e5a0e2f85a5c8cb4f",
+    "crates/idobata/src/crypto.rs": "d08fd0b2292084d16b4459b1068582d08899d00219ad079e9f2051f9e1227b69",
+    "crates/idobata/src/main.rs": "b30a829bde21c3e6a87f2133facd21b8aaba6a60ca83fb9ce832e7959f642b3d",
+    "crates/idobata/src/types.rs": "fb3c4629cc7300934e321c619803d16c1fda9efd16cb3e2f67e249812fcdcc8d",
+    "crates/idobata/src/daemon.rs": "4c94ffd89b2a99d7d250dddd54fe58313b04b7541770a805148c199dfa147a00",
+    "crates/idobata/tests/ledger_cli.rs": "058a9b1ddb2be9fd6e103bb288eca2dad9d8d48a5242b64bf787a40ef9fb37b3",
+    "crates/idobata/tests/ledger_acceptance.rs": "139cacac2ada77fe3c4d7734eae1b53826c84e515a7fc6748d702fe2763568d2"
+  },
+  "scanner_wasm_sha256": "e765bdca9f335bed3c26c2dee1bce39e9eb652e2af2552945c1818934d88e4fd",
+  "limitations": [
+    "Registered operator independence and honest semantic judgment are assumptions, not established by this synthetic test.",
+    "Pure application tests do not alone prove BFT; this acceptance exercises separate consensus/runtime transport and quorum paths.",
+    "Default lifetime metadata quota also limits honest operators; used-source tombstones are not expired to regain mint eligibility.",
+    "Final full workspace checks and optimized stress tests are still pending; no release/native/prod claim is made here."
+  ]
+}

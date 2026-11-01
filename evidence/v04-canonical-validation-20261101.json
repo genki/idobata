@@ -1,0 +1,32 @@
+{
+  "version": "0.4.0",
+  "source_archive_sha256": "48a2af9374e5193c3be5842a1a1d2c735ed8c14ebe2ac30c42c7606c4c409b03",
+  "source_tree_sha256": "bdb86fb42aeca8716147d627c15bd21560f1cd66badbf5dcee36a6ffc0282735",
+  "core_compiled_tree_sha256": "d3831ac1fd58ba95d54f413c1d5e1102550d6de5d0b46d0a98eca49938412385",
+  "source_file_count": 62,
+  "default_workspace": {
+    "passed": 268,
+    "failed": 0,
+    "ignored": 4,
+    "log_sha256": "90aa2a87e6a8d32c6679c1c3a1de59a4f20d409cd8e29b56b5d18e88e6c2430c"
+  },
+  "optimized_explicit_stress": {
+    "passed": 4,
+    "failed": 0,
+    "log_sha256": "968240d87a1f85001fa8f54eea075c92bf50e2e3deaf7cb3ac44dda77c448b21"
+  },
+  "strict_clippy": {
+    "passed": true,
+    "all_workspace_targets": true,
+    "warnings_are_errors": true,
+    "log_sha256": "500530fb51597a26a7d231aac7172e2cd8a2b2f9276ed21641f7535831842b14"
+  },
+  "native_binary_sha256": {
+    "idobata-linux-x86_64": "ef4f1d9f3f542ca70ee99d01101578552bc389483d1f0f33e2b8d44fe019c935",
+    "idobata-macos-arm64": "4685daf4672b7254c266c71930130360438b0297be137adccb458b4cd91a9e4e",
+    "idobata-windows-x86_64.exe": "30a03ab8a6b46157fe1db0adfd5496925da7e3173356bedcf6c1069b6d615344"
+  },
+  "scanner_wasm_sha256": "e765bdca9f335bed3c26c2dee1bce39e9eb652e2af2552945c1818934d88e4fd",
+  "scanner_version": "0.3.0",
+  "synthetic_operators_are_not_independent_production_operators": true
+}

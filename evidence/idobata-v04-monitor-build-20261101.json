@@ -1,0 +1,44 @@
+{
+  "version": 1,
+  "checked_at": 1793512332,
+  "full_machina_build": true,
+  "server_tests": {
+    "passed": 1171,
+    "failed": 0
+  },
+  "focused_tests": {
+    "python_watcher": 15,
+    "moon_monitor": 23
+  },
+  "revisions": {
+    "dist/revision.json": 7470,
+    "public/revision.json": 7470
+  },
+  "bundle_checks": {
+    "public_row": true,
+    "ledger_row": true,
+    "active_write_failure": true,
+    "v04": true
+  },
+  "owned_sources": {
+    "server/internal/idobata-monitor.mjs": "cf460b66bf5a8096e14823da3f6bb0e8067b4ea24fea2cad3016d5aac74223f1",
+    "tests/idobata-monitor.test.mjs": "11b63b244a959b78fcd384fea7965d22919c0038636873311561ada6e7f8be8f"
+  },
+  "foreign_files": 92,
+  "foreign_unchanged": true,
+  "deployed": false,
+  "artifact": {
+    "sha256": "18d912f7089e7935baaa81eca91e0aa3a23117aacb70539ec044ed0b7cab04d5",
+    "bytes": 179927461
+  },
+  "scope": "preparation only; v03 services and observation history unchanged",
+  "watcher_sources": {
+    "scripts/watch-cluster.py": "a978ff61b241c0781cf4a062e2b43e212ee7c55fba13631448129f0253287c67",
+    "scripts/test-watch-cluster.py": "ced5b37a6c067668ea61aeec9ce4d0825f45623550df6dd52882aaea1efc513b"
+  },
+  "watcher_series": "v04",
+  "legacy_series_preserved": [
+    "v02",
+    "v03"
+  ]
+}

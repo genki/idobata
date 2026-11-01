@@ -1,0 +1,55 @@
+{
+  "version": 1,
+  "status": "passed",
+  "mode": "single serial optimized ignored test executable; no concurrent deadline-sensitive fixture",
+  "command": "cargo test -p idobata --lib --release --locked -- --ignored --test-threads=1 --nocapture",
+  "passed": 4,
+  "failed": 0,
+  "body_seconds": 28.13,
+  "release_compile_seconds": 226,
+  "product_limits_or_timers_relaxed": false,
+  "ledger_quota": {
+    "closed_question_tombstones": 256,
+    "operator_lifetime_charge_bytes": [
+      262144,
+      262144
+    ],
+    "state_bytes": 229896,
+    "transfer_ms": 26.917,
+    "setup_seconds": 21.774,
+    "quota_probe_uses_fresh_epoch": 16,
+    "attacker_epoch_attempts_before_probe": 0,
+    "exact_rejection": "ledger_operator_state_quota",
+    "honest_active_question_preserved_after_transfer": true,
+    "fix_scope": "fixture only: avoid exhausted epoch15 attempt allowance shadowing the lifetime quota"
+  },
+  "knowledge_quota": {
+    "records": 631,
+    "operator_bytes": [
+      2094217,
+      2094217
+    ],
+    "normal_search_ms": 133.038973,
+    "explore_search_ms": 137.485132,
+    "rejected_admission_ms": 346.572874
+  },
+  "public_projection": {
+    "aggregate_bytes": 1097076,
+    "full_review_packets_retained": 31,
+    "maximum_automation_proof_bytes": 16146,
+    "maximum_allowed_proof_bytes": 16384,
+    "fix_scope": "fixture only: keep certificates/proofs inside unchanged wire limits"
+  },
+  "durable_large_signed_store_seconds": 0.574,
+  "log_sha256": "88384493a9fc9d7dba15fcaa137bd6b367e5e052fa5471afa1296dafbfa02d7a",
+  "release_test_executable_sha256": "9f789d3520f9fb07482553d6f48969fd7a68fc4c001a400c63074bb30f53de47",
+  "source_sha256": {
+    "crates/idobata/src/ledger.rs": "4e7bb2df3c32fa874476e563adc05dd7cfa172dad038e5ede3b6a96806d456f9",
+    "crates/idobata/src/ledger_tests.rs": "be0139fdff82c042d5a33a92cd32dfe5da10cdaec0cfa23aa0c3bfe68128fea4",
+    "crates/idobata/src/crypto.rs": "d08fd0b2292084d16b4459b1068582d08899d00219ad079e9f2051f9e1227b69",
+    "crates/idobata/src/daemon.rs": "4b7c31e8eec60fc792658a4a5d1c547569c33065cc1f7799e4b1c39f427e7fdf",
+    "crates/idobata/src/knowledge_publication.rs": "a45d36c984835ac64653df440f8cb41f8276a84cf293961e3f830828e2c75275",
+    "crates/idobata/src/ledger_runtime.rs": "e82f3a9d2a09f9fec68a30d340cf9abcafc615636674978ce679d6e6f3304767"
+  },
+  "production_mutations": false
+}

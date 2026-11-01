@@ -9,7 +9,7 @@ use crate::{
     util,
 };
 use fs2::FileExt;
-use futures::StreamExt;
+use futures::{FutureExt, StreamExt, future::BoxFuture, stream::FuturesUnordered};
 use libp2p::{
     PeerId, identity,
     request_response::{self, Message, OutboundRequestId},
@@ -98,6 +98,48 @@ impl Context {
         crypto::validate_draft(draft)?;
         self.scanner.scan(draft, redact)
     }
+    fn public_sources(&self, alias: &str) -> Result<Vec<crate::knowledge_publication::Source>> {
+        let config = config::load(&self.home)?;
+        let room = self.room(&config, alias)?;
+        if !room.certificate.signed.public {
+            return Err(INVALID);
+        }
+        let mut sources = Vec::new();
+        let mut groups = BTreeMap::new();
+        for item in self.state.inbox.iter().rev() {
+            let Some(cert) = &item.certificate else {
+                continue;
+            };
+            if cert.certificate.signed.room_id != room.certificate.signed.room_id
+                || !cert.certificate.signed.public
+            {
+                continue;
+            }
+            let envelope: Envelope = serde_json::from_slice(&item.wire).map_err(|_| STORAGE)?;
+            if !envelope.payload.options.public {
+                continue;
+            }
+            let group = crate::knowledge::resource_group(
+                &room,
+                &envelope.payload.sender_peer_id,
+                &config.knowledge_operator_history,
+            );
+            let count = groups.entry(group).or_insert(0);
+            if *count >= 4 {
+                continue;
+            }
+            *count += 1;
+            sources.push(crate::knowledge_publication::Source::Legacy {
+                envelope: Box::new(envelope),
+                certificate: Box::new(cert.clone()),
+                received_at: item.received_at,
+            });
+            if sources.len() >= 16 {
+                break;
+            }
+        }
+        Ok(sources)
+    }
     fn blocked(&mut self, report: Report) -> Reply {
         self.state.rejected_count = self.state.rejected_count.saturating_add(1);
         let _ = self.storage.save(&self.state);
@@ -111,11 +153,21 @@ impl Context {
     fn handle(&mut self, owner: &str, request: Request, connections: usize) -> Result<Reply> {
         let c = config::load(&self.home)?;
         match request {
-            Request::KnowledgePublish { .. }
+            Request::LedgerStatus
+            | Request::LedgerBalance { .. }
+            | Request::LedgerQuestions { .. }
+            | Request::LedgerQuestion { .. }
+            | Request::LedgerSubmit { .. }
+            | Request::LedgerVote { .. }
+            | Request::LedgerTransaction { .. }
+            | Request::LedgerBlocks { .. }
+            | Request::LedgerCheckpoint
+            | Request::KnowledgePublish { .. }
             | Request::KnowledgeSearch { .. }
             | Request::KnowledgeGet { .. }
             | Request::KnowledgeEvaluate { .. }
             | Request::KnowledgePeers { .. }
+            | Request::KnowledgePublicSnapshot { .. }
             | Request::KnowledgeStatus { .. } => Err(INVALID),
             Request::Info => Ok(Reply::new(
                 0,
@@ -786,6 +838,244 @@ fn poll_delivery(
     }
     Ok(())
 }
+// Agent requests remain on the same authenticated IPC connection while the
+// existing bounded knowledge queries fetch proofs. Never await here: doing so
+// would stop the swarm that must deliver those query responses.
+enum LedgerIntent {
+    Submit(crate::ledger::Operation),
+    Vote {
+        question: String,
+        answer: String,
+        verdict: crate::ledger::Verdict,
+    },
+}
+struct PendingLedger {
+    intent: LedgerIntent,
+    response: tokio::sync::oneshot::Sender<Reply>,
+    remaining: usize,
+    deadline: Instant,
+}
+#[derive(Default)]
+struct LedgerBroker {
+    next: u64,
+    pending: BTreeMap<u64, PendingLedger>,
+    replies: FuturesUnordered<BoxFuture<'static, (u64, Reply)>>,
+}
+fn ledger_reply(result: Result<serde_json::Value>) -> Reply {
+    match result {
+        Ok(value) => {
+            let code = match value["status"].as_str() {
+                Some(
+                    "pending" | "hold" | "unknown" | "pruned" | "expired_or_replaced" | "not_found",
+                ) => 10,
+                Some("fault") => 30,
+                _ => 0,
+            };
+            Reply::new(code, value)
+        }
+        Err(e) => Reply::new(
+            e.code,
+            json!({"status":if e.code==10 {"hold"}else{"failed"},"error":e.error,"finalized":false,"experiment_only":true}),
+        ),
+    }
+}
+fn ledger_handles(request: &Request) -> bool {
+    matches!(
+        request,
+        Request::LedgerStatus
+            | Request::LedgerBalance { .. }
+            | Request::LedgerQuestions { .. }
+            | Request::LedgerQuestion { .. }
+            | Request::LedgerSubmit { .. }
+            | Request::LedgerVote { .. }
+            | Request::LedgerTransaction { .. }
+            | Request::LedgerBlocks { .. }
+            | Request::LedgerCheckpoint
+    )
+}
+fn ledger_mutation_reply(result: Result<serde_json::Value>) -> Reply {
+    match result {
+        Err(error) if error.code == STORAGE.code && error.error == STORAGE.error => Reply::new(
+            error.code,
+            json!({"status":"unknown","error":error.error,"enqueued":null,"finalized":null,"retry_policy":"inspect_ledger_status_recent_submissions_and_wallet_nonce_before_resubmitting","experiment_only":true}),
+        ),
+        result => ledger_reply(result),
+    }
+}
+fn apply_ledger_intent(
+    intent: LedgerIntent,
+    ledger: &mut crate::ledger_runtime::Runtime,
+    knowledge: &crate::knowledge_runtime::Runtime,
+) -> Reply {
+    ledger_mutation_reply(match intent {
+        LedgerIntent::Submit(operation) => ledger.submit_from_knowledge(operation, knowledge),
+        LedgerIntent::Vote {
+            question,
+            answer,
+            verdict,
+        } => ledger.cast_vote_from_knowledge(&question, &answer, verdict, knowledge),
+    })
+}
+impl LedgerBroker {
+    fn command(
+        &mut self,
+        command: ipc::Command,
+        ledger: &mut crate::ledger_runtime::Runtime,
+        knowledge: &mut crate::knowledge_runtime::Runtime,
+        swarm: &mut libp2p::Swarm<network::Behaviour>,
+    ) {
+        let ipc::Command {
+            owner,
+            request,
+            response,
+        } = command;
+        let intent = match request {
+            Request::LedgerSubmit { operation } => LedgerIntent::Submit(operation),
+            Request::LedgerVote {
+                question,
+                answer,
+                verdict,
+            } => LedgerIntent::Vote {
+                question,
+                answer,
+                verdict,
+            },
+            request => {
+                let result = match request {
+                    Request::LedgerStatus => Ok(ledger.status()),
+                    Request::LedgerBalance { peer_id } => ledger.balance(peer_id.as_deref()),
+                    Request::LedgerQuestions { limit, cursor } => {
+                        ledger.questions(limit, cursor.as_deref())
+                    }
+                    Request::LedgerQuestion { id } => ledger.question(&id),
+                    Request::LedgerTransaction { id } => ledger.transaction(&id),
+                    Request::LedgerBlocks { from, limit } => ledger.blocks(from, limit),
+                    Request::LedgerCheckpoint => ledger.checkpoint(),
+                    _ => Err(INVALID),
+                };
+                let _ = response.send(ledger_reply(result));
+                return;
+            }
+        };
+        let required = match &intent {
+            LedgerIntent::Submit(operation) => ledger.required_records(operation),
+            LedgerIntent::Vote {
+                question, answer, ..
+            } => ledger.required_vote_records(question, answer),
+        };
+        let ids = match required {
+            Ok(ids) if ids.len() <= 3 => ids,
+            Ok(_) => {
+                let _ = response.send(ledger_reply(Err(INVALID)));
+                return;
+            }
+            Err(e) => {
+                let _ = response.send(ledger_reply(Err(e)));
+                return;
+            }
+        };
+        if ids.is_empty() {
+            let _ = response.send(apply_ledger_intent(intent, ledger, knowledge));
+            return;
+        }
+        if self.pending.len() >= 8 || self.replies.len().saturating_add(ids.len()) > 24 {
+            let _ = response.send(ledger_reply(Err(Error::new(
+                10,
+                "ledger_reference_queue_full",
+            ))));
+            return;
+        }
+        let Some(room) = ledger.room_alias().map(str::to_owned) else {
+            let _ = response.send(ledger_reply(Err(Error::new(10, "ledger_not_configured"))));
+            return;
+        };
+        let Some(id) = self.next.checked_add(1) else {
+            let _ = response.send(ledger_reply(Err(STORAGE)));
+            return;
+        };
+        self.next = id;
+        self.pending.insert(
+            id,
+            PendingLedger {
+                intent,
+                response,
+                remaining: ids.len(),
+                deadline: Instant::now() + Duration::from_secs(8),
+            },
+        );
+        for record in ids {
+            let (response, rx) = tokio::sync::oneshot::channel();
+            knowledge.command(
+                ipc::Command {
+                    owner: owner.clone(),
+                    request: Request::KnowledgeGet {
+                        room: room.clone(),
+                        id: record,
+                    },
+                    response,
+                },
+                swarm,
+            );
+            self.replies.push(
+                async move {
+                    (
+                        id,
+                        rx.await
+                            .unwrap_or_else(|_| Reply::new(40, json!({"status":"failed"}))),
+                    )
+                }
+                .boxed(),
+            );
+        }
+    }
+    fn completed(
+        &mut self,
+        id: u64,
+        reply: Reply,
+        ledger: &mut crate::ledger_runtime::Runtime,
+        knowledge: &crate::knowledge_runtime::Runtime,
+    ) {
+        let Some(job) = self.pending.get_mut(&id) else {
+            return;
+        };
+        if reply.code != 0 || job.deadline <= Instant::now() || job.response.is_closed() {
+            if let Some(job) = self.pending.remove(&id) {
+                let _ = job.response.send(ledger_reply(Err(Error::new(
+                    10,
+                    "ledger_reference_unavailable",
+                ))));
+            }
+            return;
+        }
+        job.remaining -= 1;
+        if job.remaining == 0 {
+            let job = self
+                .pending
+                .remove(&id)
+                .expect("pending job was just found");
+            let _ = job
+                .response
+                .send(apply_ledger_intent(job.intent, ledger, knowledge));
+        }
+    }
+    fn expire(&mut self) {
+        let expired = self
+            .pending
+            .iter()
+            .filter(|(_, job)| job.deadline <= Instant::now() || job.response.is_closed())
+            .map(|(id, _)| *id)
+            .collect::<Vec<_>>();
+        for id in expired {
+            if let Some(job) = self.pending.remove(&id) {
+                let _ = job.response.send(ledger_reply(Err(Error::new(
+                    10,
+                    "ledger_reference_deadline",
+                ))));
+            }
+        }
+    }
+}
+
 pub async fn run(home: &Path) -> Result<()> {
     util::disable_core_dumps();
     let c = config::load(home)?;
@@ -814,6 +1104,8 @@ pub async fn run(home: &Path) -> Result<()> {
     };
     network::refresh(&mut swarm, &c, &mut delivery.allowed, &own);
     let mut knowledge = crate::knowledge_runtime::Runtime::open(home, key.clone())?;
+    let mut ledger = crate::ledger_runtime::Runtime::open(home, key.clone())?;
+    let mut ledger_broker = LedgerBroker::default();
     let mut ctx = Context {
         home: home.into(),
         key,
@@ -859,21 +1151,31 @@ pub async fn run(home: &Path) -> Result<()> {
             _=&mut shutdown=>break,
             result=&mut ipc_task=>{return result.map_err(|_|STORAGE)?},
             Some(command)=rx.recv()=>{
-                if crate::knowledge_runtime::Runtime::handles(&command.request) {
+                if ledger_handles(&command.request) {
+                    ledger_broker.command(command,&mut ledger,&mut knowledge,&mut swarm);
+                } else if let Request::KnowledgePublicSnapshot {room,cursor,forget_only,..}=&command.request {
+                    let legacy=if cursor.is_none() && !forget_only {ctx.public_sources(room)}else{Ok(vec![])};
+                    match legacy {
+                        Ok(legacy)=>knowledge.public_command(command,legacy,&mut swarm),
+                        Err(e)=>{let _=command.response.send(Reply::new(e.code,json!({"status":"failed","error":e.error})));}
+                    }
+                } else if crate::knowledge_runtime::Runtime::handles(&command.request) {
                     knowledge.command(command,&mut swarm);
                 } else {
                     let info=matches!(&command.request,Request::Info);
                     let reply=ctx.handle(&command.owner,command.request,swarm.connected_peers().count());
                     let mut reply=reply.unwrap_or_else(|e|Reply::new(e.code,json!({"status":"failed","error":e.error,"enqueued":false})));
-                    if info {reply.result["knowledge"]=knowledge.metrics();}
+                    if info {reply.result["knowledge"]=knowledge.metrics();reply.result["ledger"]=ledger.status();}
                     let _=command.response.send(reply);
                 }
             },
             event=swarm.select_next_some()=>match event {
                 SwarmEvent::Behaviour(BehaviourEvent::Knowledge(event))=>knowledge.event(event,&mut swarm),
+                SwarmEvent::Behaviour(BehaviourEvent::Ledger(event))=>ledger.event(event,&mut swarm),
                 event=>transport_event(&mut ctx,&mut swarm,&mut delivery,event)?,
             },
-            _=interval.tick()=>{poll_delivery(&mut ctx,&mut swarm,&mut delivery)?;knowledge.poll(&mut swarm);},
+            Some((id,reply))=ledger_broker.replies.next(), if !ledger_broker.replies.is_empty()=>ledger_broker.completed(id,reply,&mut ledger,&knowledge),
+            _=interval.tick()=>{poll_delivery(&mut ctx,&mut swarm,&mut delivery)?;knowledge.poll(&mut swarm);ledger.poll(&mut swarm,&knowledge);ledger_broker.expire();},
         }
     }
     ipc_task.abort();
@@ -935,5 +1237,111 @@ mod authorization_display_tests {
             &other.public().to_peer_id().to_string(),
             &crypto::public(&other)
         ));
+    }
+}
+
+#[cfg(test)]
+mod ledger_ipc_tests {
+    use super::*;
+
+    #[test]
+    fn pending_and_unknown_ledger_results_are_not_reported_as_final_success() {
+        for status in [
+            "hold",
+            "pending",
+            "unknown",
+            "pruned",
+            "expired_or_replaced",
+            "not_found",
+        ] {
+            assert_eq!(ledger_reply(Ok(json!({"status":status}))).code, 10);
+        }
+        assert_eq!(ledger_reply(Ok(json!({"status":"confirmed"}))).code, 0);
+        assert_eq!(ledger_reply(Ok(json!({"status":"fault"}))).code, 30);
+        let denied = ledger_reply(Err(Error::new(10, "ledger_reference_unavailable")));
+        assert_eq!(denied.result["finalized"], false);
+    }
+
+    #[test]
+    fn storage_error_after_mutation_does_not_claim_transaction_absence() {
+        // atomic rename may have succeeded before parent-directory fsync failed;
+        // the protected pending transaction can reappear during recovery.
+        let reply = ledger_mutation_reply(Err(STORAGE));
+        assert_eq!(reply.code, 22);
+        assert_eq!(reply.result["status"], "unknown");
+        assert!(reply.result["enqueued"].is_null());
+        assert!(reply.result["finalized"].is_null());
+        assert!(
+            reply.result["retry_policy"]
+                .as_str()
+                .unwrap()
+                .contains("recent_submissions")
+        );
+        assert_eq!(
+            ledger_mutation_reply(Err(INVALID)).result["status"],
+            "failed"
+        );
+        assert_eq!(
+            ledger_mutation_reply(Err(SCANNER)).result["status"],
+            "failed"
+        );
+        assert_eq!(
+            ledger_mutation_reply(Err(Error::new(22, "knowledge_content_rejected"))).result["status"],
+            "failed"
+        );
+    }
+
+    #[test]
+    fn expired_reference_job_cannot_submit_and_late_completion_is_ignored() {
+        let temporary = tempfile::tempdir().unwrap();
+        let home = temporary.path().join("node");
+        config::init(&home, vec!["/ip4/127.0.0.1/tcp/34000".into()]).unwrap();
+        let key = crypto::load_key(&home).unwrap();
+        let mut ledger = crate::ledger_runtime::Runtime::open(&home, key.clone()).unwrap();
+        let knowledge = crate::knowledge_runtime::Runtime::open(&home, key).unwrap();
+        let (response, mut receiver) = tokio::sync::oneshot::channel();
+        let mut broker = LedgerBroker::default();
+        broker.pending.insert(
+            1,
+            PendingLedger {
+                intent: LedgerIntent::Submit(crate::ledger::Operation::Transfer {
+                    to_peer_id: "unused".into(),
+                    amount: 1,
+                }),
+                response,
+                remaining: 1,
+                deadline: Instant::now() - Duration::from_secs(1),
+            },
+        );
+        broker.expire();
+        assert!(broker.pending.is_empty());
+        assert_eq!(
+            receiver.try_recv().unwrap().result["error"],
+            "ledger_reference_deadline"
+        );
+        broker.completed(
+            1,
+            Reply::new(0, json!({"status":"found"})),
+            &mut ledger,
+            &knowledge,
+        );
+        assert_eq!(ledger.status()["reason"], "ledger_not_configured");
+        assert!(!home.join("ledger-runtime.enc").exists());
+    }
+
+    #[test]
+    fn corrupt_ledger_configuration_is_a_visible_isolated_fault() {
+        let temporary = tempfile::tempdir().unwrap();
+        let home = temporary.path().join("node");
+        config::init(&home, vec!["/ip4/127.0.0.1/tcp/34000".into()]).unwrap();
+        util::atomic_write(&home.join("ledger-settings.json"), b"not-json").unwrap();
+        let key = crypto::load_key(&home).unwrap();
+        let ledger = crate::ledger_runtime::Runtime::open(&home, key.clone()).unwrap();
+        assert_eq!(ledger.status()["status"], "fault");
+        assert!(crate::knowledge_runtime::Runtime::open(&home, key).is_ok());
+        assert_eq!(
+            std::fs::read(home.join("ledger-settings.json")).unwrap(),
+            b"not-json"
+        );
     }
 }

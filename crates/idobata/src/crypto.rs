@@ -5,7 +5,12 @@ use crate::{
 };
 use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD as B64};
 use libp2p::{Multiaddr, PeerId, identity, multiaddr::Protocol};
-use std::{collections::BTreeSet, path::Path};
+use sha2::{Digest, Sha256};
+use std::{
+    collections::{BTreeSet, VecDeque},
+    path::Path,
+    sync::{Mutex, OnceLock},
+};
 pub const MAX_WIRE: usize = 16384;
 pub fn encode(b: &[u8]) -> String {
     B64.encode(b)
@@ -29,6 +34,61 @@ pub fn sign<T: serde::Serialize>(
     bytes.extend(util::canonical(value)?);
     key.sign(&bytes).map(|s| encode(&s)).map_err(|_| INVALID)
 }
+const MAX_VERIFIED_SIGNATURES: usize = 2048;
+#[derive(Default)]
+struct SignatureCache {
+    verified: BTreeSet<[u8; 32]>,
+    order: VecDeque<[u8; 32]>,
+}
+impl SignatureCache {
+    fn remember(&mut self, fingerprint: [u8; 32]) {
+        if self.verified.contains(&fingerprint) {
+            return;
+        }
+        while self.verified.len() >= MAX_VERIFIED_SIGNATURES {
+            if let Some(old) = self.order.pop_front() {
+                self.verified.remove(&old);
+            }
+        }
+        self.verified.insert(fingerprint);
+        self.order.push_back(fingerprint);
+    }
+}
+fn signature_fingerprint(key: &identity::PublicKey, bytes: &[u8], signature: &[u8]) -> [u8; 32] {
+    let public = key.encode_protobuf();
+    let mut hash = Sha256::new();
+    hash.update(b"idobata.verified-signature-cache.v1\0");
+    for part in [public.as_slice(), bytes, signature] {
+        hash.update((part.len() as u64).to_be_bytes());
+        hash.update(part);
+    }
+    hash.finalize().into()
+}
+fn verify_signature_cached(
+    key: &identity::PublicKey,
+    bytes: &[u8],
+    signature: &[u8],
+    cache: &Mutex<SignatureCache>,
+) -> Result<()> {
+    let fingerprint = signature_fingerprint(key, bytes, signature);
+    if cache
+        .lock()
+        .ok()
+        .is_some_and(|c| c.verified.contains(&fingerprint))
+    {
+        return Ok(());
+    }
+    if !key.verify(bytes, signature) {
+        return Err(INVALID);
+    }
+    // Pure signature validity is timeless. Authorization, membership, policy,
+    // expiry and admission checks belong to callers and are never cached here.
+    // A poisoned performance cache falls back to the complete signature check.
+    if let Ok(mut cache) = cache.lock() {
+        cache.remember(fingerprint);
+    }
+    Ok(())
+}
 pub fn verify<T: serde::Serialize>(
     key: &identity::PublicKey,
     domain: &str,
@@ -38,10 +98,14 @@ pub fn verify<T: serde::Serialize>(
     let mut bytes = domain.as_bytes().to_vec();
     bytes.push(0);
     bytes.extend(util::canonical(value)?);
-    if !key.verify(&bytes, &decode(sig)?) {
-        return Err(INVALID);
-    }
-    Ok(())
+    let signature = decode(sig)?;
+    static VERIFIED: OnceLock<Mutex<SignatureCache>> = OnceLock::new();
+    verify_signature_cached(
+        key,
+        &bytes,
+        &signature,
+        VERIFIED.get_or_init(Default::default),
+    )
 }
 pub fn load_key(home: &Path) -> Result<identity::Keypair> {
     let p = home.join("identity.key");
@@ -262,4 +326,115 @@ pub fn new_envelope_with_options(
         return Err(INVALID);
     }
     Ok(env)
+}
+
+#[cfg(test)]
+mod signature_cache_tests {
+    use super::*;
+    use serde_json::json;
+
+    fn signed_bytes(domain: &str, value: &serde_json::Value) -> Vec<u8> {
+        let mut bytes = domain.as_bytes().to_vec();
+        bytes.push(0);
+        bytes.extend(util::canonical(value).unwrap());
+        bytes
+    }
+    #[test]
+    fn verified_cache_separates_public_key_domain_message_and_signature_and_never_remembers_invalid()
+     {
+        let key = identity::Keypair::generate_ed25519();
+        let other = identity::Keypair::generate_ed25519();
+        let value = json!({"amount":1,"nonce":1});
+        let domain = "idobata.ledger.transaction.v1";
+        let bytes = signed_bytes(domain, &value);
+        let signature = decode(&sign(&key, domain, &value).unwrap()).unwrap();
+        let cache = Mutex::new(SignatureCache::default());
+        let mut changed_signature = signature.clone();
+        changed_signature[0] ^= 1;
+        assert!(
+            verify_signature_cached(&key.public(), &bytes, &changed_signature, &cache).is_err()
+        );
+        assert!(cache.lock().unwrap().verified.is_empty());
+        verify_signature_cached(&key.public(), &bytes, &signature, &cache).unwrap();
+        verify_signature_cached(&key.public(), &bytes, &signature, &cache).unwrap();
+        assert_eq!(cache.lock().unwrap().verified.len(), 1);
+        for (public, bytes, signature) in [
+            (other.public(), bytes.clone(), signature.clone()),
+            (
+                key.public(),
+                signed_bytes("idobata.ledger.acceptance-vote.v1", &value),
+                signature.clone(),
+            ),
+            (
+                key.public(),
+                signed_bytes(domain, &json!({"amount":2,"nonce":1})),
+                signature.clone(),
+            ),
+            (key.public(), bytes.clone(), changed_signature),
+        ] {
+            assert!(verify_signature_cached(&public, &bytes, &signature, &cache).is_err());
+            assert_eq!(cache.lock().unwrap().verified.len(), 1);
+        }
+    }
+    #[test]
+    fn signature_cache_has_fixed_capacity_and_poison_cannot_change_signature_validity() {
+        let mut cache = SignatureCache::default();
+        for n in 0..MAX_VERIFIED_SIGNATURES + 17 {
+            cache.remember(Sha256::digest(n.to_be_bytes()).into());
+        }
+        assert_eq!(cache.verified.len(), MAX_VERIFIED_SIGNATURES);
+        assert_eq!(cache.order.len(), MAX_VERIFIED_SIGNATURES);
+        let oldest: [u8; 32] = Sha256::digest(0usize.to_be_bytes()).into();
+        let newest: [u8; 32] = Sha256::digest((MAX_VERIFIED_SIGNATURES + 16).to_be_bytes()).into();
+        assert!(!cache.verified.contains(&oldest));
+        assert!(cache.verified.contains(&newest));
+        let cache = Mutex::new(cache);
+        let _ = std::panic::catch_unwind(|| {
+            let _guard = cache.lock().unwrap();
+            panic!("synthetic cache poison");
+        });
+        let key = identity::Keypair::generate_ed25519();
+        let bytes = b"complete domain-separated test bytes";
+        let signature = key.sign(bytes).unwrap();
+        verify_signature_cached(&key.public(), bytes, &signature, &cache).unwrap();
+        assert!(
+            verify_signature_cached(&key.public(), b"different bytes", &signature, &cache).is_err()
+        );
+    }
+    #[test]
+    fn cached_room_signature_never_bypasses_expiry_or_policy_or_changed_certificate() {
+        let key = identity::Keypair::generate_ed25519();
+        let now = util::now();
+        let signed = Room {
+            version: 1,
+            room_id: util::random_id(),
+            epoch: 1,
+            issued_at: now,
+            expires_at: now + 60,
+            policy_id: crate::scanner::Scanner::policy_id(),
+            members: vec![Member {
+                peer_id: key.public().to_peer_id().to_string(),
+                public_key: public(&key),
+                addresses: vec![],
+            }],
+            public: false,
+            knowledge_automation_required: false,
+            knowledge_operators: None,
+        };
+        let mut room = TrustedRoom {
+            authority_peer_id: key.public().to_peer_id().to_string(),
+            certificate: Signed {
+                signature: sign(&key, "idobata.room.v1", &signed).unwrap(),
+                public_key: public(&key),
+                signed,
+            },
+        };
+        let policy = crate::scanner::Scanner::policy_id();
+        validate_room(&room, &policy, now).unwrap();
+        validate_room(&room, &policy, now).unwrap();
+        assert!(validate_room(&room, &policy, now + 60).is_err());
+        assert!(validate_room(&room, "different-policy", now).is_err());
+        room.certificate.signed.epoch += 1;
+        assert!(validate_room(&room, &policy, now).is_err());
+    }
 }

@@ -1,0 +1,77 @@
+{
+  "version": 1,
+  "date": "2026-11-01",
+  "status": "passed",
+  "scope": "isolated local Runtime/Noise integration; four real OS processes, synthetic operator registrations",
+  "command": "cargo test --offline --locked -p idobata --test ledger_network four_process -- --nocapture",
+  "elapsed_seconds": 53.48,
+  "validators": 4,
+  "synthetic_operators": 4,
+  "fault_bound": 1,
+  "commit_quorum": 3,
+  "physical_hosts": 1,
+  "independent_real_operators_established": false,
+  "production_homes_or_keys_used": false,
+  "production_currency_issued": false,
+  "checks": [
+    {
+      "case": "four_online",
+      "initial_balances": [
+        10,
+        10
+      ],
+      "transfer": 1,
+      "final_balances": [
+        9,
+        11
+      ],
+      "passed": true
+    },
+    {
+      "case": "one_validator_stopped",
+      "online": 3,
+      "transfer": 1,
+      "final_balances": [
+        8,
+        12
+      ],
+      "passed": true
+    },
+    {
+      "case": "restart_sync",
+      "check": "restarted process authenticates historical transaction through certified sequential sync",
+      "passed": true
+    },
+    {
+      "case": "minority_partition",
+      "online": 2,
+      "hold_observed_seconds": 6,
+      "pending_transfer": 1,
+      "balances_unchanged": [
+        8,
+        12
+      ],
+      "passed": true
+    },
+    {
+      "case": "quorum_reconnected",
+      "online": 3,
+      "final_balances": [
+        7,
+        13
+      ],
+      "passed": true
+    }
+  ],
+  "limits": {
+    "wire_bytes": 1048576,
+    "concurrent_requests": 4,
+    "per_peer_pending": 1
+  },
+  "notes": [
+    "This is a closed test with explicit bootstrap balances; it does not establish independent production operators.",
+    "Product daemon/CLI reward acceptance and native cross-host execution are separate acceptance stages.",
+    "This successful run precedes the later immutable-validation performance optimization; final combined validation must rerun the test."
+  ],
+  "test_executable_sha256": "83bf85be5b63970622581f2f4a846b2eaec82d8931aa818d530578affc69f333"
+}

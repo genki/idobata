@@ -1,0 +1,79 @@
+{
+  "version": 1,
+  "scope": "isolated generated test identities; no production state or issuance",
+  "status": "failed_not_adopted",
+  "phase": "question_commit_before_any_node_stopped",
+  "operators": 7,
+  "configured_fault_bound": 2,
+  "commit_quorum": 5,
+  "bootstrap_units": 0,
+  "question_bounty": 0,
+  "full_mesh_ready": true,
+  "knowledge_three_replica_handoff_ready": true,
+  "finder_excluded_from_all_reference_keeper_sets": true,
+  "application_heights": [
+    2,
+    2,
+    2,
+    2,
+    2,
+    2,
+    2
+  ],
+  "consensus_height": 3,
+  "consensus_round": 2,
+  "prevotes": [
+    6,
+    4,
+    6,
+    3,
+    6,
+    6,
+    5
+  ],
+  "precommits": [
+    2,
+    1,
+    1,
+    1,
+    2,
+    0,
+    0
+  ],
+  "queued_requests": [
+    22,
+    18,
+    23,
+    17,
+    35,
+    16,
+    23
+  ],
+  "pending_requests": [
+    4,
+    4,
+    4,
+    4,
+    4,
+    4,
+    4
+  ],
+  "last_commit_age_seconds": [
+    29,
+    30,
+    31,
+    30,
+    30,
+    31,
+    33
+  ],
+  "balances_and_minted_remained_zero": true,
+  "runtime_fault_observed": false,
+  "double_vote_evidence_observed": false,
+  "body_duration_seconds": 57.78,
+  "assertions_or_product_deadlines_relaxed": false,
+  "log_sha256": "01fc23d4e5e8d8dae2055ad8516c976d3c8fd66ab35d22676284a1fd7e144fc5",
+  "artifact_sha256": "not_recorded_at_start; development source was not frozen",
+  "cleanup": "fixture Drop kills and waits for all generated child processes and removes temporary home/key directories",
+  "next": "Runtime owner classifies seven-node control-message liveness; rerun unchanged acceptance assertions after fixes"
+}

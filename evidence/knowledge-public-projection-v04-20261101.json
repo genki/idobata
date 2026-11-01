@@ -1,0 +1,85 @@
+{
+  "version": 1,
+  "scope": "local implementation acceptance; no production deployment",
+  "sdk_version": "0.4.0",
+  "checked_at": 1793515504,
+  "owned_sources": {
+    "crates/idobata/src/knowledge_publication.rs": "a45d36c984835ac64653df440f8cb41f8276a84cf293961e3f830828e2c75275",
+    "crates/idobata/src/knowledge_runtime.rs": "ac9a3bc2e7e1d67994c56dd084aa1a9671a49df29b974b0ee4982379afbd7668",
+    "crates/idobata/tests/knowledge_publication.rs": "ba3fa16f7d6b854fd0232c1e2f8c066ca6e67b5e3443c75d19ff34817ce16bb4",
+    "docs/public-knowledge.md": "4a15f116873fde41ae353bd7a9654b7da90c015fc83ba05e4620b94d3d63fbf1"
+  },
+  "tests": {
+    "module_passed": 12,
+    "runtime_boundary_passed": 4,
+    "actual_daemon_and_cli_passed": 1,
+    "unique_normal_passed": 17,
+    "large_full_proof_quota_stress": "passed_combined_serial_release_run",
+    "actual_daemon_cli_elapsed_seconds": 15.69,
+    "bare_host_privacy_regression_elapsed_seconds": 0.26,
+    "large_full_proof_quota_measurements": {
+      "aggregate_bytes": 1097076,
+      "complete_review_packets": 31,
+      "maximum_automation_proof_bytes": 16146,
+      "automation_proof_limit_bytes": 16384,
+      "cache_owner_limit_bytes": 1048576,
+      "combined_release_stress_passed": 4,
+      "combined_release_stress_failed": 0,
+      "combined_release_stress_elapsed_seconds": 28.13
+    },
+    "stress_fixture_correction": {
+      "scope": "test_only",
+      "reason": "room_certificate_did_not_fit_existing_automation_packet_bound",
+      "member_addresses": 2,
+      "operator_label_bytes": 47,
+      "product_limits_changed": false,
+      "reviews_dropped": false
+    }
+  },
+  "fixture": {
+    "os_processes": 1,
+    "daemon_instances": 4,
+    "real_remote_hosts": 0,
+    "operator_groups": 1,
+    "publisher_is_keeper": false,
+    "extra_keeper_replica_created": false
+  },
+  "verified": [
+    "active_cache_write_io_fault_and_success_recovery",
+    "author_and_review_signature_and_admission",
+    "bare_private_host_port_case_and_trailing_dot",
+    "current_authorization_and_epoch_scoped_pages",
+    "double_public_permission",
+    "full_problem_solution_conditions_or_explicit_omission",
+    "future_source_waits_for_local_clock",
+    "known_omitted_automatic_id_withdrawable",
+    "legacy_and_knowledge_shared_unknown_slots",
+    "legacy_manifest_signature_and_size_compatibility",
+    "manual_origin_not_forgeable_by_p2p_text",
+    "nonkeeper_distributed_retrieval",
+    "partial_fetch_preserves_verified_cache",
+    "per_owner_cache_fairness",
+    "private_routing_identifiers_excluded",
+    "public_permission_and_room_removal_purge",
+    "public_url_path_not_misclassified_as_private_hostname",
+    "remote_scores_not_trusted",
+    "source_cache_encrypted_distinct_aad",
+    "source_observation_time_not_advanced_by_cache_reuse",
+    "thirty_day_public_window",
+    "unknown_withdrawal_does_not_change_manifest",
+    "withdrawal_removes_cached_projection"
+  ],
+  "limits": {
+    "feed_posts": 50,
+    "feed_bytes": 262144,
+    "cache_bytes_global": 4194304,
+    "cache_bytes_per_owner": 1048576,
+    "cache_sources_global": 256,
+    "cache_sources_per_owner": 64,
+    "cache_slots_global": 16,
+    "cache_slots_per_owner": 4
+  },
+  "full_workspace_fmt_clippy": "pending_combined_check",
+  "production_changed": false,
+  "native_rebuilt": false
+}

@@ -1,6 +1,32 @@
 # 現在の検証状況
 
-全構想の完全実装には至っていない。v0.4の[残タスクと完了条件](implementation-status.md)を別に追跡する。
+実装・実機検証・公開配布・長時間観測は、[段階別の完了条件](implementation-status.md)で区別する。
+
+## v0.4の実装と実機検証（2026-11-01）
+
+固定ソース `48a2af9374e5193c3be5842a1a1d2c735ed8c14ebe2ac30c42c7606c4c409b03` を
+3OSでビルドし、常設4台をSDK 0.4へ更新した。公開配布・監視の最終反映は別途記録する。
+
+- 整形、全workspace・全targetの厳格Clippy、通常268試験、最適化した容量境界4試験が成功した。
+  [固定ソースと検査結果](../evidence/v04-canonical-validation-20261101.json)にログとバイナリのSHAを記録した。
+- 実4ホスト・3OSの7合成operatorで、R3からの非keeper取得、質問者・元著者の停止、
+  3判定者の票、残り5ノードのQC5による最低1単位の自動発行、元著者復帰・同期・送金を確認した。
+  [18検査の結果](../evidence/ledger-cross-host-v04-20261101.json)ではcleanupエラー0、一時homeと鍵7件を削除済み。
+- 分断・再接続、二重署名、lock/POL、タイムアウトと証明の再送、保存失敗、checkpointと最低anchor、
+  署名履歴欠落時の停止を検証した。待機票の証明は空block確定後・再起動後も保持する。
+  不正本文のcode22拒否は依頼内で処理し、本当の保存障害で台帳を停止する。
+- 容量試験は、2敵対operatorの保存枠を満たした後も正常主体の質問と送金が継続すること、
+  約1.09MBの合法な公開証明を31件の評価を省かず投影できることを確認した。
+- [Linux](../evidence/linux-production-v04-20261101.json)、
+  [Mac 2台](../evidence/macos-production-upgrade-v04-20261101.json)、
+  [Windows](../evidence/windows-production-v04-20261101.json)で、鍵・設定・サービス実行主体を保全した。
+  通常PATHのDoctorはhealthy、公開キャッシュは正常、本番の台帳は未設定Holdである。
+
+実運営主体は1者であり、合成7者の試験を独立した本番7者の証明としない。
+固定genesisの私的実験用台帳であり、形式的なBFT安全性証明や公開参加のSybil防御の証明を主張しない。
+OS自体の再起動・スリープと72時間観測は、実施済みのdaemon再起動・分断試験から区別する。
+
+## v0.3の履歴
 
 2026-11-01に、監視のOK/NG往復の修正、operator単位の結託対策、常設4台への反映とv0.3.0の公開を完了した。
 webshはcommit `8e9c535791d2a7c22368b991c6c95d0fe0059ef7`を通常手順で配備し、client/server/publicは7466。

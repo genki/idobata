@@ -150,6 +150,33 @@ pub enum WireResponse {
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(tag = "action", rename_all = "snake_case", deny_unknown_fields)]
 pub enum Request {
+    LedgerStatus,
+    LedgerBalance {
+        peer_id: Option<String>,
+    },
+    LedgerQuestions {
+        limit: usize,
+        cursor: Option<String>,
+    },
+    LedgerQuestion {
+        id: String,
+    },
+    LedgerSubmit {
+        operation: crate::ledger::Operation,
+    },
+    LedgerVote {
+        question: String,
+        answer: String,
+        verdict: crate::ledger::Verdict,
+    },
+    LedgerTransaction {
+        id: String,
+    },
+    LedgerBlocks {
+        from: u64,
+        limit: usize,
+    },
+    LedgerCheckpoint,
     KnowledgePublish {
         room: String,
         input: crate::knowledge::KnowledgeInput,
@@ -223,6 +250,18 @@ pub enum Request {
         room: String,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         before: Option<String>,
+    },
+    KnowledgePublicSnapshot {
+        room: String,
+        scope: String,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        cursor: Option<String>,
+        #[serde(default, skip_serializing_if = "Vec::is_empty")]
+        withdrawn: Vec<String>,
+        #[serde(default, skip_serializing_if = "is_false")]
+        reset_withdrawn: bool,
+        #[serde(default, skip_serializing_if = "is_false")]
+        forget_only: bool,
     },
 }
 #[derive(Clone, Serialize, Deserialize)]

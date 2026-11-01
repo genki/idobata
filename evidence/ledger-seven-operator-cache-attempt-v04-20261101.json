@@ -1,0 +1,215 @@
+{
+  "version": 1,
+  "scope": "isolated synthetic test identities; no production state or issuance",
+  "status": "failed_not_adopted",
+  "phase": "question_commit_before_any_node_stopped",
+  "artifact_sha256": "6bc01bd2a1c20f9cc138e2f553af81c8734dd33478ecd66fb196ee1291a23275",
+  "operators": 7,
+  "configured_fault_bound": 2,
+  "commit_quorum": 5,
+  "bootstrap_units": 0,
+  "question_bounty": 0,
+  "full_mesh_ready": true,
+  "knowledge_three_replica_handoff_ready": true,
+  "finder_excluded_from_all_reference_keeper_sets": true,
+  "application_heights": [
+    2,
+    2,
+    2,
+    2,
+    2,
+    2,
+    2
+  ],
+  "consensus_rounds": [
+    2,
+    2,
+    2,
+    2,
+    2,
+    2,
+    2
+  ],
+  "prevotes": [
+    1,
+    1,
+    1,
+    1,
+    3,
+    1,
+    1
+  ],
+  "precommits": [
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0
+  ],
+  "queued_requests": [
+    11,
+    13,
+    14,
+    24,
+    16,
+    16,
+    11
+  ],
+  "pending_requests": [
+    4,
+    0,
+    4,
+    3,
+    4,
+    4,
+    4
+  ],
+  "record_checks": [
+    32,
+    34,
+    44,
+    46,
+    38,
+    36,
+    34
+  ],
+  "record_cache_hits": [
+    28,
+    32,
+    42,
+    44,
+    36,
+    34,
+    32
+  ],
+  "record_total_us": [
+    789434,
+    253989,
+    374975,
+    510365,
+    429882,
+    334463,
+    411642
+  ],
+  "timing": {
+    "incoming": [
+      {
+        "count": 102,
+        "max_us": 1806765,
+        "total_us": 12959966
+      },
+      {
+        "count": 113,
+        "max_us": 1228576,
+        "total_us": 16982403
+      },
+      {
+        "count": 107,
+        "max_us": 1382719,
+        "total_us": 18103375
+      },
+      {
+        "count": 103,
+        "max_us": 3159691,
+        "total_us": 21870669
+      },
+      {
+        "count": 102,
+        "max_us": 2303733,
+        "total_us": 18781904
+      },
+      {
+        "count": 92,
+        "max_us": 2798671,
+        "total_us": 18127885
+      },
+      {
+        "count": 88,
+        "max_us": 1848757,
+        "total_us": 19270292
+      }
+    ],
+    "drive": [
+      {
+        "count": 156,
+        "max_us": 802326,
+        "total_us": 13404823
+      },
+      {
+        "count": 158,
+        "max_us": 1431242,
+        "total_us": 14324136
+      },
+      {
+        "count": 158,
+        "max_us": 1848318,
+        "total_us": 14068757
+      },
+      {
+        "count": 141,
+        "max_us": 1169186,
+        "total_us": 10874049
+      },
+      {
+        "count": 164,
+        "max_us": 848687,
+        "total_us": 12822497
+      },
+      {
+        "count": 161,
+        "max_us": 944549,
+        "total_us": 12213713
+      },
+      {
+        "count": 163,
+        "max_us": 1490635,
+        "total_us": 11634236
+      }
+    ],
+    "response": [
+      {
+        "count": 103,
+        "max_us": 7255069,
+        "total_us": 125747517
+      },
+      {
+        "count": 120,
+        "max_us": 9447934,
+        "total_us": 119429871
+      },
+      {
+        "count": 107,
+        "max_us": 6570689,
+        "total_us": 112273942
+      },
+      {
+        "count": 82,
+        "max_us": 10194522,
+        "total_us": 117951884
+      },
+      {
+        "count": 100,
+        "max_us": 7206008,
+        "total_us": 126284855
+      },
+      {
+        "count": 99,
+        "max_us": 6862749,
+        "total_us": 119640630
+      },
+      {
+        "count": 84,
+        "max_us": 8968663,
+        "total_us": 116502648
+      }
+    ]
+  },
+  "balances_and_minted_remained_zero": true,
+  "body_duration_seconds": 49.07,
+  "assertions_or_product_deadlines_relaxed": false,
+  "log_sha256": "0cb1dcf28aa0db96af5d067eca7a6c8ae8d2dc66c0a6698e036df2fcc59d89ee",
+  "cleanup_mode": "fixture Drop kills and waits for generated child processes and removes temporary home/key directories",
+  "classification": "immutable record validation work reduced; remaining gross incoming/drive processing still delays control-message progress; exact remaining cause under investigation"
+}

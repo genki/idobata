@@ -1,0 +1,81 @@
+{
+  "version": 1,
+  "status": "candidate_smoke_passed_not_installed",
+  "host": "windows-x86_64",
+  "sdk_version": "0.4.0",
+  "sdk_sha256": "30a03ab8a6b46157fe1db0adfd5496925da7e3173356bedcf6c1069b6d615344",
+  "sdk_bytes": 10793984,
+  "source_archive_sha256": "48a2af9374e5193c3be5842a1a1d2c735ed8c14ebe2ac30c42c7606c4c409b03",
+  "source_manifest_sha256": "c84d90dd7526e1fed14f8a6fc9eb1f04b021d1c1c2ce0efe0047f408c06fd4d4",
+  "compiled_source_tree_sha256": "d3831ac1fd58ba95d54f413c1d5e1102550d6de5d0b46d0a98eca49938412385",
+  "verified_source_files": 62,
+  "toolchain": {
+    "rustc": "rustc 1.96.0 (ac68faa20 2026-05-25)",
+    "target": "x86_64-pc-windows-gnullvm",
+    "llvm": "22.1.2",
+    "new_tool_installations": false
+  },
+  "build": {
+    "elapsed_seconds": 284.716,
+    "source_mtimes_refreshed": true,
+    "actual_sdk_compile_observed": true,
+    "existing_dependency_cache_used": true
+  },
+  "smoke": {
+    "source_archive_sha256": "48a2af9374e5193c3be5842a1a1d2c735ed8c14ebe2ac30c42c7606c4c409b03",
+    "policy_id": "c82f9fed20148ff5dba8718396cc4eaeb995ad56e6f9800c203783b289901952",
+    "explicit_missing_home_exit": 22,
+    "unconfigured_ledger_status": "hold",
+    "version": "idobata 0.4.0",
+    "production_services_or_tasks_changed": false,
+    "unconfigured_ledger_exit": 10,
+    "unconfigured_ledger_reason": "ledger_not_configured",
+    "operator_explore_cli_present": true,
+    "isolated_fixture_home_and_keys_removed": true,
+    "blocked_scan_exit": 20,
+    "isolated_doctor": "healthy",
+    "production_home_or_keys_accessed": false,
+    "sdk_sha256": "30a03ab8a6b46157fe1db0adfd5496925da7e3173356bedcf6c1069b6d615344",
+    "plain_scan_exit": 0,
+    "temporary_fixture_created": true,
+    "status": "passed",
+    "ledger_cli_present": true,
+    "production_installed": false,
+    "scanner_wasm_sha256": "e765bdca9f335bed3c26c2dee1bce39e9eb652e2af2552945c1818934d88e4fd",
+    "new_runtime_markers_present": true
+  },
+  "source_postcheck": {
+    "candidate_grants_only_expected_principals": true,
+    "source_archive_sha256": "48a2af9374e5193c3be5842a1a1d2c735ed8c14ebe2ac30c42c7606c4c409b03",
+    "source_directory_access_rules_protected": true,
+    "sdk_sha256": "30a03ab8a6b46157fe1db0adfd5496925da7e3173356bedcf6c1069b6d615344",
+    "isolated_smoke_home_removed": true,
+    "verified_source_files": 62,
+    "production_mutation": false
+  },
+  "download": {
+    "hash_equal_to_remote": true,
+    "pe_machine": "x86_64",
+    "bytes_equal_to_remote": true
+  },
+  "evidence_sha256": {
+    "windows-build-metadata.json": "16c71a0a35c37076c7d7dce01a4af7613aa2bfe562825caedfc966cea4af5d65",
+    "windows-smoke.json": "b0ac97bc8847715227e1d9c1c6d3643849ae27486cad0bb38a381fac6eab1266",
+    "windows-source-postcheck.json": "6f6a0c55793f8a5a789d72a3af04fca1439307ce44f8b0b5c7338f29b635da0e",
+    "windows-cargo-build.stderr.log": "6810eb91dea8ab8d58c6a127a54385d9d32bc0a00fa60e17ad74b6f44bb67cc6",
+    "windows-cargo-build.stdout.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "windows-build-prepared.ps1": "1101d0bad9578a221f72898db84cc4a54ed41db409e2619d0616e9b12439f1ca",
+    "windows-smoke-prepared.ps1": "bf86d4f1c178077e381aaabccc46b8400673b85371215ddb655583437f2bad4c",
+    "windows-source-postcheck-prepared.ps1": "a57dc5eec38f8f8a9f0b380a67095825b5eeceb5c16cf5a01bea3bf18c2bbf5e"
+  },
+  "scope": "Candidate built and tested in an isolated private user-temp child using newly generated temporary daemon keys. No production home, key, service, task or upgrade Plan was accessed or changed.",
+  "obsolete_candidates_not_adopted": [
+    "1ef62f137b25",
+    "57314eda1b75"
+  ],
+  "next_gate": "Root-authorized cross-host synthetic operator acceptance; production installation requires separate authorization.",
+  "limitations": [
+    "Candidate smoke does not establish cross-host ledger consensus or production operator independence.",
+    "The production hosts remain one actual operator; ledger stays unconfigured unless a valid independent-validator experiment is explicitly configured."
+  ]
+}

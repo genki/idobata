@@ -18,6 +18,8 @@ use std::{collections::BTreeSet, io, time::Duration};
 /// Knowledge records carry historical authorization and signed review evidence.
 /// Keep this independent of the compact legacy message frames and local IPC.
 pub const MAX_KNOWLEDGE_WIRE: usize = 4 * 1024 * 1024;
+/// Application checkpoints use bounded chunks, never a monolithic snapshot.
+pub const MAX_LEDGER_WIRE: usize = 1024 * 1024;
 
 #[derive(Clone, Default)]
 pub struct Codec;
@@ -124,6 +126,7 @@ pub struct Behaviour {
     pub limits: connection_limits::Behaviour,
     pub messages: request_response::Behaviour<Codec>,
     pub knowledge: request_response::Behaviour<KnowledgeCodec>,
+    pub ledger: request_response::Behaviour<LedgerCodec>,
 }
 pub async fn build(key: identity::Keypair, c: &Config) -> Result<Swarm<Behaviour>> {
     let messages = request_response::Behaviour::with_codec(
@@ -156,6 +159,16 @@ pub async fn build(key: identity::Keypair, c: &Config) -> Result<Swarm<Behaviour
     let behaviour = Behaviour {
         messages,
         knowledge,
+        ledger: request_response::Behaviour::with_codec(
+            LedgerCodec,
+            [(
+                StreamProtocol::new("/idobata/ledger/1"),
+                ProtocolSupport::Full,
+            )],
+            request_response::Config::default()
+                .with_request_timeout(Duration::from_secs(10))
+                .with_max_concurrent_streams(4),
+        ),
         allowed: Default::default(),
         limits: connection_limits::Behaviour::new(limits),
     };
@@ -182,6 +195,44 @@ pub async fn build(key: identity::Keypair, c: &Config) -> Result<Swarm<Behaviour
             .map_err(|_| NETWORK)?;
     }
     Ok(swarm)
+}
+
+#[derive(Clone, Default)]
+pub struct LedgerCodec;
+impl request_response::Codec for LedgerCodec {
+    type Protocol = StreamProtocol;
+    type Request = Vec<u8>;
+    type Response = Vec<u8>;
+    async fn read_request<T: AsyncRead + Unpin + Send>(
+        &mut self,
+        _: &Self::Protocol,
+        io: &mut T,
+    ) -> io::Result<Vec<u8>> {
+        read(io, MAX_LEDGER_WIRE).await
+    }
+    async fn read_response<T: AsyncRead + Unpin + Send>(
+        &mut self,
+        _: &Self::Protocol,
+        io: &mut T,
+    ) -> io::Result<Vec<u8>> {
+        read(io, MAX_LEDGER_WIRE).await
+    }
+    async fn write_request<T: AsyncWrite + Unpin + Send>(
+        &mut self,
+        _: &Self::Protocol,
+        io: &mut T,
+        data: Vec<u8>,
+    ) -> io::Result<()> {
+        write(io, data, MAX_LEDGER_WIRE).await
+    }
+    async fn write_response<T: AsyncWrite + Unpin + Send>(
+        &mut self,
+        _: &Self::Protocol,
+        io: &mut T,
+        data: Vec<u8>,
+    ) -> io::Result<()> {
+        write(io, data, MAX_LEDGER_WIRE).await
+    }
 }
 pub fn refresh(
     swarm: &mut Swarm<Behaviour>,
@@ -250,6 +301,14 @@ mod tests {
 
     fn connection_fixture() -> Behaviour {
         Behaviour {
+            ledger: request_response::Behaviour::with_codec(
+                LedgerCodec,
+                [(
+                    StreamProtocol::new("/idobata/ledger/1"),
+                    ProtocolSupport::Full,
+                )],
+                request_response::Config::default(),
+            ),
             messages: request_response::Behaviour::with_codec(
                 Codec,
                 [(

@@ -1,0 +1,10 @@
+{
+  "recorded_at": 1793519082.7579315,
+  "reason": "planned_sdk_v04_upgrade_begins_after_this_checkpoint",
+  "old_series": "v03",
+  "source_sdk": "0.3.0",
+  "samples": 1379,
+  "failed_samples": 0,
+  "observation_started_at": 1793475161.8238487,
+  "not_a_v04_observation": true
+}
