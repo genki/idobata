@@ -1,0 +1,74 @@
+{
+  "version": 1,
+  "test": "eight-hour-observation-and-automatic-tuf-refresh",
+  "status": "passed",
+  "checked_at": 1793505999.8194993,
+  "series": "v03",
+  "started_at": 1793475161.8238487,
+  "elapsed_seconds": 30825.163853406906,
+  "samples": 968,
+  "failed_samples": 0,
+  "service_restarts": 0,
+  "max_observation_gap_seconds": 37.45589637756348,
+  "monitor_entries_up": 13,
+  "new_ng_notifications_since_release_observation": 0,
+  "alert_log_size_unchanged": true,
+  "canary": {
+    "created_at": 1793504091.7647004,
+    "complete": true,
+    "delivered_count": 3,
+    "recipient_count": 3
+  },
+  "tuf_roles": {
+    "root": {
+      "version": 1,
+      "expires_at": 1824982332.0,
+      "sha256": "e62718a4d4b3095906ce8015d40466c586eebd3161ea6117f86915bf15c4494f"
+    },
+    "targets": {
+      "version": 200,
+      "expires_at": 1801250632.0,
+      "sha256": "59feb68a1e7732e6c3b3a0aa93673dd8d4b4df6a5ec2d2d193f34b8b29538035"
+    },
+    "snapshot": {
+      "version": 202,
+      "expires_at": 1794101039.684631,
+      "sha256": "e403e4f62e88cb23b6f682994d4568f7dc88e3b2c75f190b4368333d46569fd1"
+    },
+    "timestamp": {
+      "version": 202,
+      "expires_at": 1793582639.696945,
+      "sha256": "0021d53a47608d2db307cf4a81b96965b132cadc8b3b898854ec3ec7895ac296"
+    }
+  },
+  "online_snapshot_timestamp_advanced_from_release_201": true,
+  "offline_root_and_targets_unchanged": true,
+  "fresh_state_default_public_tuf_download": {
+    "verified": true,
+    "target": "idobata-0.3.0-linux-x86_64.tar.gz",
+    "sha256": "9a23a9093dd0692bee6194891ddbbe220bd300f3bcf6b6f117219b271d8a231e",
+    "bytes": 4772267
+  },
+  "periodic_services": {
+    "idobata-publisher.service": {
+      "result": "success",
+      "exit_status": 0
+    },
+    "idobata-public-route.service": {
+      "result": "success",
+      "exit_status": 0
+    },
+    "idobata-renew.service": {
+      "result": "success",
+      "exit_status": 0
+    },
+    "idobata-release.service": {
+      "result": "success",
+      "exit_status": 0
+    }
+  },
+  "all_six_units_active": true,
+  "seventy_two_hours_complete": false,
+  "os_reboot_or_sleep_tested": false,
+  "production_changes_or_posts_generated": false
+}

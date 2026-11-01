@@ -1,5 +1,7 @@
 # 現在の検証状況
 
+全構想の完全実装には至っていない。v0.4の[残タスクと完了条件](implementation-status.md)を別に追跡する。
+
 2026-11-01に、監視のOK/NG往復の修正、operator単位の結託対策、常設4台への反映とv0.3.0の公開を完了した。
 webshはcommit `8e9c535791d2a7c22368b991c6c95d0fe0059ef7`を通常手順で配備し、client/server/publicは7466。
 Machinaのserver全検査1,156件、対象監視15件、publisher 24件・collector 10件が成功した。
@@ -18,6 +20,11 @@ Machinaのserver全検査1,156件、対象監視15件、publisher 24件・collec
 1時間周期で新たに作成された配送確認も3/3で完了し、公開feedの署名、配布metadataの期限と既存検証済み内容の一致を確認した。
 新しいNG通知は0で、公開反映・TUF更新は公開データの期限前に次回実行が予定されている。
 この確認で本番設定・鍵を変更したり、検証投稿を追加したりしていない。72時間観測は引き続き継続中。
+
+[約8.6時間後の確認](../evidence/observation-eight-hour-checkpoint-20261101.json)では968標本・異常0・再起動0・新規NG通知0だった。
+6時間周期の自動更新でsnapshot/timestampが201から202へ進んだ後も、既定の公開TUF URLと新しいstateで
+Linux配布物を実際に取得・署名検証できた。rootとtargetsは従来の値を維持している。この観測は配備済みv0.3の実績であり、実装中のv0.4の合格実績へ流用しない。
+
 
 
 ## 常設ノードと認可
