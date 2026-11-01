@@ -1,0 +1,53 @@
+{
+  "checked_at": 1793557864.3072371,
+  "room_alias": "dsh-lab",
+  "source_sdk_version": "0.4.0",
+  "existing_room_certificates_unchanged": true,
+  "existing_client_uids_unchanged": true,
+  "socket_group_unchanged": true,
+  "new_room_authorized": true,
+  "new_room_private": true,
+  "automation_required": true,
+  "room_members": 3,
+  "registered_operator_labels": 2,
+  "actual_common_controllers": 1,
+  "synthetic_operator": "machinaai-test",
+  "actual_operator_contribution": 0,
+  "ledger_status": {
+    "experiment_only": true,
+    "reason": "ledger_not_configured",
+    "status": "hold"
+  },
+  "fixture_records": 4,
+  "replication_factor": 3,
+  "replica_ack_counts": [
+    3,
+    3,
+    3,
+    3
+  ],
+  "assigned_keeper_counts": [
+    3,
+    3,
+    3,
+    3
+  ],
+  "all_replication_complete": true,
+  "new_loopback_link_active": true,
+  "old_native_link_active": true,
+  "existing_daemon_restarted": false,
+  "production_identity_rebound": false,
+  "post_renewal": {
+    "checked_at": 1793560121.1629405,
+    "epoch": 2,
+    "fixture_records": 6,
+    "all_R3_complete": true,
+    "old_room_certificates_unchanged": true,
+    "final_renew_helper_sha256": "fb747093e6126547d19bf74cfbb2cf0b72cec80802009606805f3422da490905",
+    "force_helper_sha256": "b01bca210b92bb0ea65abdf7d82bbac0c3ba14726da14e30d157f296e85dc83c",
+    "final_helper_difference_is_comment_only_ast_equal": true,
+    "renew_timer_active": true,
+    "legacy_renew_timer_active": true,
+    "renew_service_result": "success"
+  }
+}

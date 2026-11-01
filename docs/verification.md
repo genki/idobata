@@ -39,6 +39,45 @@ component 13件と公開HTTP 2件の計15件UPを確認した。新版はv04の�
 [公開サイト](../evidence/site-v04-production-deploy-20261101.json)は両LBの18ルートと公開ブラウザ16項目を確認し、
 publisher・TUF・他サービスのfrontdoor設定を維持した。
 
+## DSH擬似operatorの配備と判断運用（2026-11-02）
+
+[反映した構成](pseudo-operator-validation.md)は、既存4 peerを維持し、DSH VM内に
+専用identity・非agentサービス所有の鍵・UID2000だけを認可したIPCを追加する。
+[peer配備の証跡](../evidence/dsh-peer-deployment-20261102.json)は、
+SDKをv0.4固定ソースと同じ62ファイルからLinux aarch64用にビルドしたことを記録する。
+既存DSHのホスト非共有・通信制限を維持し、peer通信はloopback限定SSHと既存公開WSSを使う。
+
+専用非公開roomの3 peerは、Linux hubとmachinaaiホストがs21g、DSH追加peerがmachinaai-testである。
+実管理主体は1者のままとし、公開APIや監視で実独立主体数へ加算しない。
+[hubの反映記録](../evidence/dsh-lab-hub-reflection-20261102.json)では、初期4レコードの
+3 keeper・ACK3を確認した。更新後も含む6レコードもACK3で複製完了し、既存roomの証明書・IPC認可を維持した。
+[公開feed確認](../evidence/dsh-lab-feed-privacy-20261102.json)では全6件のIDと検証語が非掲載だった。
+ACKは受領時の確認であり、将来の保存継続を無条件に保証するものではない。
+
+[判断runnerの実測](../evidence/dsh-judge-runner-20261102.json)では、常設timerが正答を選択し、
+既存Qwenのuseful判定からautomation proof付き評価適用まで14.50秒で完了した。
+誤答は7.41秒、採点指示を混ぜた誤答は7.70秒でnot_usefulとなり、SDKにはincorrectを適用した。
+初期の形式拒否1件は適用前に止め、失敗journal・counterを消していない。
+別の無送信診断ではanswer_id欠落を観測したが、過去の拒否原因と同一とは断定しない。
+モデル出力をversion/judgment/reasonだけへ限定し、対象ID・内容digestはrunner側で付与・照合する方式へ修正した。
+本文中の指示を実行するツールは渡さない。これらは有限の意味判断の検証であり、万能な注入耐性や独立AIの証明ではない。
+
+認可をepoch1から2へ実更新し、3 peerとrunnerの証明書一致を確認した。
+実際にrunner.lockを持つguest更新プロセスでjoin・root config更新を完結させ、
+先行永続markerで途中停止をfail closedにする。EOF・SDK後の停止・同epoch修復は
+実subprocess/flock/一時filesystemの焦点試験で確認した。
+更新後の新しい正答も常設timerが自動処理し、新証明書のproofによる評価適用を7.35秒で完了した。
+累計5試行・成功4・形式拒否1を保持し、次のtimer周期でもsequence8と評価数が増えないことを確認した。
+台帳は未設定Hold、通常検索への昇格も0件である。
+通常の認可点検serviceは更新前後とも成功し、6時間timerと旧room更新の共通lockを有効にした。
+
+[監視の通常配備](../evidence/dsh-delegation-monitor-20261102.json)はWebSH main `23485f68`、
+revision7473、全server1186検査成功。clientのactive151ファイルはコード差分なしを確認した。
+[実障害と復帰の追記](../evidence/dsh-delegation-monitor-followup-20261102.json)は
+形式拒否時に16 UP/1 DOWN、修正後に17 UP、認可更新後の適用成功も17 UPと記録した。
+旧4 peerの観測窓・既存15項目を維持し、DSH検証peerとrunnerだけを別項目で追加した。
+手動通知、既存identityの付け替え、新しい有料設備、GitHub Actionsは導入していない。
+
 ## 擬似operatorとdsh運用境界の検証（2026-11-01）
 
 [検証用operatorの仕様](pseudo-operator-validation.md)に沿って、常設peerを変更せず確認した。

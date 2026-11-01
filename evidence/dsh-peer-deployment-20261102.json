@@ -1,0 +1,262 @@
+{
+  "version": 1,
+  "checked_at": 1793560225.4938343,
+  "status": "peer_and_renewal_deployment_verified",
+  "governance": {
+    "controller": "s21g",
+    "synthetic_operator": "machinaai-test",
+    "executor": "dsh",
+    "synthetic": true,
+    "actual_independent_operator_count": 1,
+    "test_claimed_operator_groups": 2,
+    "dsh5_used": false
+  },
+  "internal_linux_arm64_build": {
+    "status": "built",
+    "source_archive_sha256": "48a2af9374e5193c3be5842a1a1d2c735ed8c14ebe2ac30c42c7606c4c409b03",
+    "source_files_verified_pre_and_post": 62,
+    "source_mtimes_touched": 62,
+    "actual_compiling_idobata_observed": true,
+    "architecture": "aarch64-unknown-linux-gnu",
+    "sdk_sha256": "b054e8d0b60c9907687a35b3ff093abf74a13c863e2522da891a3c4d8b7e2bb6",
+    "sdk_bytes": 11678952,
+    "elapsed_seconds": 104.55,
+    "core_compiled_tree_sha256": "d3831ac1fd58ba95d54f413c1d5e1102550d6de5d0b46d0a98eca49938412385"
+  },
+  "internal_binary_is_not_an_additional_public_release_target": true,
+  "fixed_policy_id": "c82f9fed20148ff5dba8718396cc4eaeb995ad56e6f9800c203783b289901952",
+  "fixed_wasm_sha256": "e765bdca9f335bed3c26c2dee1bce39e9eb652e2af2552945c1818934d88e4fd",
+  "msrv": "1.88",
+  "build_rustc": "rustc 1.91.1 (ed61e7d7e 2025-11-07)",
+  "guest_installation": {
+    "service_name": "idobata-dsh-peer.service",
+    "service_user": "idobata-test",
+    "host_keys_or_home_or_ipc_shared": false,
+    "identity_and_storage_keys_generated_in_guest": true,
+    "raw_key_values_exported_or_inspected": false,
+    "new_sdk_root_owned_0755_verified": true,
+    "agent_client_uid": 2000,
+    "shared_ipc_application_auth_uid_only": true,
+    "sdk_source_unchanged": true
+  },
+  "initial_uid2000_cli_acceptance": {
+    "status": "verified",
+    "uid": 2000,
+    "ordinary_path_cli": true,
+    "sdk_version": "0.4.0",
+    "fixed_profile": true,
+    "doctor_healthy": true,
+    "info_ready": true,
+    "lab_authorized": true,
+    "lab_private": true,
+    "lab_automation_required": true,
+    "lab_epoch": 1,
+    "lab_expires_at": 1794162033,
+    "room_count": 1,
+    "connected_peers": 2,
+    "knowledge_ready": true,
+    "knowledge_objects": 0,
+    "ledger_hold_not_configured": true,
+    "service_keys_readable": false,
+    "host_ipc_absent": true,
+    "direct_native_peer_tcp_denied": true,
+    "inference_invoked": false
+  },
+  "offline_scanner_acceptance": {
+    "allowed": 1,
+    "blocked": 1,
+    "rejected_input_absent_from_output": true
+  },
+  "private_lab": {
+    "room_alias": "dsh-lab",
+    "members": 3,
+    "private": true,
+    "automation_required": true,
+    "certificate_hours": 168,
+    "real_independent_operator_count": 1,
+    "original_production_rosters_unchanged": true
+  },
+  "initial_fixture_replication_acceptance": {
+    "checked_at": 1793557960.086163,
+    "status": "passed",
+    "records": 4,
+    "actual_copies": 12,
+    "replication_factor": 3,
+    "all_assignments_equal": true,
+    "all_keeper_receipts": 3,
+    "staging_total": 0,
+    "peers": [
+      {
+        "peer_role": "hub",
+        "matching_records": 4,
+        "local_keepers": 4,
+        "staging_records": 0,
+        "complete_records": 4,
+        "receipt_count_histogram": {
+          "3": 4
+        }
+      },
+      {
+        "peer_role": "native",
+        "matching_records": 4,
+        "local_keepers": 4,
+        "staging_records": 0,
+        "complete_records": 4,
+        "receipt_count_histogram": {
+          "3": 4
+        }
+      },
+      {
+        "peer_role": "guest",
+        "matching_records": 4,
+        "local_keepers": 4,
+        "staging_records": 0,
+        "complete_records": 4,
+        "receipt_count_histogram": {
+          "3": 4
+        }
+      }
+    ],
+    "private_record_checks": [
+      {
+        "fixture_index": 0,
+        "retrieved_by_dsh_uid": true,
+        "private": true,
+        "authorization_digest_present": true
+      },
+      {
+        "fixture_index": 1,
+        "retrieved_by_dsh_uid": true,
+        "private": true,
+        "authorization_digest_present": true
+      },
+      {
+        "fixture_index": 2,
+        "retrieved_by_dsh_uid": true,
+        "private": true,
+        "authorization_digest_present": true
+      },
+      {
+        "fixture_index": 3,
+        "retrieved_by_dsh_uid": true,
+        "private": true,
+        "authorization_digest_present": true
+      }
+    ],
+    "controller": "s21g",
+    "synthetic_operator": "machinaai-test",
+    "actual_independent_operator_count": 1
+  },
+  "network_guard_acceptance": {
+    "status": "passed",
+    "isolated_network_namespace_only": true,
+    "guard_survives_existing_dsh_firewall_reapply": true,
+    "agent_uid_chain_remains_present": true,
+    "missing_guard_start_checker_rejected": true,
+    "ipv6_deny_verified": true,
+    "production_service_or_model_restarts": 0
+  },
+  "network_namespace_cleanup": {
+    "unnamed_child_process_exited": true,
+    "persistent_namespace_created": false,
+    "live_vm_rules_or_services_changed_by_test": false
+  },
+  "renewal_acceptance": {
+    "shared_existing_maintenance_lock": true,
+    "legacy_renew_script_unchanged": true,
+    "same_actual_guest_process_holds_lock_through_guest_join_runner_config_and_reply": true,
+    "durable_root_pending_marker_fail_closed": true,
+    "pre_candidate_transport_eof_tested": true,
+    "sdk_join_then_crash_tested": true,
+    "same_epoch_repair_tested": true,
+    "pending_cannot_take_noop_path": true,
+    "unknown_rpc_fields_rejected": true,
+    "force_epoch2_verified_by_parent": true,
+    "force_implementation_sha256": "b01bca210b92bb0ea65abdf7d82bbac0c3ba14726da14e30d157f296e85dc83c",
+    "final_source_sha256": "fb747093e6126547d19bf74cfbb2cf0b72cec80802009606805f3422da490905",
+    "force_to_final_difference_is_comment_only_and_ast_identical": true,
+    "final_comment_only_source_installed_and_verified_by_parent": true,
+    "real_systemd_noop_epoch2_success_verified_by_parent": true,
+    "new_and_existing_renewal_timers_active_verified_by_parent": true,
+    "additional_force_performed": false
+  },
+  "post_renewal_read_only_closure": {
+    "status": "passed",
+    "checked_at": 1793560066.9290333,
+    "authority_epoch": 2,
+    "peer_and_runner_epoch_equal": true,
+    "peers": [
+      {
+        "trusted_room_equal": true,
+        "epoch": 2,
+        "role": "hub",
+        "authorized": true,
+        "sdk_version": "0.4.0"
+      },
+      {
+        "role": "native",
+        "epoch": 2,
+        "trusted_room_equal": true,
+        "old_rooms_exactly_preserved": true,
+        "old_key_metadata_preserved": true,
+        "daemon_uptime_exceeds_lab_install_age": true,
+        "authorized": true,
+        "sdk_version": "0.4.0"
+      },
+      {
+        "role": "guest",
+        "epoch": 2,
+        "trusted_room_equal": true,
+        "runner_trusted_room_equal": true,
+        "pending_marker_absent": true,
+        "root_sdk_0755": true,
+        "sdk_sha256": "b054e8d0b60c9907687a35b3ff093abf74a13c863e2522da891a3c4d8b7e2bb6",
+        "service_uid_separate_from_agent": true,
+        "key_metadata_service_owned_0600": true,
+        "key_material_read_or_exported": false
+      }
+    ],
+    "initial_native_pid_preserved_assertion_passed": true,
+    "three_peer_epoch2_verified": true
+  },
+  "focused_checks": {
+    "provision_tests_passed": 8,
+    "renewal_tests_passed": 14,
+    "py_compile_passed": true,
+    "git_diff_check_passed": true
+  },
+  "source_files": [
+    {
+      "path": "scripts/provision-dsh-idobata-peer.py",
+      "sha256": "b421af228aa44a05326235a5be7d7987819c60371b0d653baf684365b05c594e"
+    },
+    {
+      "path": "scripts/test-provision-dsh-idobata-peer.py",
+      "sha256": "88b916c2fba0eac3a81f090aa1b73fdbe686c1deea7a7a5cf1532cf7e0370923"
+    },
+    {
+      "path": "scripts/renew-dsh-lab.py",
+      "sha256": "fb747093e6126547d19bf74cfbb2cf0b72cec80802009606805f3422da490905"
+    },
+    {
+      "path": "scripts/test-renew-dsh-lab.py",
+      "sha256": "5db1f190fbe667fbc00cea4d87d06eb8ed1d759923a9d0a1754f37fc36e4998e"
+    },
+    {
+      "path": "docs/dsh-peer-operations.md",
+      "sha256": "4f1fb876d1fe9f3f910f5f378d4decc2cd0a11b182c6daa9df310403c93cdecc"
+    }
+  ],
+  "judgment_runner_model_cases_recorded_separately": true,
+  "no_genesis_wallet_transfer_or_production_operator_rebinding": true,
+  "new_paid_infrastructure_or_github_actions": false,
+  "manual_external_notifications_sent": false,
+  "finalized_at": 1793560356.3806653,
+  "postrenewal_judgment_acceptance_reported_by_runner_owner": {
+    "new_correct_job_evaluation_succeeded": true,
+    "next_timer_idle": true,
+    "review_sequence_unchanged_on_idle": true,
+    "sequence": 8,
+    "recorded_separately": true
+  }
+}

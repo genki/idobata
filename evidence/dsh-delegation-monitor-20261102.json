@@ -1,0 +1,185 @@
+{
+  "version": 1,
+  "status": "deployed_and_verified",
+  "verified_at_utc": "2026-11-01T18:55:01.572703+00:00",
+  "scope": "Synthetic DSH peer and Qwen judgment runner operational metadata only; existing four-peer monitoring/canary/window retained.",
+  "metadata": {
+    "synthetic": true,
+    "common_controller": "s21g",
+    "operator": "machinaai-test",
+    "executor": "dsh",
+    "model_provider": "qwen",
+    "model_tools": false,
+    "actual_operator_contribution": 0
+  },
+  "transport": {
+    "existing_host_ssh": true,
+    "existing_dsh_vm_only": true,
+    "vm_autostart": false,
+    "agent_uid_context_preserved": true,
+    "explicit_dedicated_ipc": true,
+    "private_node_home_or_node_keys_read_by_collector": false,
+    "prompt_record_ids_model_output_or_free_errors_persisted": false,
+    "stdout_stderr_bounded": true
+  },
+  "collector": {
+    "unit": "idobata-delegation-watch.service",
+    "active": true,
+    "enabled": true,
+    "interval_seconds": 30,
+    "runner_stale_seconds": 180,
+    "maximum_job_seconds": 300,
+    "fixed_commands_config_private_owner_and_0600": true,
+    "installed_source_equal": true,
+    "initial_status_saved_before_enable": true
+  },
+  "websh": {
+    "commit": "23485f688ecd85bd52ef97ed046fce23a0cf1854",
+    "pushed_main": true,
+    "index_clean": true,
+    "normal_full_machina_build": true,
+    "source_job": "c0f204df784d4a1e9887f00bb8128699",
+    "artifact_sha256": "2a6e00944bbbf1b30c03e19f06edc116c11acf358039709b325c866fb9b99754",
+    "artifact_bytes": 179933012,
+    "server_tests": {
+      "passed": 1186,
+      "failed": 0
+    },
+    "standard_deploy_and_service_restart": true,
+    "healthz": "ok",
+    "server_revision": 7473,
+    "client_revision": 7473
+  },
+  "focused_tests": {
+    "python_collector_setup": 12,
+    "moon_new_and_existing": 32,
+    "eslint": "passed",
+    "zero_attempt_configuration_state_faults": "peer UP; runner unavailable/DOWN, successful=false; no counters invented"
+  },
+  "client_scope": {
+    "active_modules": 151,
+    "byte_equal": 84,
+    "only_asset_reference_hash_names_differ": 66,
+    "only_expected_build_revision_after_reference_normalization": 1,
+    "unexplained_functional_differences": 0,
+    "additional_public_scripts_byte_equal": 2,
+    "old_hashed_assets_retained": true
+  },
+  "foreign_work_preserved": {
+    "initial_files": 94,
+    "source_files_unchanged": 93,
+    "only_generated_file_changed": "public/revision.json",
+    "generated_revision_change": "7472 -> 7473",
+    "only_owned_four_websh_files_committed": true
+  },
+  "existing_monitoring": {
+    "checks_before": 15,
+    "checks_after": 17,
+    "all_checks_up_at_capture": true,
+    "existing_checks_up": true,
+    "physical_peers": 4,
+    "series": "v04",
+    "window_start_unchanged": true,
+    "samples_at_capture": 1233,
+    "failed_samples_at_capture": 0,
+    "canary_or_roster_changed_by_monitor_task": false
+  },
+  "actual_body_free_observations": {
+    "initial_empty_queue": {
+      "state": "hold",
+      "reason": "no_open_questions",
+      "successful": false,
+      "evaluation_applied": false,
+      "counts": {
+        "attempts": 0,
+        "successes": 0,
+        "failures": 0,
+        "holds": 0
+      }
+    },
+    "model_completion_and_later_idle": [
+      {
+        "observed_at": 1793558799.5607884,
+        "checks": 17,
+        "up": 17,
+        "state": "success",
+        "reason": "evaluation_applied",
+        "successful": true,
+        "evaluation_applied": true,
+        "counts": {
+          "attempts": 1,
+          "successes": 1,
+          "failures": 0,
+          "holds": 0
+        },
+        "actual_operator_contribution": 0,
+        "provider": "qwen",
+        "tools": false
+      },
+      {
+        "observed_at": 1793559036.9694211,
+        "checks": 17,
+        "up": 17,
+        "state": "hold",
+        "reason": "no_eligible_answer",
+        "successful": false,
+        "evaluation_applied": false,
+        "counts": {
+          "attempts": 1,
+          "successes": 1,
+          "failures": 0,
+          "holds": 0
+        },
+        "actual_operator_contribution": 0,
+        "provider": "qwen",
+        "tools": false
+      }
+    ],
+    "running_phase_observed": false,
+    "running_phase_limitation": "The actual job completed in approximately 14.5 seconds between monitor samples; running behavior was unit-tested, not claimed observed."
+  },
+  "fault_behavior": {
+    "hold_is_up_waiting_successful_false": true,
+    "not_run_and_running_are_not_success": true,
+    "dry_run_is_not_evaluation_applied": true,
+    "model_timeout_or_ipc_missing_or_stale_is_down": true,
+    "pre_model_control_fault_with_zero_attempts": "unavailable/DOWN, successful=false; precise control-plane fault reason is coalesced in this deployed monitor",
+    "success_counter_meaning": "Processed successes include dry-run and duplicate completion; this is not an applied-evaluation count."
+  },
+  "immutable_product": {
+    "verified_unchanged_files": 54,
+    "reference_source_archive_sha256": "48a2af9374e5193c3be5842a1a1d2c735ed8c14ebe2ac30c42c7606c4c409b03",
+    "sdk_rust_cargo_scanner_wasm_profiles_unchanged": true,
+    "sdk_republished": false
+  },
+  "owned_source_sha256": {
+    "idobata/scripts/watch-delegation.py": "471ec361c3d95a2ea03be5b6f02a41c307a62afd28e9883995a8abac04019064",
+    "idobata/scripts/setup-delegation-monitor.py": "754ae4e3a235caa9f8ed023ddc9db8b942b159950c22f1e2015a2398329a1ce4",
+    "idobata/scripts/test-watch-delegation.py": "581e686b5e9f2fffc3e587c52a9db841dd162a55d375baa0cdbf4ad88dec0c84",
+    "idobata/docs/dsh-delegation-monitor.md": "a17399c5379949b37064cda32760ad38d1f342b67620652fc88af7e884cd722e",
+    "websh/server/internal/idobata-delegation-monitor.mjs": "473593b958d19afd15e35d9a97ad5b65e90c435aac1a60012d7750e0b928a7d2",
+    "websh/server/internal/idobata-monitor.mjs": "4197eb24cacf12587cfeb736826ab4f4baca7af8442a4d46a203f9173c1a8e6d",
+    "websh/tests/idobata-delegation-monitor.test.mjs": "a0868b063b1421e156874daff0726a4af6e8b5c5b44213d32441c63822140458",
+    "websh/tests/idobata-monitor.test.mjs": "e72c504c71b2663592217aad6e8cada0d78919aa1e62152cca8aec5fb5da944a"
+  },
+  "verification_sha256": {
+    "idobata-dsh-monitor-node-tests.log": "ef3756ca53ea0346e46369f3b8cb422fa2b988c1d248e58767f682fdb48e2905",
+    "idobata-dsh-monitor-build-test-summary.log": "f2f2921106eb2c22676669a95d060e7562fe80aa123969e0f7b819a3acbde30a",
+    "idobata-dsh-monitor-final-machina-build.log": "bb3e450bf3e62457a7c88502928794b381adacbeebb002724a531c6b6ac0aff5",
+    "idobata-dsh-monitor-deployed-revision.json": "e0e16290e40047379b66061165f96113acccda246f0a08cec0c91b8d001ae19e",
+    "idobata-dsh-monitor-live-before.json": "ccc5a45aca22e3aa7055e7aa7a616a816e0bad82312c6feef43854607b74c621",
+    "idobata-dsh-monitor-live-after.json": "c4908de4eed7a5f026b2eac7fc3ce610cd7732df5697d3d39ce13d8504bbe81a",
+    "idobata-dsh-monitor-model-api-observations.json": "6c2d7b17d7a0ff6e7ab43cb7ccfa6565ccc04d74be3143e4dc8d3eb29429a13b",
+    "idobata-dsh-monitor-zero-attempt-fault-result.json": "938136a7c329b084b685ff342ffbcbcc2fecf68e7f85d0485713d3dff900ba37"
+  },
+  "constraints": {
+    "github_actions_added_or_used": false,
+    "manual_talker_slack_notice_sent": false,
+    "new_recurring_paid_service": false
+  },
+  "limitations": [
+    "Common-controller labels are operator-fixed metadata, not cryptographic evidence of independent ownership or AI origin.",
+    "Actual production operator count is not increased by a separate key, daemon or judgment model.",
+    "Node key-access protection is verified by the separate peer-provisioning acceptance; this collector reads only Doctor and safe runner status."
+  ]
+}

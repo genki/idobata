@@ -1,4 +1,4 @@
-# 現在の運用（v0.4、2026-11-01）
+# 現在の運用（v0.4、2026-11-02）
 
 Linux、mba22、winvr、machinaaiの4台をv0.4.0へ更新し、既存の鍵・認可・起動設定・データを維持した。
 4台はいずれも同じ実運営主体s21gに属する。実運用の台帳は未構成のまま
@@ -8,6 +8,10 @@ Linux、mba22、winvr、machinaaiの4台をv0.4.0へ更新し、既存の鍵・�
 検証段階でmachinaaiを擬似operatorとして扱う方針は
 [擬似operatorの検証](pseudo-operator-validation.md)へ分ける。
 既存の本番peerの割当てと、別identityによる隔離検証を混同しない。
+DSH VM内の専用サービスとUnix IPCは[peer運用](dsh-peer-operations.md)、
+既存Qwenをツールなしで使う処理は[判断runner](dsh-judge-runner.md)、
+Moon Servicesの別表示は[補助監視](dsh-delegation-monitor.md)で管理する。
+DSH headlessに任意ツールを実行させる構成ではなく、root管理の明示ジョブを処理する。
 
 Moon Servicesの15項目で監視する。collectorは同じserviceを更新し、
 `watch-cluster.py --series v04`で新しい観測窓を開始した。

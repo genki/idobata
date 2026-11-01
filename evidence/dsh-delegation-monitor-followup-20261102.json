@@ -1,0 +1,161 @@
+{
+  "version": 1,
+  "status": "operational_failure_and_recovery_verified",
+  "verified_at_utc": "2026-11-01T19:09:00.565548+00:00",
+  "previous_evidence": {
+    "path": "evidence/dsh-delegation-monitor-20261102.json",
+    "sha256": "9eee4b01906d91de4b3b9ae077f2089955eaec31ca76233b9c4539dbd44159bd",
+    "unchanged": true,
+    "scope": "Historical initial deployment and first successful evaluation; retained without rewriting later failures."
+  },
+  "websh": {
+    "commit": "23485f688ecd85bd52ef97ed046fce23a0cf1854",
+    "server_revision": 7473,
+    "client_revision": 7473,
+    "additional_monitor_code_change_or_restart": false
+  },
+  "observations": [
+    {
+      "observed_at": 1793559560.8236291,
+      "checks": 17,
+      "up": 16,
+      "down": 1,
+      "runner_status": "down",
+      "state": "failure",
+      "reason": "invalid_judgment",
+      "successful": false,
+      "evaluation_applied": false,
+      "counts": {
+        "attempts": 2,
+        "successes": 1,
+        "failures": 1,
+        "holds": 0
+      },
+      "actual_operator_contribution": 0,
+      "existing_checks_up": true
+    },
+    {
+      "observed_at": 1793559772.8010142,
+      "checks": 17,
+      "up": 17,
+      "down": 0,
+      "runner_status": "up",
+      "state": "hold",
+      "reason": "no_eligible_answer",
+      "successful": false,
+      "evaluation_applied": false,
+      "counts": {
+        "attempts": 4,
+        "successes": 3,
+        "failures": 1,
+        "holds": 0
+      },
+      "actual_operator_contribution": 0,
+      "existing_checks_up": true
+    },
+    {
+      "observed_at": 1793560068.877177,
+      "phase": "after_room_epoch_2_acceptance",
+      "checks": 17,
+      "up": 17,
+      "down": 0,
+      "runner_status": "up",
+      "state": "success",
+      "reason": "evaluation_applied",
+      "successful": true,
+      "evaluation_applied": true,
+      "counts": {
+        "attempts": 5,
+        "successes": 4,
+        "failures": 1,
+        "holds": 0
+      },
+      "actual_operator_contribution": 0,
+      "existing_checks_up": true
+    }
+  ],
+  "failure": {
+    "observed_state": "failure",
+    "observed_reason": "invalid_judgment",
+    "runner_check": "DOWN",
+    "evaluation_applied": false,
+    "other_sixteen_checks": "UP",
+    "history_deleted_or_counters_reset": false,
+    "root_cause_limit": "A separate diagnostic found a missing answer_id field. The original rejected response was not proven identical; API classification alone does not establish that cause."
+  },
+  "runner_recovery": {
+    "reported_change": "Strict model output is version/judgment/reason only; local fixed target and content digest remain locally bound.",
+    "model_or_job_body_persisted_in_monitor_evidence": false,
+    "old_failure_count_preserved": 1,
+    "idle_after_repair": {
+      "state": "hold",
+      "reason": "no_eligible_answer",
+      "successful": false,
+      "counts": {
+        "attempts": 4,
+        "successes": 3,
+        "failures": 1,
+        "holds": 0
+      }
+    }
+  },
+  "renewal_review": {
+    "scope": "Read-only source review; no force or configuration operations by this monitor agent.",
+    "reviewed_source_sha256": "b01bca210b92bb0ea65abdf7d82bbac0c3ba14726da14e30d157f296e85dc83c",
+    "source_at_evidence_sha256": "fb747093e6126547d19bf74cfbb2cf0b72cec80802009606805f3422da490905",
+    "subsequent_change_reported_by_root": "Comment-only with equal Python AST, verified by Root before installation.",
+    "original_race_closed": "Actual guest flock holder executes the typed candidate update on the same SSH channel; no separate guest updater depends on local SSH liveness.",
+    "crash_guard": "Root-owned pending marker is durable before handshake; SDK join and runner configuration are checked before removing/fsyncing it. EOF/crash keeps the marker and the runner fails closed.",
+    "review_result": "No new blocker found in reviewed paths.",
+    "owner_reported_focused_tests": 14
+  },
+  "postrenew_acceptance": {
+    "room_epoch": 2,
+    "force_and_new_job_managed_by": "Root and runner agent",
+    "actual_monitor_sample": {
+      "observed_at": 1793560068.877177,
+      "phase": "after_room_epoch_2_acceptance",
+      "checks": 17,
+      "up": 17,
+      "down": 0,
+      "runner_status": "up",
+      "state": "success",
+      "reason": "evaluation_applied",
+      "successful": true,
+      "evaluation_applied": true,
+      "counts": {
+        "attempts": 5,
+        "successes": 4,
+        "failures": 1,
+        "holds": 0
+      },
+      "actual_operator_contribution": 0,
+      "existing_checks_up": true
+    },
+    "historical_failure_count": 1,
+    "independent_operator_contribution": 0
+  },
+  "running_observation": {
+    "api_running_sample_observed": false,
+    "owner_reported_safe_status_running_observed": true,
+    "limitation": "The monitor API samples captured failure, recovery idle and postrenew success. Brief running phases are not claimed as observed through this API."
+  },
+  "counter_meaning": "successes are processed attempts, including dry-run or a successfully applied negative evaluation; they are not a count of useful answers or independent endorsements.",
+  "privacy": {
+    "bodyfree_api_fields_only": true,
+    "question_answer_peer_ids_model_text_prompts_or_keys_included": false,
+    "synthetic": true,
+    "common_controller": "s21g",
+    "executor": "dsh",
+    "provider": "qwen",
+    "tools": false,
+    "actual_operator_contribution": 0
+  },
+  "constraints": {
+    "manual_talker_slack_notice_sent": false,
+    "new_paid_service": false,
+    "sdk_or_scanner_republished": false,
+    "long_observation_or_repeated_test_run_added": false
+  },
+  "observation_log_sha256": "b25c2aab8a719131aff0228c57f4c4a3bb93465b69ef3b19b5da15162073031f"
+}

@@ -1,0 +1,389 @@
+{
+  "version": 1,
+  "status": "deployed_and_verified",
+  "recorded_at_utc": "2026-11-01T19:10:35.804213+00:00",
+  "scope": "Private dsh-lab explicit root-owned jobs; existing Qwen relay in the existing DSH VM. No DSH headless or independent-AI identity claim.",
+  "metadata": {
+    "synthetic": true,
+    "common_controller": "s21g",
+    "operator_label": "machinaai-test",
+    "executor": "Qwen judgment runner in DSH environment",
+    "model_provider": "existing_qwen",
+    "model_tools": false,
+    "actual_operator_contribution": 0,
+    "room_peers": 3,
+    "configured_operator_labels": 2,
+    "actual_common_controller_groups": 1
+  },
+  "runtime": {
+    "effective_uid": 2000,
+    "no_new_privileges": true,
+    "seccomp_mode": 2,
+    "effective_capabilities": 0,
+    "fixed_dedicated_ipc": true,
+    "daemon_keys_or_administrative_api_given_to_model": false,
+    "new_model_provider_or_paid_resource": false,
+    "default_job_deadline_seconds": 180,
+    "maximum_job_deadline_seconds": 300,
+    "status_heartbeat_seconds": 10,
+    "standing_timer_period_seconds": 120,
+    "root_owned_explicit_job_manifests": true,
+    "automatic_unbounded_search_or_retry": false
+  },
+  "real_inference": {
+    "cases": [
+      {
+        "fixture": "correct",
+        "judgment": "useful",
+        "phase": "applied",
+        "started_at": 1793558711.344466,
+        "completed_at": 1793558725.8399043,
+        "seconds": 14.495,
+        "state": "success",
+        "reason": "evaluation_applied",
+        "reason_sha256": "38e1fa593bdaa28214b36ccb3aa0a1b53e6a660fa1d9df69e46b962f85cd2592",
+        "counts": {
+          "attempts": 1,
+          "failures": 0,
+          "holds": 0,
+          "successes": 1
+        },
+        "model_tools": false,
+        "runtime_module_sha256": "9558044c449c71d7061c9eff0300016b954523dcb487a9529f083bd12017649d"
+      },
+      {
+        "fixture": "incorrect_replacement",
+        "judgment": "not_useful",
+        "phase": "applied",
+        "started_at": 1793559571.474735,
+        "completed_at": 1793559578.8867483,
+        "seconds": 7.412,
+        "state": "success",
+        "reason": "evaluation_applied",
+        "reason_sha256": "71da23a9bf58f49d6d76c9952001e6c65ee1bb1df71e9e71c3043827d9519f58",
+        "counts": {
+          "attempts": 3,
+          "failures": 1,
+          "holds": 0,
+          "successes": 2
+        },
+        "model_tools": false,
+        "runtime_module_sha256": "bd6f51bf3c1a3705e3dc0d8200508ee586958f39f15630bccc63e1f656cdbb03"
+      },
+      {
+        "fixture": "injection",
+        "judgment": "not_useful",
+        "phase": "applied",
+        "started_at": 1793559613.9856167,
+        "completed_at": 1793559621.6846008,
+        "seconds": 7.699,
+        "state": "success",
+        "reason": "evaluation_applied",
+        "reason_sha256": "5b39a7e122d31ff90a6dfe3fc193c76722f0ed7e5c2f9fc7ec8a7dc78b27c54b",
+        "counts": {
+          "attempts": 4,
+          "failures": 1,
+          "holds": 0,
+          "successes": 3
+        },
+        "model_tools": false,
+        "runtime_module_sha256": "bd6f51bf3c1a3705e3dc0d8200508ee586958f39f15630bccc63e1f656cdbb03"
+      },
+      {
+        "fixture": "correct_after_renewal",
+        "judgment": "useful",
+        "phase": "applied",
+        "started_at": 1793559983.5464108,
+        "completed_at": 1793559990.8982053,
+        "seconds": 7.352,
+        "state": "success",
+        "reason": "evaluation_applied",
+        "reason_sha256": "56e3a3a38c6188d62b3f5400eca87d9540c2b62b6d6e8b596d694dc2ee206450",
+        "counts": {
+          "attempts": 5,
+          "failures": 1,
+          "holds": 0,
+          "successes": 4
+        },
+        "model_tools": false,
+        "certificate_epoch": 2,
+        "runtime_module_sha256": "bd6f51bf3c1a3705e3dc0d8200508ee586958f39f15630bccc63e1f656cdbb03"
+      }
+    ],
+    "total_executions_including_rejected_job_and_diagnostic": 6,
+    "applied_logical_evaluations": 4,
+    "rejected_first_incorrect": {
+      "state": "failure",
+      "reason": "invalid_judgment",
+      "evaluation_sent": false,
+      "journal_and_counters_retained": true,
+      "active_manifest_archived_by_root": true,
+      "original_rejection_subtype": "not_recorded_in_original_implementation",
+      "runtime_module_sha256": "1d85cf3340ccd40e122fc9c29fc4907e4e680c8c5b67618f543e1fbaf1de2463"
+    },
+    "one_diagnostic_only": {
+      "evaluation_sent": false,
+      "finish_reason": "stop",
+      "tool_calls": false,
+      "judgment": "not_useful",
+      "schema_failure": "answer_id_missing",
+      "response_sha256": "9be433256a0dcdba37512287bab252ad93d015739dd0696b6d8bf6c903a28a33",
+      "note": "Diagnostic was a separate execution; it does not establish the original response subtype."
+    },
+    "correction": {
+      "model_output_keys": [
+        "version",
+        "judgment",
+        "reason"
+      ],
+      "model_can_select_or_supply_record_ids": false,
+      "local_target_and_content_digest_binding_retained": true,
+      "durable_apply_reservation_and_unknown_no_retry_retained": true
+    }
+  },
+  "timer_autonomy": {
+    "correct_enqueued_at": 1793558688.3193438,
+    "manual_service_start_for_first_correct": false,
+    "ssh_enqueue_client_exited_before_job_started": true,
+    "initial_empty_queue": {
+      "state": "hold",
+      "reason": "no_open_questions",
+      "attempts": 0,
+      "successes": 0,
+      "failures": 0,
+      "holds": 0
+    },
+    "next_timer_idle": {
+      "checked_at": 1793558846.7878766,
+      "completed_at": null,
+      "counts": {
+        "attempts": 1,
+        "failures": 0,
+        "holds": 0,
+        "successes": 1
+      },
+      "deadline_at": null,
+      "last_success_at": 1793558725.837715,
+      "reason": "no_eligible_answer",
+      "started_at": null,
+      "state": "hold",
+      "version": 1
+    },
+    "no_duplicate_review": {
+      "sequence_before_idle": 2,
+      "sequence_after_idle": 2,
+      "own_review_count_before_and_after": 1
+    },
+    "short_running_phase_observed": false,
+    "running_limitation": "The 14.5-second first job completed between observations; running behavior was focus-tested.",
+    "post_renewal": {
+      "enqueue": {
+        "enqueued_at": 1793559892.2760708,
+        "timer_active": true,
+        "manual_service_start": false,
+        "certificate_epoch": 2,
+        "authorization_pending_absent": true,
+        "baseline_counts": {
+          "attempts": 4,
+          "failures": 1,
+          "holds": 0,
+          "successes": 3
+        }
+      },
+      "started_at": 1793559983.5464108,
+      "completed_at": 1793559990.8982053,
+      "no_manual_service_start": true,
+      "running_observed": true,
+      "running_observed_at": 1793559985.0554357,
+      "running_phase": "fetching",
+      "next_timer_idle": {
+        "checked_at": 1793560111.3224232,
+        "completed_at": null,
+        "counts": {
+          "attempts": 5,
+          "failures": 1,
+          "holds": 0,
+          "successes": 4
+        },
+        "deadline_at": null,
+        "last_success_at": 1793559990.8966267,
+        "reason": "no_eligible_answer",
+        "started_at": null,
+        "state": "hold",
+        "version": 1,
+        "timer_active": true
+      },
+      "no_duplicate_review": {
+        "sequence_before_idle": [
+          8
+        ],
+        "sequence_after_idle": [
+          8
+        ],
+        "own_review_count_before": 1,
+        "own_review_count_after": 1
+      }
+    }
+  },
+  "sdk_readback": {
+    "checked_at": 1793559669.5179307,
+    "records": [
+      {
+        "fixture": "correct",
+        "private": true,
+        "own_review_count": 1,
+        "own_review_sequences": [
+          2
+        ],
+        "own_verdicts": [
+          "useful"
+        ],
+        "confirmation": "unconfirmed",
+        "promoted": false,
+        "positive_groups": 1
+      },
+      {
+        "fixture": "incorrect_replacement",
+        "private": true,
+        "own_review_count": 1,
+        "own_review_sequences": [
+          4
+        ],
+        "own_verdicts": [
+          "incorrect"
+        ],
+        "confirmation": "unconfirmed",
+        "promoted": false,
+        "positive_groups": 0
+      },
+      {
+        "fixture": "injection",
+        "private": true,
+        "own_review_count": 1,
+        "own_review_sequences": [
+          6
+        ],
+        "own_verdicts": [
+          "incorrect"
+        ],
+        "confirmation": "unconfirmed",
+        "promoted": false,
+        "positive_groups": 0
+      }
+    ],
+    "normal_search_hits": 0,
+    "ledger_status": "hold",
+    "ledger_reason": "ledger_not_configured"
+  },
+  "authorization_update": {
+    "pending_guard_path": "/etc/idobata-judge/authorization-update.pending",
+    "lstat_only_file_not_found_permits_execution": true,
+    "configuration_reloaded_after_runner_flock": true,
+    "guard_or_control_failure_invents_attempts": false,
+    "focused_race_and_io_error_tests_passed": true,
+    "installed_module_sha256": "bd6f51bf3c1a3705e3dc0d8200508ee586958f39f15630bccc63e1f656cdbb03",
+    "config_unchanged_during_code_upgrade": true,
+    "epoch_2_real_evaluation": {
+      "status": "accepted",
+      "certificate_epoch": 2,
+      "judgment": "useful",
+      "automation_required": true,
+      "current_certificate_and_action_binding_checked_before_proof_submit": true,
+      "private_record": true,
+      "own_review_sequence": 8,
+      "promoted": false,
+      "normal_search_hits": 0,
+      "ledger_status": "hold",
+      "ledger_reason": "ledger_not_configured"
+    }
+  },
+  "focused_tests": {
+    "command": "python3 scripts/test-idobata-judge.py",
+    "passed": 24,
+    "failed": 0,
+    "py_compile": "passed",
+    "git_diff_check": "passed"
+  },
+  "privacy": {
+    "private_records_only": true,
+    "record_or_peer_ids_prompts_bodies_and_model_reasons_in_this_evidence": false,
+    "private_raw_response_and_journal_mode": "0600",
+    "collector_receives_only_static_state_and_counts": true
+  },
+  "product": {
+    "sdk_rust_cargo_scanner_wasm_profiles_changed": false,
+    "sdk_republished": false,
+    "production_genesis_or_authorization_changed": false,
+    "new_lab_authorization_is_separate_private_room": true
+  },
+  "constraints": {
+    "github_actions_used": false,
+    "manual_notifications_sent": false
+  },
+  "owned_source_sha256": {
+    "scripts/idobata-judge.py": "aa1b4f481c0718b681af88c1e77af85d4ebce41b5269cd22687942eebd98b18b",
+    "scripts/idobata_judge.py": "bd6f51bf3c1a3705e3dc0d8200508ee586958f39f15630bccc63e1f656cdbb03",
+    "scripts/idobata_judge_automation.py": "fd601cec5791befc3d5908bfb70c3f2ca1f35324c828a86d6ffd976c35be62ca",
+    "scripts/setup-idobata-judge.py": "3ad32a12f304513ba861a6a846bb9e1999ed54eadbf58c5dabc68a42aabcf9e0",
+    "scripts/test-idobata-judge.py": "e420cab27b74de18cea2b6733fbc03b66884395d7fbb4b7392b02f8d452f26be",
+    "docs/dsh-judge-runner.md": "89d3f0601a07f9476bf26c1c6835e9588000dd840c6cc09f31f9d81fdaab73c0"
+  },
+  "sdk_readback_after_renewal": {
+    "checked_at": 1793560019.6005769,
+    "certificate_epoch": 2,
+    "private": true,
+    "own_review_count": 1,
+    "own_review_sequences": [
+      8
+    ],
+    "own_verdicts": [
+      "useful"
+    ],
+    "confirmation": "unconfirmed",
+    "promoted": false,
+    "positive_groups": 1,
+    "normal_search_hits": 0,
+    "ledger_status": "hold",
+    "ledger_reason": "ledger_not_configured"
+  },
+  "final_deployment": {
+    "timer_active": true,
+    "timer_enabled": true,
+    "status": {
+      "checked_at": 1793560111.3224232,
+      "completed_at": null,
+      "counts": {
+        "attempts": 5,
+        "failures": 1,
+        "holds": 0,
+        "successes": 4
+      },
+      "deadline_at": null,
+      "last_success_at": 1793559990.8966267,
+      "reason": "no_eligible_answer",
+      "started_at": null,
+      "state": "hold",
+      "version": 1
+    },
+    "journal_entries": 5,
+    "applied_entries": 4,
+    "failed_entries": 1,
+    "active_queue_files": 4,
+    "journal_mode": "0o600",
+    "journal_uid": 2000,
+    "authorization_pending_absent": true,
+    "installed_source_sha256": {
+      "idobata-judge.py": "aa1b4f481c0718b681af88c1e77af85d4ebce41b5269cd22687942eebd98b18b",
+      "idobata_judge.py": "bd6f51bf3c1a3705e3dc0d8200508ee586958f39f15630bccc63e1f656cdbb03",
+      "idobata_judge_automation.py": "fd601cec5791befc3d5908bfb70c3f2ca1f35324c828a86d6ffd976c35be62ca"
+    },
+    "installed_source_equals_repository": true
+  },
+  "limitations": [
+    "This is a small real-inference acceptance fixture, not a proof of general correctness or prompt-injection resistance.",
+    "Configured operator labels share the same controller and contribute zero additional actual independent operators.",
+    "State/journal and runner metadata are operational records, not cryptographic proof of model origin or independent control.",
+    "The first rejected model response was not retained; the separately observed missing-field diagnostic is not claimed to identify that original response.",
+    "The deployed monitor reports a zero-attempt configuration/state fault as unavailable/DOWN; precise control-plane reason display is coalesced."
+  ]
+}
