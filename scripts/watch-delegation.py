@@ -6,6 +6,8 @@ import json
 import os
 from pathlib import Path
 import selectors
+import signal
+import sys
 import stat
 import subprocess
 import tempfile
@@ -114,10 +116,18 @@ def summarize_runner(value, now):
     return result
 
 
-def bounded_call(argv, limit=65_536, timeout=18):
+class ProbeError(RuntimeError):
+    """自由形式のエラーを外へ渡さず、固定分類だけを保持する。"""
+    def __init__(self, category):
+        super().__init__(category)
+        self.category = category
+
+
+def bounded_call(argv, limit=65_536, timeout=30):
     """stdout/stderrを上限付きで読み、例外や任意stderrを監視へ渡さない。"""
     process = subprocess.Popen(argv, stdin=subprocess.DEVNULL,
-                               stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                               stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                               start_new_session=True)
     buffers = {'stdout': bytearray(), 'stderr': bytearray()}
     deadline = time.monotonic() + timeout
     try:
@@ -127,7 +137,7 @@ def bounded_call(argv, limit=65_536, timeout=18):
             while selected.get_map():
                 left = deadline - time.monotonic()
                 if left <= 0:
-                    raise RuntimeError('command_unavailable')
+                    raise ProbeError('deadline_exceeded')
                 for key, _ in selected.select(min(left, 1)):
                     chunk = os.read(key.fileobj.fileno(), 8192)
                     if not chunk:
@@ -135,27 +145,56 @@ def bounded_call(argv, limit=65_536, timeout=18):
                     else:
                         buffers[key.data].extend(chunk)
                         if len(buffers[key.data]) > limit:
-                            raise RuntimeError('command_unavailable')
+                            raise ProbeError('output_limit')
         process.wait(timeout=max(0.01, deadline - time.monotonic()))
         if process.returncode not in [0, 10, 30]:
-            raise RuntimeError('command_unavailable')
+            # stderr本文や接続先、認証情報は記録しない。
+            error = bytes(buffers['stderr']).lower()
+            category = ('ssh_timeout' if b'timed out' in error else
+                        'ssh_auth_failed' if b'permission denied' in error else
+                        'ssh_failed' if process.returncode == 255 else
+                        'command_failed')
+            raise ProbeError(category)
         return json.loads(buffers['stdout'].decode('utf-8'))
     finally:
-        if process.poll() is None:
-            process.kill()
-            process.wait()
+        # ProxyCommandの子も回収し、タイムアウト後の接続蓄積を防ぐ。
+        try:
+            os.killpg(process.pid, signal.SIGKILL)
+        except ProcessLookupError:
+            pass
+        process.wait()
         process.stdout.close()
         process.stderr.close()
 
 
 def observe(argv, kind, now, invoke=bounded_call):
-    try:
-        value = invoke(argv, limit=65_536 if kind == 'peer' else 16_384)
-        return (summarize_peer(value, now) if kind == 'peer'
-                else summarize_runner(value, now))
-    except (OSError, ValueError, TypeError, RuntimeError, subprocess.SubprocessError):
-        return {'state': 'unavailable', 'reason': kind + '_unavailable',
-                'checked_at': now}
+    started = time.monotonic()
+    for attempt in range(2):
+        try:
+            value = invoke(argv, limit=65_536 if kind == 'peer' else 16_384,
+                           timeout=max(0.01, 30-(time.monotonic()-started)))
+            if attempt:
+                print(json.dumps({'event': 'delegation_probe_recovered',
+                                  'kind': kind, 'attempt': attempt+1}),
+                      file=sys.stderr, flush=True)
+            return (summarize_peer(value, now) if kind == 'peer'
+                    else summarize_runner(value, now))
+        except (OSError, ValueError, TypeError, RuntimeError,
+                subprocess.SubprocessError) as error:
+            category = (error.category if isinstance(error, ProbeError) else
+                        'invalid_json' if isinstance(error, ValueError) else
+                        'probe_failed')
+            elapsed = time.monotonic()-started
+            print(json.dumps({'event': 'delegation_probe_failed', 'kind': kind,
+                              'category': category, 'attempt': attempt+1,
+                              'elapsed_ms': round(elapsed*1000)}),
+                  file=sys.stderr, flush=True)
+            # 接続失敗だけ一度再取得する。実状態のNGや不正JSONは再解釈しない。
+            if (attempt == 0 and elapsed < 29
+                    and category in {'ssh_timeout', 'ssh_failed'}):
+                continue
+            return {'state': 'unavailable', 'reason': kind + '_unavailable',
+                    'checked_at': now}
 
 
 def config_valid(config):

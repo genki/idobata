@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
 """補助監視の状態区別・情報境界・既存4peerからの分離を検証する。"""
 import importlib.util
+import contextlib
+import io
+from unittest import mock
 import base64
 import json
 from pathlib import Path
@@ -44,6 +47,7 @@ class DelegationWatchTests(unittest.TestCase):
         for key in ['doctor_argv', 'runner_argv']:
             argv = value[key]
             self.assertIn('-oForwardAgent=no', argv)
+            self.assertIn('-oConnectTimeout=12', argv)
             nested = shlex.split(argv[-1])
             self.assertEqual(nested[0], '/usr/bin/ssh')
             self.assertIn('lima-dsh', nested)
@@ -164,6 +168,51 @@ class DelegationWatchTests(unittest.TestCase):
                 WATCH.bounded_call(command, **options)
         self.assertEqual(WATCH.bounded_call(
             [sys.executable, '-c', 'print("{}")']), {})
+
+    def test_ssh_timeout_is_classified_without_stderr_disclosure(self):
+        command = [sys.executable, '-c',
+                   'import sys; sys.stderr.write("private-sentinel timed out"); '
+                   'sys.exit(255)']
+        with self.assertRaises(WATCH.ProbeError) as caught:
+            WATCH.bounded_call(command)
+        self.assertEqual(caught.exception.category, 'ssh_timeout')
+        stream = io.StringIO()
+        def invoke(*_args, **_kwargs):
+            raise caught.exception
+        with contextlib.redirect_stderr(stream):
+            result = WATCH.observe(command, 'peer', 100, invoke)
+        event = json.loads(stream.getvalue().splitlines()[0])
+        self.assertEqual(event['category'], 'ssh_timeout')
+        self.assertEqual(result['state'], 'unavailable')
+        self.assertNotIn('private-sentinel', stream.getvalue())
+
+    def test_transport_retry_is_bounded_and_does_not_hide_real_failure(self):
+        invoke = mock.Mock(side_effect=[WATCH.ProbeError('ssh_timeout'), runner()])
+        with contextlib.redirect_stderr(io.StringIO()):
+            result = WATCH.observe(['fixed-ssh'], 'runner', 100, invoke)
+        self.assertEqual(result['state'], 'success')
+        self.assertEqual(invoke.call_count, 2)
+        self.assertLessEqual(invoke.call_args.kwargs['timeout'], 30)
+        for side_effect in [[WATCH.ProbeError('ssh_timeout')]*2,
+                            [ValueError('private-sentinel')]]:
+            invoke = mock.Mock(side_effect=side_effect)
+            with contextlib.redirect_stderr(io.StringIO()):
+                result = WATCH.observe(['fixed-ssh'], 'runner', 100, invoke)
+            self.assertEqual(result['state'], 'unavailable')
+            self.assertEqual(invoke.call_count, len(side_effect))
+        invoke = mock.Mock(return_value=runner('failure', 'model_failed'))
+        result = WATCH.observe(['fixed-ssh'], 'runner', 100, invoke)
+        self.assertEqual(result['state'], 'failure')
+        invoke.assert_called_once()
+
+    def test_timeout_reaps_proxy_process_group(self):
+        original = WATCH.os.killpg
+        with mock.patch.object(WATCH.os, 'killpg', wraps=original) as kill:
+            with self.assertRaises(WATCH.ProbeError):
+                WATCH.bounded_call([sys.executable, '-c',
+                                    'import time; time.sleep(5)'], timeout=0.05)
+        kill.assert_called_once()
+        self.assertEqual(kill.call_args.args[1], WATCH.signal.SIGKILL)
 
     def test_atomic_metadata_files_are_private_and_leave_no_temp_files(self):
         with tempfile.TemporaryDirectory() as d:

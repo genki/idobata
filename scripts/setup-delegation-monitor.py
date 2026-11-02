@@ -44,7 +44,7 @@ def transport(command):
              '-oForwardAgent=no', '-oControlMaster=no', '-oControlPath=none',
              '-F', '/Users/machinaai/.lima/dsh/ssh.config', 'lima-dsh',
              'sudo -n /usr/local/sbin/dsh-websh-exec ' + encoded]
-    return ['ssh', '-T', '-oBatchMode=yes', '-oConnectTimeout=5',
+    return ['ssh', '-T', '-oBatchMode=yes', '-oConnectTimeout=12',
             '-oForwardAgent=no', '-oControlMaster=no', '-oControlPath=none',
             'machinaai', shlex.join(guest)]
 
