@@ -29,6 +29,16 @@ function events(requests) {
  async function fixture({suffix='',referrer='',preload='',emptyId=false,pagePath='/'}={},check){
   const context=await browser.newContext({extraHTTPHeaders:{'X-Idobata-Diagnostic':'1'}});
   const requests=[],loaders=[],errors=[],violations=[];
+  const observers=new Set();
+  const waitForCollectedEvent=(name,match=()=>true,timeout=10000)=>{
+   const find=()=>events(requests).find(value=>value.get('en')===name&&match(value));
+   const existing=find();if(existing)return Promise.resolve(existing);
+   return new Promise((resolve,reject)=>{
+    const done=()=>{const value=find();if(value){clearTimeout(timer);observers.delete(done);resolve(value)}};
+    const timer=setTimeout(()=>{observers.delete(done);reject(new Error('No intercepted '+name+' dispatch before deadline'))},timeout);
+    observers.add(done);
+   });
+  };
   await context.exposeBinding('__idobataAnalyticsCspCheck',(_source,value)=>violations.push(value));
   await context.addInitScript(({referrer,preload})=>{
    if(window===parent&&referrer)Object.defineProperty(document,'referrer',{value:referrer});
@@ -61,6 +71,7 @@ function events(requests) {
    requests.push({url:request.url(),body:request.postData()||'',headers:request.headers()});
    // A synthetic success avoids SDK fallback retries, still with zero real hits.
    await route.fulfill({status:204,body:''});
+   for(const observe of observers)observe();
   });
   const page=await context.newPage();page.on('pageerror',e=>errors.push(e.message));
   try{
@@ -69,7 +80,7 @@ function events(requests) {
     const policy=response.headers()['content-security-policy']||'';
     assert.match(policy,/frame-src 'self'/);assert(!/googletagmanager/.test(policy));
    }
-   await check({page,context,requests,loaders});
+   await check({page,context,requests,loaders,waitForCollectedEvent});
    for(const r of [...requests,...loaders])assert(!decode(JSON.stringify(r)).includes(sentinel),'private sentinel leaked to Google request');
    assert.deepEqual(violations,[],'CSP blocked a required analytics asset or transport');
    assert.deepEqual(errors,[],'browser script error');
@@ -119,9 +130,12 @@ function events(requests) {
    assert(view);assert.equal(view.get('dl'),'https://idobata.s21g.com/docs/');assert.equal(view.get('dr'),'https://www.google.com/');
    assert.equal(view.get('ep.source_category'),'google');assert.equal(view.get('ep.page_kind'),'docs');checks.push('known public referrer maps to canonical origin and fixed source category');
   });
-  for(let attempt=0;attempt<3;attempt++)await fixture({},async({page,requests})=>{
-   await page.waitForFunction(id=>Boolean(document.querySelector('[data-idobata-analytics-sender]')?.contentWindow.google_tag_manager?.[id]),id);
-   await page.locator('a[href="/agents.md"]').first().click();await page.waitForURL('**/agents.md');await wait(1200);
+  for(let attempt=0;attempt<3;attempt++)await fixture({},async({page,requests,waitForCollectedEvent})=>{
+   // A container object can exist before the GA transport is operational.
+   // Prove a real first page_view dispatch before testing a ready-SDK click.
+   await waitForCollectedEvent('page_view');
+   const clicked=waitForCollectedEvent('navigation_click',value=>value.get('ep.destination')==='agent_guide',1200);
+   await page.locator('a[href="/agents.md"]').first().click();await page.waitForURL('**/agents.md');await clicked;
    assert(events(requests).some(p=>p.get('en')==='navigation_click'&&p.get('ep.destination')==='agent_guide'),'same-tab click was lost before navigation');
    checks.push('real same-tab guide navigation preserves fixed click event ('+(attempt+1)+'/3)');
   });

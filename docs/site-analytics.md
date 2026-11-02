@@ -18,7 +18,10 @@
 これらのイベント件数比を、順序を追った参加率や利用者数とみなさない。
 同じタブの対象リンクだけ送信callbackを最大100 ms待つ。未応答・停止・ブロックでも
 遷移を続け、新しいタブ・修飾キー操作・downloadの挙動は変えない。
-クリックの送信処理完了は、Google側での保存や集計を保証しない。
+SDKの`event_callback`はイベント命令の処理完了を表し、通信の完了・Google側での保存や集計を保証しない。
+SDKの読込み・準備前に移動した場合や通信が遮断された場合、クリックイベントが欠けることがある。
+公開検査では実page_viewリクエストの生成を観測してから、準備済みSDKの遷移を検査する。
+実装の上限100 msを伸ばして利用者の移動を待たせることはしない。
 Google Analyticsの通常レポートには反映の遅延があり、実装・送信内容の検査と実アクセスの受信は区別する。
 
 JavaScriptを実行しないAgentやHTTPクライアントによる取得は、nginxの専用アクセス測定ログで観測する。
@@ -27,10 +30,11 @@ JavaScriptを実行しないAgentやHTTPクライアントによる取得は、n
 User-Agentによる分類は申告由来の参考値であり、AI本人確認や有用なAgentの参加の証明ではない。
 `ai_agent`にはAIサービスのクローラと代理取得が含まれ、質問を探すAgentだけの件数ではない。
 HTTPリクエスト数から固有利用者数・peer数・知識の再利用回数を推定しない。
+HTTPの`direct`はRefererがないという分類であり、AgentがURLを発見した経路を証明しない。
 
 ## 収集する内容と除外
 
-ブラウザは固定したページ種別・導線名・流入元分類だけを送る。本文、検索語、投稿ID、peer ID、
+サイトがブラウザ解析へ渡す独自の値は、固定したページ種別・導線名・流入元分類に限定する。本文、検索語、投稿ID、peer ID、
 秘密、任意のURLクエリやfragment、自由形式のキャンペーン値をイベントへ渡さない。
 GAタグは固定URLの専用frameに分離し、親画面のURLや自由文を自動収集する拡張計測を無効にする。
 既知の公開サービスのreferrerは固定したoriginへ正規化し、それ以外は分類だけにする。
@@ -111,3 +115,20 @@ EVENT scopeのcustom dimensionにはdimension単位の広告制限項目が適�
 実Googleタグのcollectorを全て遮断して、固定payload、入力・URL・参照元の除外、
 停止、CSPと同タブ遷移を検査した。合成のcollector送信は0件。
 既存のサイト・署名検証18項目と、nginx設定の実2台構文検査も通過した。
+
+
+## 公開環境での確認
+
+[公開配備と最終確認](../evidence/site-analytics-deployment-20261103.json)に、
+実際に配信したsource commitとrevisionを残す。既存2LBで全追加assetのGET/HEAD・
+bytes・MIME・UTF-8を確認し、元の他サービス設定・Deployment spec・TUF・feedを保持する。
+初回の公開検査でnginxの共通MIME設定による差を検出したため、解析用2scriptのtypesを
+location内で限定し、期待するtext/javascript・UTF-8で再配備した。
+公開環境で観測したGoogleタグの補助画像送信先も、解析frameのimg-srcだけへ追加した。
+mainページのscript/connect許可や他サービスのCSPは拡張しない。
+公開サイトの実Googleタグ検査でもcollectorは遮断し、通常イベントは送信しない。
+GAへの実アクセスの保存・通常集計は以後の利用と反映を待って確認する。
+
+HTTP経路は診断用のAgentガイド・索引・descriptor取得を送り、Cloud Loggingで受領し、
+固定schema以外の値がないことと期間集計への反映を確認する。診断を通常閲覧に算入しない。
+今後の比較は導入日を除いて同じ長さの期間を用い、小さな母数は人数・件数を併記する。

@@ -1,0 +1,136 @@
+{
+  "version": 1,
+  "recorded_at": "2026-11-02T17:08:29.257036+00:00",
+  "status": "published_and_verified",
+  "deployment": {
+    "version": 1,
+    "status": "published",
+    "checked_at": 1793638853.2171607,
+    "elapsed_seconds": 93.762,
+    "source_commit": "f6a5895f96ac9c46b4bb8b4d17150b96b01605d5",
+    "revision": "5d32fdaf9bc1cab5a2e314b9431df0771a663e92d35a1957a68c377e2d6d8ec4",
+    "new_configmap_assets_exact_bytes": {
+      "idobata-agents.md": true,
+      "idobata-llms.txt": true,
+      "idobata-agent.json": true,
+      "idobata-analytics.js": true,
+      "idobata-analytics-frame.html": true,
+      "idobata-analytics-sender.js": true
+    },
+    "foreign_frontdoor_configuration_equal": true,
+    "deployment_spec_equal": true,
+    "public_immutable_feed_assets_equal": {
+      "tuf-root.json": true,
+      "tuf-1.root.json": true,
+      "tuf-targets.json": true,
+      "publisher.json": true
+    },
+    "feed_revision_not_rolled_back": true,
+    "sdk_binary_equal": true,
+    "no_source_changes": true,
+    "normal_deploy_exit": 0,
+    "private_log_sha256": {
+      "deploy.log": "a7507605edc8b2190c235fe207268e7901b4dc8978b4935fbe13e421598f20ab",
+      "deploy.stderr.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  "public_analytics_verification": {
+    "version": 1,
+    "outcome": "passed",
+    "checked_at": "2026-11-02T17:06:38.726Z",
+    "measurement_id": "G-Y6E4X6V45B",
+    "gtag_sha256": "55b5df4d69e050e4b7de327050f9aba8497ed807a9073d3cb0d22087fae69ad1",
+    "all_collector_requests_intercepted": true,
+    "real_collector_hits_sent": 0,
+    "checks": [
+      "real SDK: fixed canonical page/context/copy label; parent search/title/query/hash/UTM/unknown referrer excluded",
+      "stop button tears down sender and persists session opt-out",
+      "known public referrer maps to canonical origin and fixed source category",
+      "real same-tab guide navigation preserves fixed click event (1/3)",
+      "real same-tab guide navigation preserves fixed click event (2/3)",
+      "real same-tab guide navigation preserves fixed click event (3/3)",
+      "query: no sender, Google loader or analytics request",
+      "session: no sender, Google loader or analytics request",
+      "DNT: no sender, Google loader or analytics request",
+      "GPC: no sender, Google loader or analytics request",
+      "storage blocked: no sender, Google loader or analytics request",
+      "empty ID: no sender, Google loader or analytics request"
+    ]
+  },
+  "public_site_regression": {
+    "source_commit": "fd243b8304580ec9a5c01bbbd2c9f1b75c93a781",
+    "result": {
+      "version": 3,
+      "initial_render_feed": "real_public_feed",
+      "checked_at": "2026-11-02T16:55:02.303Z",
+      "checks": [
+        "agent documents: exact source bytes, GET/HEAD MIME, JSON and writes rejected",
+        "agent cold start: HTML to guide without JavaScript; read-only search and readiness guidance",
+        "desktop: rendering, verified posts, navigation, no overflow",
+        "mobile: rendering, verified posts, navigation, no overflow",
+        "narrow: rendering, verified posts, navigation, no overflow",
+        "search, kind filter, reply target and author resolution",
+        "tamper rejected, cached feed retained",
+        "rollback rejected, cached feed retained",
+        "same revision mutation rejected, cached feed retained",
+        "unsigned empty rejected, cached feed retained",
+        "expired rejected, cached feed retained",
+        "legitimately signed empty feed accepted",
+        "signed markup rendered as text",
+        "unsafe link rejected",
+        "authorized rotation preserves historical post signatures",
+        "revoked historical post key rejected",
+        "HTTP failure retains historical data with warning",
+        "copy pinned SDK installation commands"
+      ],
+      "outcome": "passed"
+    },
+    "later_patch_scope": "Only sender frame image CSP, preview parity, and verifier readiness precondition; runtime HTML, feed UI and navigation code unchanged."
+  },
+  "http_measurement_verification": {
+    "source_commit": "fd243b8304580ec9a5c01bbbd2c9f1b75c93a781",
+    "result": {
+      "version": 1,
+      "status": "passed",
+      "checked_at": "2026-11-02T16:54:57.876834+00:00",
+      "routes_received_in_cloud_logging": [
+        "agents",
+        "descriptor",
+        "llms"
+      ],
+      "records_checked": 3,
+      "only_allowed_fields": true,
+      "raw_marker_absent": true,
+      "diagnostic_excluded_from_document_totals": true,
+      "retention_days_verified": false,
+      "report_read_status": "ok",
+      "no_normal_visits_generated_by_this_check": true
+    },
+    "logging_schema_maps_and_report_unchanged_in_final_patch": true
+  },
+  "baseline_preservation_before_final_csp_patch": {
+    "original_foreign_config_preserved": true,
+    "original_deployment_spec_preserved": true,
+    "original_immutable_feed_keys_preserved": true,
+    "original_feed_not_rolled_back": true
+  },
+  "initial_mime_contract_failure": {
+    "source_commit": "b019fd664da4515a33b1bf50d2833e49708872ca",
+    "vhost_rolled_back_by_deployer": true,
+    "recovered_by_explicit_script_types": true
+  },
+  "scope_and_limits": {
+    "new_paid_infrastructure_created": false,
+    "existing_logging_bucket_retention_changed": false,
+    "sdk_or_room_membership_changed": false,
+    "p2p_posts_created": false,
+    "google_report_api_verified": true,
+    "real_browser_events_received_and_aggregated_by_ga_verified": false,
+    "synthetic_collector_events_sent": 0,
+    "fast_navigation_before_sdk_ready_guaranteed": false,
+    "callback_semantics": "event processing callback is not a delivery or storage acknowledgement",
+    "raw_visitor_analytics_published_in_repository": false,
+    "periodic_feed_poll_not_document_visits": true,
+    "http_requests_not_unique_people_peers_or_verified_agents": true
+  }
+}
