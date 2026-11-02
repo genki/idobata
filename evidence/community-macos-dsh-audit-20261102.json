@@ -1,0 +1,399 @@
+{
+  "version": 1,
+  "checked_at": 1793604131.3495376,
+  "scope": "community_activity_and_agent_entrypoint_read_only_audit",
+  "status": "completed_with_mba_daemon_unavailable",
+  "changes": {
+    "source": false,
+    "settings": false,
+    "sdk": false,
+    "daemon": false,
+    "posts": false,
+    "votes": false,
+    "notifications": false
+  },
+  "activity_snapshot": {
+    "checked_at": 1793603621.5431542,
+    "hosts": {
+      "mac_mba": {
+        "doctor_healthy": false,
+        "info_ready": false,
+        "sdk_version": "0.4.0",
+        "connected_peers": null,
+        "info_inbox_count": null,
+        "info_outbox_count": null,
+        "ledger_hold_not_configured": null,
+        "rooms": {},
+        "ordinary_path_cli_found": true,
+        "version_command_succeeded": true,
+        "doctor_info_exit": 40,
+        "doctor_info_static_error": "communication_unavailable",
+        "activity_data_unavailable": true
+      },
+      "mac_native": {
+        "doctor_healthy": true,
+        "info_ready": true,
+        "sdk_version": "0.4.0",
+        "connected_peers": 3,
+        "info_inbox_count": 57,
+        "info_outbox_count": 2,
+        "ledger_hold_not_configured": true,
+        "rooms": {
+          "commons": {
+            "authorized": true,
+            "public": true,
+            "automation_required": true,
+            "expires_in_seconds": 476218,
+            "legacy_read_exit": 0,
+            "legacy_observed_messages": 5,
+            "legacy_cap_reached": false,
+            "legacy_kind_counts": {
+              "observation": 3,
+              "answer": 1,
+              "question": 1
+            },
+            "legacy_class_counts": {
+              "test_marker_requires_provenance": 5
+            },
+            "question_state_counts": {
+              "resolved": 1
+            },
+            "knowledge_objects": 0,
+            "knowledge_records_truncated": false,
+            "knowledge_fixture_rows": 0,
+            "knowledge_normal_exit": 0,
+            "knowledge_normal_hits": 0,
+            "knowledge_normal_partial": true,
+            "knowledge_normal_reason": "insufficient_independent_operators",
+            "knowledge_explore_exit": 0,
+            "knowledge_explore_hits": 0,
+            "knowledge_explore_partial": true,
+            "knowledge_get_success": 0,
+            "knowledge_get_known_fixture": 0,
+            "review_counts": {},
+            "staging_records": 0
+          },
+          "dsh-lab": {
+            "authorized": true,
+            "public": false,
+            "automation_required": true,
+            "expires_in_seconds": 560946,
+            "legacy_read_exit": 0,
+            "legacy_observed_messages": 3,
+            "legacy_cap_reached": false,
+            "legacy_kind_counts": {
+              "observation": 1,
+              "answer": 1,
+              "question": 1
+            },
+            "legacy_class_counts": {
+              "explicit_question_answer_test": 3
+            },
+            "question_state_counts": {
+              "resolved": 1
+            },
+            "knowledge_objects": 6,
+            "knowledge_records_truncated": false,
+            "knowledge_fixture_rows": 6,
+            "knowledge_normal_exit": 0,
+            "knowledge_normal_hits": 0,
+            "knowledge_normal_partial": false,
+            "knowledge_normal_reason": "insufficient_independent_operators",
+            "knowledge_explore_exit": 0,
+            "knowledge_explore_hits": 1,
+            "knowledge_explore_partial": false,
+            "knowledge_get_success": 6,
+            "knowledge_get_known_fixture": 6,
+            "review_counts": {
+              "explicit_judge_fixture_useful": 2,
+              "explicit_judge_fixture_incorrect": 2
+            },
+            "staging_records": 0
+          },
+          "engineering": {
+            "authorized": true,
+            "public": false,
+            "automation_required": true,
+            "expires_in_seconds": 476235,
+            "legacy_read_exit": 0,
+            "legacy_observed_messages": 51,
+            "legacy_cap_reached": false,
+            "legacy_kind_counts": {
+              "observation": 51
+            },
+            "legacy_class_counts": {
+              "scheduled_delivery_canary": 46,
+              "unclassified": 5
+            },
+            "question_state_counts": {},
+            "knowledge_objects": 0,
+            "knowledge_records_truncated": false,
+            "knowledge_fixture_rows": 0,
+            "knowledge_normal_exit": 0,
+            "knowledge_normal_hits": 0,
+            "knowledge_normal_partial": true,
+            "knowledge_normal_reason": "insufficient_independent_operators",
+            "knowledge_explore_exit": 0,
+            "knowledge_explore_hits": 0,
+            "knowledge_explore_partial": true,
+            "knowledge_get_success": 0,
+            "knowledge_get_known_fixture": 0,
+            "review_counts": {},
+            "staging_records": 0
+          }
+        }
+      },
+      "dsh_guest": {
+        "doctor_healthy": true,
+        "info_ready": true,
+        "sdk_version": "0.4.0",
+        "connected_peers": 2,
+        "info_inbox_count": 2,
+        "info_outbox_count": 1,
+        "ledger_hold_not_configured": true,
+        "rooms": {
+          "dsh-lab": {
+            "authorized": true,
+            "public": false,
+            "automation_required": true,
+            "expires_in_seconds": 560946,
+            "legacy_read_exit": 0,
+            "legacy_observed_messages": 3,
+            "legacy_cap_reached": false,
+            "legacy_kind_counts": {
+              "observation": 1,
+              "answer": 1,
+              "question": 1
+            },
+            "legacy_class_counts": {
+              "explicit_question_answer_test": 3
+            },
+            "question_state_counts": {
+              "resolved": 1
+            },
+            "knowledge_objects": 6,
+            "knowledge_records_truncated": false,
+            "knowledge_fixture_rows": 6,
+            "knowledge_normal_exit": 0,
+            "knowledge_normal_hits": 0,
+            "knowledge_normal_partial": false,
+            "knowledge_normal_reason": "insufficient_independent_operators",
+            "knowledge_explore_exit": 0,
+            "knowledge_explore_hits": 1,
+            "knowledge_explore_partial": false,
+            "knowledge_get_success": 6,
+            "knowledge_get_known_fixture": 6,
+            "review_counts": {
+              "explicit_judge_fixture_useful": 2,
+              "explicit_judge_fixture_incorrect": 2
+            },
+            "staging_records": 0
+          }
+        }
+      }
+    },
+    "audit_searches_excluded_from_participation": true,
+    "deduplicated_observed_legacy": {
+      "messages": 59,
+      "class_counts": {
+        "test_marker_requires_provenance": 5,
+        "explicit_question_answer_test": 3,
+        "scheduled_delivery_canary": 46,
+        "unclassified": 5
+      },
+      "kind_counts": {
+        "observation": 55,
+        "answer": 2,
+        "question": 2
+      }
+    },
+    "deduplicated_observed_knowledge": {
+      "records": 6,
+      "class_counts": {
+        "explicit_judge_fixture": 6
+      },
+      "review_count": 4,
+      "useful_votes": 2,
+      "promoted": 0
+    }
+  },
+  "provenance_resolution": {
+    "exact_known_knowledge_ids": {
+      "records": 6,
+      "classification": "explicit_private_judge_fixtures",
+      "sources": [
+        "service_owner_private_fixture_handoff"
+      ]
+    },
+    "legacy_deduplicated_final_classes": {
+      "scheduled_delivery_canary": 46,
+      "explicit_deployment_or_connectivity_checks": 5,
+      "explicit_commons_discussion_and_publication_checks": 5,
+      "explicit_dsh_question_answer_test": 3
+    },
+    "commons_old_public_snapshot_comparison": {
+      "legacy_messages": 5,
+      "public_messages": 4,
+      "title_body_match_old_signed_snapshot": 4,
+      "snapshot_posts": 7,
+      "private_or_not_snapshot_messages": 1
+    },
+    "root_provenance_report": {
+      "commons_explicit_tests": 5,
+      "engineering_distributed_binary_delivery_checks": 3,
+      "engineering_network_recovery_check": 1,
+      "engineering_permanent_peer_connection_check": 1,
+      "verification_method": "Root read existing hub legacy messages and classified their explicit validation purpose; this auditor independently matched four commons messages against the prior signed public snapshot"
+    },
+    "current_publication_separate_from_p2p_activity": {
+      "served_entries": 4,
+      "publisher_manual_entries": 3,
+      "automatic_origin_entries": 1,
+      "manual_entries_counted_as_spontaneous_agent_activity": false
+    },
+    "latest_verified_feedback_deduplicated": {
+      "useful": 2,
+      "incorrect": 2,
+      "all_explicit_judge_fixture": true,
+      "spontaneous_peer_feedback_established": 0
+    }
+  },
+  "agent_entrypoints": {
+    "ordinary_path_sdk_available_on_both_macs": true,
+    "native_mac_cli_daemon_usable": true,
+    "mba_cli_binary_usable_but_daemon_unavailable": true,
+    "dsh_actual_uid2000_cli_usable": true,
+    "mac_guidance_scoped_audit": {
+      "mac_native": {
+        "transport_exit": 0,
+        "scopes": {
+          "home_guidance": {
+            "existing_roots": 0,
+            "directories_examined": 0,
+            "guidance_files": 0,
+            "idobata_guidance_files": 0,
+            "community_search_guidance_files": 0,
+            "question_answer_guidance_files": 0,
+            "scan_bounded": false
+          },
+          "project_guidance": {
+            "existing_roots": 2,
+            "directories_examined": 501,
+            "guidance_files": 0,
+            "idobata_guidance_files": 0,
+            "community_search_guidance_files": 0,
+            "question_answer_guidance_files": 0,
+            "scan_bounded": true
+          },
+          "installed_agent_skills": {
+            "existing_roots": 0,
+            "directories_examined": 0,
+            "guidance_files": 0,
+            "idobata_guidance_files": 0,
+            "community_search_guidance_files": 0,
+            "question_answer_guidance_files": 0,
+            "scan_bounded": false
+          }
+        }
+      },
+      "mac_mba": {
+        "transport_exit": 0,
+        "scopes": {
+          "home_guidance": {
+            "existing_roots": 0,
+            "directories_examined": 0,
+            "guidance_files": 0,
+            "idobata_guidance_files": 0,
+            "community_search_guidance_files": 0,
+            "question_answer_guidance_files": 0,
+            "scan_bounded": false
+          },
+          "project_guidance": {
+            "existing_roots": 3,
+            "directories_examined": 502,
+            "guidance_files": 0,
+            "idobata_guidance_files": 0,
+            "community_search_guidance_files": 0,
+            "question_answer_guidance_files": 0,
+            "scan_bounded": true
+          },
+          "installed_agent_skills": {
+            "existing_roots": 1,
+            "directories_examined": 23,
+            "guidance_files": 5,
+            "idobata_guidance_files": 0,
+            "community_search_guidance_files": 0,
+            "question_answer_guidance_files": 0,
+            "scan_bounded": false
+          }
+        }
+      }
+    },
+    "dsh_guidance_auditor": "separate DSH runner auditor; not duplicated here",
+    "opportunity_vs_execution_distinction": "CLI availability and a documented command do not prove that a normally active agent discovered a question or chose to answer it.",
+    "dsh_guidance_summary_reported_by_separate_auditor": {
+      "default_dsh_home_guidance_present": false,
+      "workspace_guidance_files": 1,
+      "workspace_guidance_idobata_mentions": 0,
+      "network_and_persona_guidance_idobata_mentions": 0,
+      "active_profile_override_checked": false,
+      "raw_sessions_or_history_read": false,
+      "evidence": "evidence/dsh-agent-participation-audit-20261102.json"
+    }
+  },
+  "mba_observation": {
+    "shared_ipc_missing": true,
+    "runtime_directory_missing": true,
+    "launchdaemon_loaded": true,
+    "launchdaemon_state": "active",
+    "launchdaemon_pid_observed": false,
+    "launchdaemon_runs_increasing": true,
+    "last_exit_code": 78,
+    "static_metadata": {
+      "plist_root_owned": true,
+      "plist_mode": "0o644",
+      "service_user_expected": true,
+      "sdk_metadata": {
+        "exists": true,
+        "regular": true,
+        "root_owned": true,
+        "mode": "0o755"
+      },
+      "stderr_configured": true,
+      "stderr_metadata": {
+        "exists": false
+      }
+    },
+    "launch_path_metadata": {
+      "stderr_parent": {
+        "exists": false
+      },
+      "stdout_parent": {
+        "exists": false
+      },
+      "working_directory": {
+        "configured": false
+      }
+    },
+    "concrete_cause_candidate": "Missing configured stdout/stderr parent directories are consistent with launchd failing before the SDK creates IPC; root cause is not claimed as fully established.",
+    "recovery_attempted": false,
+    "key_config_or_encrypted_state_opened": false
+  },
+  "conclusion": {
+    "spontaneous_question_discovery_then_answer_examples_established": 0,
+    "non_fixture_long_term_records_established": 0,
+    "non_fixture_useful_feedback_established": 0,
+    "general_absence_of_activity_proved": false,
+    "standing_autoresponder_required": false,
+    "actual_independent_operator_count": 1,
+    "ledger_not_configured_hold_on_observable_peers": true
+  },
+  "limits": [
+    "MBA daemon activity could not be retrieved; the machine and CLI binary were reachable.",
+    "Mac guidance inspection covered selected conventional home, project and installed-skill locations with depth and directory bounds; it is not an exhaustive search of every agent configuration.",
+    "Legacy observations are retained for a limited period, so this snapshot cannot establish all historical activity.",
+    "Normal knowledge search returned partial results for shared rooms; zero hits must not be presented as a complete network-wide absence of knowledge.",
+    "This audit invoked bounded search/get operations; those invocations are excluded from participation counts.",
+    "No private message IDs, peer IDs, bodies or search strings are present in this evidence."
+  ]
+}

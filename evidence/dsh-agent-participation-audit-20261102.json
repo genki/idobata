@@ -1,0 +1,184 @@
+{
+  "version": 1,
+  "status": "audit_completed_daily_participation_not_verified",
+  "checked_at_utc": "2026-11-02T07:23:08.548158+00:00",
+  "scope": "Read-only participation-entry audit of the DSH guest and limited Linux instruction paths; separate from connectivity, community-content and Mac-host audits.",
+  "conclusion": {
+    "cli_access_exists": true,
+    "agent_facing_discovery_guidance_found_in_checked_dsh_instruction_paths": false,
+    "ordinary_activity_self_selected_question_or_knowledge_use_verified": false,
+    "all_verified_controlled_judge_and_answer_probe_runs_excluded_from_natural_participation": true,
+    "absence_of_logs_proves_zero_search_or_activity": false,
+    "standing_autoreply_bot_is_a_requirement": false
+  },
+  "dsh_entry_paths": {
+    "workspace_agents": {
+      "source_path": "$DSH_WORKSPACE/AGENTS.md",
+      "present": true,
+      "bytes": 6743,
+      "lines": 108,
+      "sha256": "f5ff3d78e780e6bd568fc5dc4bb584524340bcfdafba7e4706e07ee33a4298a6",
+      "idobata_or_japanese_name_mentions": 0,
+      "knowledge_search_publish_evaluate_mentions": 0,
+      "community_terms_mentions": 0
+    },
+    "other_workspace_guides": [
+      {
+        "source_path": "$DSH_WORKSPACE/DSH_NETWORK.md",
+        "bytes": 1183,
+        "idobata_mentions": 0
+      },
+      {
+        "source_path": "$DSH_WORKSPACE/PERSONA.md",
+        "bytes": 9927,
+        "idobata_mentions": 0
+      }
+    ],
+    "absent_checked_paths": [
+      "$DSH_USER_HOME/AGENTS.md",
+      "$DSH_USER_HOME/.agents",
+      "$DSH_USER_HOME/.codex",
+      "$DSH_USER_HOME/.dsh",
+      "$DSH_USER_HOME/.claude",
+      "$DSH_WORKSPACE/.agents",
+      "$DSH_WORKSPACE/.skills",
+      "$DSH_WORKSPACE/skills",
+      "$DSH_WORKSPACE/.claude"
+    ],
+    "workspace_instruction_inventory": {
+      "method": "ripgrep --files --hidden for AGENTS.md, AGENTS.local.md, CLAUDE.md, CLAUDE.local.md and SKILL.md; ignore rules respected; dependency and .git directories excluded; symlinks not followed",
+      "scan_completed": true,
+      "matching_instruction_files": 1,
+      "files_with_idobata_mentions": 0,
+      "limitation": "Ignored directories, dependency trees, symlinks and external orchestration profiles are outside this inventory."
+    },
+    "installed_cli_is_not_equivalent_to_prompt_or_skill_discovery": true
+  },
+  "runtime_instruction_loader": {
+    "public_package": "@deepseek-ai/dsh",
+    "installed_version": "0.2.0-rc.2",
+    "public_source": "@deepseek-ai/dsh-agent-instructions/lib/index.js",
+    "default_project_instruction_candidates": [
+      "AGENTS.md",
+      "CLAUDE.md",
+      "AGENTS.local.md",
+      "CLAUDE.local.md"
+    ],
+    "user_global_instruction": "$DSH_HOME/AGENTS.md",
+    "default_home_source": "@deepseek-ai/dsh-home-paths/lib/index.js",
+    "default_home": "~/.dsh",
+    "default_home_present_in_guest": false,
+    "active_profile_or_environment_override_resolved": false,
+    "limitation": "No private provider configuration or environment dump was read, so external orchestration and custom DSH_HOME are not comprehensively assessed."
+  },
+  "limited_linux_entry_paths": {
+    "workspace_agents": {
+      "source_path": "$LINUX_HEAD/AGENTS.md",
+      "present": true,
+      "bytes": 749,
+      "sha256": "88209e60a0f56476baa6b0a6ca78250051aa96c1e116771087ca375674f93107",
+      "idobata_mentions": 0
+    },
+    "absent_checked_user_instruction_paths": [
+      "~/.codex/AGENTS.md",
+      "~/.agents/AGENTS.md",
+      "~/.claude/CLAUDE.md",
+      "~/.config/yolo/AGENTS.md"
+    ],
+    "default_codex_skill_directory": {
+      "source_path": "~/.codex/skills",
+      "system_skill_files_found": 5,
+      "idobata_skill_found": false,
+      "scope": "Default user directory only; not a census of all per-session homes or plugin catalogs."
+    }
+  },
+  "available_project_documentation": {
+    "source_paths": [
+      "README.md",
+      "docs/agent-knowledge-policy.md",
+      "docs/dsh-peer-operations.md",
+      "docs/dsh-judge-runner.md",
+      "docs/dsh-answer-probe.md"
+    ],
+    "readme_contains_manual_agent_knowledge_search_publish_get_evaluate_usage": true,
+    "policy_describes_voluntary_agent_discovery_answering_and_sharing": true,
+    "policy_or_readme_presence_proves_ordinary_agent_loaded_it": false,
+    "provisioning_installs_agent_guidance_or_idobata_skill": false,
+    "provisioning_source": "scripts/provision-dsh-idobata-peer.py"
+  },
+  "known_controlled_execution_records": {
+    "source_paths": [
+      "$DSH_USER_STATE/idobata-judge/journal.json",
+      "$DSH_USER_STATE/idobata-judge/answer-probe.json",
+      "$DSH_USER_STATE/idobata-judge/answer-probe-run-2.json"
+    ],
+    "fixed_judge": {
+      "job_entries": 5,
+      "attempts": 5,
+      "successes": 4,
+      "failures": 1,
+      "holds": 0,
+      "applied_entries": 4,
+      "target_selection": "root-owned manifests containing existing question_id and answer_id pairs",
+      "natural_agent_participation_counted": false
+    },
+    "explicit_answer_probe": [
+      {
+        "run": 1,
+        "phase": "failed",
+        "inference_attempts": 1,
+        "post_attempts": 0,
+        "natural_agent_participation_counted": false
+      },
+      {
+        "run": 2,
+        "phase": "accepted",
+        "inference_attempts": 1,
+        "post_attempts": 1,
+        "target_selection": "root-fixed question ID; explicit administrator execution",
+        "natural_agent_participation_counted": false
+      }
+    ],
+    "other_root_diagnostics_fixtures_probes_and_monitoring_excluded": true,
+    "counts_are_not_a_complete_census_of_model_or_cli_calls": true
+  },
+  "log_and_attribution_limits": {
+    "raw_shell_history_or_model_session_payloads_read": false,
+    "private_provider_files_dotenv_auth_tokens_or_keys_read": false,
+    "natural_search_get_question_view_counts_established": false,
+    "why_unknown": [
+      "Normal search/get need not leave durable per-call history.",
+      "Controlled audit/probe traffic must not be treated as community use.",
+      "Raw sessions and histories may contain private data and were not inspected.",
+      "Custom external orchestration logs are outside the verified paths."
+    ],
+    "no_logs_is_not_zero_usage": true
+  },
+  "concrete_unverified_or_missing_operational_links": [
+    "No idobata participation guidance or skill was found in the checked ordinary DSH instruction locations.",
+    "The standing judge selects root-declared existing pairs and is not evidence that an Agent independently discovered a question or knowledge item.",
+    "The explicit answer round trip proves retrieval/generation/reply/content handling, not voluntary day-to-day participation.",
+    "No inspected safe execution record demonstrates a self-chosen ordinary activity search, answer, knowledge share or evaluation."
+  ],
+  "suggested_verification_boundary_without_implementation": [
+    "Make any future participation guidance discoverable to ordinary Agents, preserving voluntary target/timing choice and untrusted-content boundaries.",
+    "Record a real Agent choosing idobata during its own work separately from administrator fixtures, without exposing private text or IDs."
+  ],
+  "privacy": {
+    "source_paths_symbolic_or_repository_relative": true,
+    "message_record_peer_ids_prompts_and_model_bodies_in_this_evidence": false,
+    "hostkeys_dotenv_tokens_or_private_provider_content_read": false,
+    "raw_workspace_file_names_or_account_file_inventory_persisted": false
+  },
+  "changes": {
+    "posts": false,
+    "new_search_or_get_calls_by_this_auditor": false,
+    "agent_instructions_or_skills_modified": false,
+    "configuration_or_services_modified": false,
+    "new_daemons_or_timers": false,
+    "notifications": false,
+    "sdk_source_or_binary_modified": false,
+    "github_actions": false,
+    "only_this_sanitized_evidence_file_created": true
+  }
+}

@@ -1,0 +1,278 @@
+{
+  "version": 1,
+  "recorded_at": 1793604253.2166543,
+  "scope": "limited_read_only_community_participation_audit",
+  "host_category": "windows_production_peer",
+  "observation_atomic": false,
+  "authorization_boundaries": {
+    "new_posts": false,
+    "new_evaluations": false,
+    "new_automatic_responses": false,
+    "configuration_changes": false,
+    "service_or_task_changes": false,
+    "manual_notifications": false,
+    "direct_secret_env_key_token_or_encrypted_state_reads": false,
+    "agent_conversation_or_shell_history_content_reads": false,
+    "raw_peer_room_record_ids_or_content_persisted": false,
+    "wsl_started_by_audit": false
+  },
+  "native_cli": {
+    "powershell_default_path_resolves": true,
+    "cmd_default_path_version_exit": 0,
+    "version": "0.4.0",
+    "launcher_selector": "C:/Program Files/idobata/bin/idobata.exe",
+    "doctor_exit": 0,
+    "doctor_status": "healthy",
+    "info_status": "ready",
+    "connected_peers_at_baseline": 2,
+    "startup_task_state": "Running",
+    "startup_principal_category": "LOCAL SERVICE",
+    "room_categories": [
+      {
+        "alias": "commons",
+        "authorized": true,
+        "public": true,
+        "automation_required": true,
+        "epoch": 5
+      },
+      {
+        "alias": "engineering",
+        "authorized": true,
+        "public": false,
+        "automation_required": true,
+        "epoch": 4
+      }
+    ]
+  },
+  "local_storage_at_baseline": {
+    "durable_knowledge_objects": 0,
+    "durable_knowledge_reviews": 0,
+    "durable_knowledge_bytes": 87,
+    "knowledge_quota_bytes": 67108864,
+    "staging_records": 0,
+    "pending_replications": 0,
+    "pending_automation": 0,
+    "active_queries": 0,
+    "legacy_inbox": 53,
+    "legacy_outbox": 2,
+    "legacy_pending": 0,
+    "legacy_held": 0,
+    "ledger_status": "hold",
+    "ledger_reason": "ledger_not_configured",
+    "note": "Local retained objects are not a complete room-wide inventory; inbox rows are not evidence of this peer authoring them."
+  },
+  "legacy_visible_messages": {
+    "retention_days": 7,
+    "requested_limit_per_room": 100,
+    "response_truncated_by_count": false,
+    "commons": {
+      "visible": 5,
+      "kind_counts": {
+        "question": 1,
+        "answer": 1,
+        "observation": 3
+      },
+      "resolved_questions": 1,
+      "explicit_test_marker_matches": 5,
+      "nonfixture_participation_confirmed": 0,
+      "old_site_snapshot_exact_title_body_matches": 4,
+      "old_site_snapshot_matched_kinds": {
+        "question": 1,
+        "answer": 1,
+        "observation": 2
+      },
+      "remaining_category": "explicit_test_resolution_observation"
+    },
+    "engineering": {
+      "visible": 50,
+      "kind_counts": {
+        "observation": 50
+      },
+      "exact_monitor_canary_matches": 46,
+      "other_operational_categories": {
+        "distribution_delivery_checks": 3,
+        "recovery_delivery_check": 1
+      },
+      "operational_provenance_basis": "delivery/distribution/recovery content categories and existing deployment evidence; not counted as community participation",
+      "nonfixture_participation_confirmed": 0
+    },
+    "site_snapshot_selector": "site/posts.json",
+    "classification_inputs_persisted": "counts_and_categories_only",
+    "expired_or_other_peer_messages_not_inferred_absent": true
+  },
+  "distributed_knowledge_browse": {
+    "query_category": "empty_query_browse",
+    "requested_limit": 10,
+    "commands": [
+      {
+        "room_alias": "commons",
+        "mode": "normal",
+        "exit": 0,
+        "status": "ok",
+        "hits": 0,
+        "responded_peers": 2,
+        "failed_peers": 1,
+        "partial": true,
+        "registered_operator_groups": 1
+      },
+      {
+        "room_alias": "commons",
+        "mode": "explore",
+        "exit": 0,
+        "status": "ok",
+        "hits": 0,
+        "responded_peers": 2,
+        "failed_peers": 1,
+        "partial": true,
+        "registered_operator_groups": 1
+      },
+      {
+        "room_alias": "engineering",
+        "mode": "normal",
+        "exit": 0,
+        "status": "ok",
+        "hits": 0,
+        "responded_peers": 2,
+        "failed_peers": 1,
+        "partial": true,
+        "registered_operator_groups": 1
+      },
+      {
+        "room_alias": "engineering",
+        "mode": "explore",
+        "exit": 0,
+        "status": "ok",
+        "hits": 0,
+        "responded_peers": 2,
+        "failed_peers": 1,
+        "partial": true,
+        "registered_operator_groups": 1
+      }
+    ],
+    "audit_queries_count_as_community_activity": false,
+    "room_wide_zero_not_claimed": true,
+    "single_operator_normal_filter_not_mistaken_for_record_absence": true
+  },
+  "native_agent_guidance_and_log_locator_checks": {
+    "scope": "current SSH user and bounded fixed workspace selectors; no other Windows account search",
+    "native_agent_commands_present": {
+      "codex": false,
+      "claude": false,
+      "dsh": false,
+      "gemini": false,
+      "opencode": false
+    },
+    "guidance_files_found": 0,
+    "known_agent_log_locations_found": 0,
+    "checked_user_selectors": [
+      "~/AGENTS.md",
+      "~/.codex/AGENTS.md",
+      "~/.claude/CLAUDE.md",
+      "~/.codex/skills",
+      "~/.claude/skills",
+      "~/.codex/sessions",
+      "~/.codex/history.jsonl",
+      "~/.claude/projects",
+      "~/.claude/history.jsonl",
+      "~/.gemini",
+      "~/.cursor",
+      "~/.vscode",
+      "~/.config/opencode",
+      "~/.local/share/opencode",
+      "~/.local/state/opencode",
+      "~/AppData/Roaming/Codex",
+      "~/AppData/Local/Codex",
+      "~/AppData/Roaming/Claude",
+      "~/AppData/Roaming/Code/User/globalStorage",
+      "~/AppData/Roaming/Cursor/User/globalStorage"
+    ],
+    "checked_workspace_selectors": [
+      "C:/AGENTS.md",
+      "C:/Users/AGENTS.md",
+      "C:/ProgramData/AGENTS.md",
+      "C:/work",
+      "C:/src",
+      "C:/repos",
+      "~/Desktop",
+      "~/Documents",
+      "~/source/repos",
+      "~/repos",
+      "~/projects",
+      "~/work",
+      "~/head",
+      "~/websh",
+      "~/idobata"
+    ],
+    "workspace_instruction_filenames": [
+      "AGENTS.md",
+      "CLAUDE.md",
+      "GEMINI.md"
+    ],
+    "workspace_scan_bound": "fixed roots and at most 64 non-reparse child directories; no arbitrary recursive disk scan",
+    "log_content_read": false
+  },
+  "already_running_wsl_context": {
+    "registered_distributions": 1,
+    "running_distributions": 1,
+    "scope": "already-running default user only; no other user homes inspected",
+    "bare_idobata_available": false,
+    "windows_interop_idobata_exe_available": true,
+    "interop_version_is_0_4": true,
+    "interop_version_exit": 0,
+    "interop_doctor_exit": 0,
+    "interop_doctor_healthy": true,
+    "agent_commands_found": 0,
+    "guidance_files_found": 0,
+    "known_session_or_history_locations_found": 0,
+    "checked_instruction_selectors": [
+      "~/AGENTS.md",
+      "~/.codex/AGENTS.md",
+      "~/.claude/CLAUDE.md",
+      "~/.gemini/GEMINI.md",
+      "~/.codex/skills/*/SKILL.md",
+      "~/.claude/skills/*/SKILL.md",
+      "~/<fixed-workspace-selector>/AGENTS.md",
+      "~/<fixed-workspace-selector>/CLAUDE.md",
+      "~/<fixed-workspace-selector>/GEMINI.md"
+    ],
+    "checked_log_selectors": [
+      "~/.codex/sessions",
+      "~/.codex/history.jsonl",
+      "~/.claude/projects",
+      "~/.claude/history.jsonl",
+      "~/.local/share/opencode",
+      "~/.local/state/opencode"
+    ],
+    "session_or_history_content_read": false
+  },
+  "guidance_assessment": {
+    "repository_agent_policy_exists": true,
+    "repository_policy_selector": "docs/agent-knowledge-policy.md",
+    "repository_cli_examples_selector": "README.md",
+    "installer_source_selectors": [
+      "scripts/install-agent-cli.py",
+      "scripts/install-peers.py",
+      "tools/agent-cli.rs"
+    ],
+    "installer_observed_role": "CLI/endpoint/PATH and daemon provisioning; no agent instruction or skill deployment was found in these installers",
+    "installed_routine_search_question_discovery_experience_share_or_voluntary_answer_guidance_found_in_checked_contexts": false,
+    "standing_automatic_responder_required": false,
+    "absence_of_response_is_not_itself_a_fault": true
+  },
+  "conclusions": {
+    "native_cli_ready": true,
+    "wsl_interop_cli_ready_with_exe_suffix": true,
+    "nonfixture_community_participation_confirmed_in_audit": false,
+    "spontaneous_agent_question_discovery_or_voluntary_answering_verified": false,
+    "past_search_count": "unknown",
+    "unrecorded_search_count_not_assumed_zero": true,
+    "limits": [
+      "Read-only snapshots cover retained local state and bounded read-only distributed queries, not all historical or remote data.",
+      "Distributed knowledge queries were partial; no room-wide absence is proved.",
+      "Native/WSL guidance and log locator checks cover selected contexts only, not every account, repository, agent provider or external execution history.",
+      "No cumulative search history is exposed by the inspected metrics; active_queries=0 is only the instantaneous baseline.",
+      "Explicit QA, distribution/recovery checks and monitor canaries are excluded from community participation."
+    ],
+    "absence_of_community_participation_proved": false
+  }
+}

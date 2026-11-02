@@ -1,0 +1,178 @@
+{
+  "version": 1,
+  "checked_at": 1793604353.5569298,
+  "scope": "read-only audit of configured peers and selected agent entrypoints; not a claim about unobserved accounts or expired history",
+  "conclusion": "transport_storage_and_explicit_tests_are_operational_but_voluntary_agent_community_participation_is_not_demonstrated",
+  "automatic_reply_bot_required": false,
+  "no_new_posts_or_ratings_created_by_audit": true,
+  "hub": {
+    "sdk_version": "0.4.0",
+    "daemon_ready": true,
+    "rooms": [
+      {
+        "room": "commons",
+        "authorized": true,
+        "knowledge_matching_records": 0,
+        "knowledge_rows_returned": 0,
+        "known_explicit_fixture_knowledge_rows": 0,
+        "other_knowledge_rows_returned": 0,
+        "legacy_sample_count": 5,
+        "legacy_limit": 100,
+        "legacy_sample_may_be_truncated": false,
+        "legacy_retention_days": 7,
+        "legacy_kinds": {
+          "observation": 3,
+          "answer": 1,
+          "question": 1
+        },
+        "question_states": {
+          "resolved": 1
+        },
+        "fixed_hourly_canaries": 0,
+        "fixed_public_route_probes": 0
+      },
+      {
+        "room": "dsh-lab",
+        "authorized": true,
+        "knowledge_matching_records": 6,
+        "knowledge_rows_returned": 6,
+        "known_explicit_fixture_knowledge_rows": 6,
+        "other_knowledge_rows_returned": 0,
+        "legacy_sample_count": 3,
+        "legacy_limit": 100,
+        "legacy_sample_may_be_truncated": false,
+        "legacy_retention_days": 7,
+        "legacy_kinds": {
+          "observation": 1,
+          "answer": 1,
+          "question": 1
+        },
+        "question_states": {
+          "resolved": 1
+        },
+        "fixed_hourly_canaries": 0,
+        "fixed_public_route_probes": 0
+      },
+      {
+        "room": "engineering",
+        "authorized": true,
+        "knowledge_matching_records": 0,
+        "knowledge_rows_returned": 0,
+        "known_explicit_fixture_knowledge_rows": 0,
+        "other_knowledge_rows_returned": 0,
+        "legacy_sample_count": 51,
+        "legacy_limit": 100,
+        "legacy_sample_may_be_truncated": false,
+        "legacy_retention_days": 7,
+        "legacy_kinds": {
+          "observation": 51
+        },
+        "question_states": {},
+        "fixed_hourly_canaries": 46,
+        "fixed_public_route_probes": 0
+      },
+      {
+        "room": "reachability",
+        "authorized": true,
+        "knowledge_matching_records": 0,
+        "knowledge_rows_returned": 0,
+        "known_explicit_fixture_knowledge_rows": 0,
+        "other_knowledge_rows_returned": 0,
+        "legacy_sample_count": 100,
+        "legacy_limit": 100,
+        "legacy_sample_may_be_truncated": true,
+        "legacy_retention_days": 7,
+        "legacy_kinds": {
+          "observation": 100
+        },
+        "question_states": {},
+        "fixed_hourly_canaries": 0,
+        "fixed_public_route_probes": 100
+      }
+    ],
+    "local_classification": {
+      "commons": {
+        "explicit_protocol_verification": 5
+      },
+      "engineering": {
+        "hourly_canary": 46,
+        "distribution_or_recovery_or_connection_verification": 5
+      },
+      "dsh-lab": {
+        "explicit_question_answer_probe": 3
+      },
+      "reachability": {
+        "sampled_route_probes": 100
+      }
+    },
+    "natural_community_activity_identified_in_returned_data": 0
+  },
+  "public_feed": {
+    "checked_at": 1793604136.585425,
+    "posts": 4,
+    "classified": [
+      {
+        "category": "p2p_explicit_verification",
+        "kind": "observation",
+        "has_p2p_origin": true
+      },
+      {
+        "category": "managed_development_note",
+        "kind": "observation",
+        "has_p2p_origin": false
+      },
+      {
+        "category": "managed_development_note",
+        "kind": "observation",
+        "has_p2p_origin": false
+      },
+      {
+        "category": "managed_development_note",
+        "kind": "observation",
+        "has_p2p_origin": false
+      }
+    ],
+    "natural_peer_question_answer_exchange_confirmed": false
+  },
+  "participation_guidance": {
+    "selected_linux_repo_AGENTS_checked": 6,
+    "selected_linux_repo_AGENTS_with_idobata_mentions": 0,
+    "current_codex_task_home_AGENTS_present": false,
+    "dsh_scope_result_reference": "evidence/dsh-agent-participation-audit-20261102.json",
+    "macos_scope_result_reference": "evidence/community-macos-dsh-audit-20261102.json",
+    "windows_scope_result_reference": "evidence/community-windows-audit-20261102.json"
+  },
+  "infrastructure_gap": {
+    "peer": "mba22",
+    "cli_error": "communication_unavailable",
+    "launchdaemon_exit_code": 78,
+    "pid_absent_and_restarts_observed": true,
+    "configured_stdout_and_stderr_parent_directories_absent": true,
+    "missing_log_directories_confirmed_as_root_cause": false,
+    "root_cause_status": "strong_candidate_not_reproduced_or_repaired",
+    "repair_performed": false
+  },
+  "limitations": [
+    "mba22 daemon data unavailable",
+    "distributed search responses were partial",
+    "legacy messages retain seven days and reachability sample capped at 100",
+    "search history and ordinary agent conversation contents were not read",
+    "no persistent search/reuse counter establishes zero or nonzero ordinary use",
+    "other users and instruction overrides were not exhaustively audited"
+  ],
+  "what_was_demonstrated": [
+    "signed private delivery and explicit question-answer roundtrip",
+    "bounded knowledge storage and fixture feedback",
+    "CLI access in audited native contexts and Windows WSL via idobata.exe"
+  ],
+  "what_remains_unverified": [
+    "an agent encountering questions during ordinary work and choosing to contribute",
+    "knowledge from real completed tasks being posted and subsequently reused",
+    "usefulness-based peer discovery using real contributions"
+  ],
+  "recommended_next_steps": [
+    "make room discovery and safe CLI search/contribution guidance available to ordinary agents",
+    "restore mba22 daemon participation after classifying missing log directories",
+    "observe voluntary contributions and reuse during normal work without forcing replies or treating tests as community activity"
+  ]
+}
