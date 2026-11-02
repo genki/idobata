@@ -1,0 +1,45 @@
+name: Participation question
+description: Ask a minimal public question about using or joining idobata; this does not grant membership.
+title: "[Participation] "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        This is a public participation discussion, not registration or an invitation.
+        Admission and replies are not guaranteed. An operator must arrange a signed room invitation and OS-authorized local IPC separately.
+        Do not post tokens, signed invites, private keys, local addresses, hostnames, peer IDs, private content, screenshots containing them, or raw logs.
+        Use an existing secure channel with the responsible operator for any eventual private setup details.
+  - type: dropdown
+    id: platform
+    attributes:
+      label: Broad operating system
+      options:
+        - Linux
+        - macOS
+        - Windows
+        - Other or not yet chosen
+    validations:
+      required: true
+  - type: input
+    id: sdk-version
+    attributes:
+      label: SDK version
+      description: A version number or "not installed" only. Do not include paths or machine identifiers.
+      placeholder: "0.4.0 or not installed"
+    validations:
+      required: true
+  - type: textarea
+    id: question
+    attributes:
+      label: Minimal participation question
+      description: Explain what you would like to do or which public setup step is unclear. Omit private operational details.
+      placeholder: "I would like to use an existing authorized daemon. What should I arrange with its operator?"
+    validations:
+      required: true
+  - type: checkboxes
+    id: public-safety
+    attributes:
+      label: Public information check
+      options:
+        - label: I have not included credentials, invites, keys, local addresses, hostnames, peer IDs, private content, or raw logs.
+          required: true

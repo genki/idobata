@@ -2,6 +2,7 @@
 """既存frontdoorへ静的サイトだけを追加する。新規Pod・PVC・LBを作らない。"""
 import argparse
 import base64
+from email.message import Message
 import json
 from pathlib import Path
 import subprocess
@@ -12,6 +13,9 @@ END = '# END IDOBATA SITE'
 FILES = {
     'idobata-index.html': 'site/index.html',
     'idobata-docs.html': 'site/docs/index.html',
+    'idobata-agents.md': 'site/agents.md',
+    'idobata-llms.txt': 'site/llms.txt',
+    'idobata-agent.json': 'site/agent.json',
     'idobata-style.css': 'site/style.css',
     'idobata-app.js': 'site/app.js',
     'idobata-posts.json': 'site/posts.json',
@@ -19,11 +23,41 @@ FILES = {
     'idobata-sitemap.xml': 'site/sitemap.xml',
     'idobata-releases.json': 'site/releases.json',
 }
+AGENT_ROUTES = {
+    '/agents.md': ('idobata-agents.md', 'text/markdown'),
+    '/llms.txt': ('idobata-llms.txt', 'text/plain'),
+    '/.well-known/idobata/agent.json': ('idobata-agent.json', 'application/json'),
+}
 
 
 def run(args, data=None):
     return subprocess.run(args, input=data, text=True, capture_output=True,
                           check=True, timeout=60).stdout
+
+
+def verify_agent_routes(address, assets):
+    """Verify public GET bytes and HEAD MIME, without executing guide commands."""
+    for route, (name, expected_type) in AGENT_ROUTES.items():
+        for head in [False, True]:
+            command = ['curl', '--fail', '--silent', '--show-error', '--max-time', '10',
+                       '--resolve', 'idobata.s21g.com:443:' + address]
+            if head:
+                command.append('--head')
+            command += ['--write-out', '\n%{http_code}\n%{content_type}',
+                        'https://idobata.s21g.com' + route]
+            response = subprocess.run(command, capture_output=True, check=True, timeout=15)
+            body, status, content_type = response.stdout.rsplit(b'\n', 2)
+            headers = Message()
+            headers['Content-Type'] = content_type.decode()
+            if status != b'200' or headers.get_content_type() != expected_type:
+                raise ValueError('agent文書のHTTP状態またはMIMEが不一致です')
+            if expected_type.startswith('text/') and headers.get_content_charset() != 'utf-8':
+                raise ValueError('agent文書のUTF-8 charsetが不一致です')
+            if not head and body != assets[name].encode('utf-8'):
+                raise ValueError('agent文書の配信bytesが不一致です')
+            if not head and route.endswith('.json'):
+                if not isinstance(json.loads(body), dict):
+                    raise ValueError('agent文書のJSON構造が不正です')
 
 
 def replace_block(config, fragment):
@@ -64,7 +98,7 @@ def main():
     if (ROOT/'site/trust-root.json').exists():
         trust_value.update(root=json.loads((ROOT/'site/trust-root.json').read_text()),bundle=json.loads((ROOT/'site/trust.json').read_text()))
     trust = 'window.IDOBATA_TRUST = Object.freeze(' + json.dumps(trust_value) + ');\n'
-    assets = {name:(ROOT/path).read_text() for name,path in FILES.items()
+    assets = {name:(ROOT/path).read_bytes().decode('utf-8') for name,path in FILES.items()
               if name not in ['idobata-posts.json','idobata-publisher.json']}
     assets['idobata-trust.js'] = trust
     for name in ['trust-root.json','trust.json']:
@@ -162,6 +196,7 @@ def main():
                         with tempfile.NamedTemporaryFile(mode='w',suffix='.json') as public_file:
                             public_file.write(data);public_file.flush()
                             run([args.binary,'public','verify','--feed',public_file.name]+trust_args)
+                verify_agent_routes(address, assets)
             # 旧workerの終了上限を過ぎてから旧配信ファイルを除く。
             if any(name in cm['data'] for name in FILES) or 'idobata-icon.png' in cm.get('binaryData',{}):
                 for _ in range(13):time.sleep(5)
