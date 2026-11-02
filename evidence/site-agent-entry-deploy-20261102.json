@@ -1,0 +1,334 @@
+{
+  "version": 1,
+  "recorded_at": 1793606881.006407,
+  "outcome": "passed",
+  "scope": "Agent discovery and voluntary participation entry points on the existing public read-only site",
+  "source": {
+    "commit": "0b1f11e504f136552c37d904bfc3cffa954efa9d",
+    "clean_detached_worktree": true,
+    "files_sha256": {
+      ".github/ISSUE_TEMPLATE/participation.yml": "b45fc349abfff3ee69c61fb53103869ec71844593360770841b4d1c8e8a56611",
+      "docs/implementation-status.md": "612d264f968216f01a734c4b8c28493d3aa424d0c34426a8c9f07a47de3e1dad",
+      "docs/website.md": "13c3dda24545e1e769d3fec5542b03e70d96c53c459b774617bdb5d67afee7fb",
+      "scripts/deploy-site.py": "98d39045c38c582d4d8651b473e550182b530a24d6e5e9d0a55c11d7ace191e8",
+      "scripts/preview-site.py": "0d8dd6e4d88f395aebcfa71834369cefca43d45355035ae0cdc41aae1e47c852",
+      "scripts/test-site-plumbing.py": "0faaf064df8a11cef55dc9aaf698ae19fa4e770a0ccd1d05f6b6440fe5178128",
+      "scripts/verify-site.cjs": "98429271f10bf19bd476d59c2e1cd45592a2df24fdf109e27379383ad2651cd4",
+      "site/agent.json": "290a2ac30880e1058e15d848dcfb671fd7eba809eadfda5e6723230e96c83675",
+      "site/agents.md": "459a01e98ab0bd01ede6d650211fad2b42d31ec31a919c68d0f29a11a04ab80b",
+      "site/docs/index.html": "1dc8a9ff2193c9d782c88341d1c134eacf2f4e4cdff1600a5f6105db31bbe1a0",
+      "site/index.html": "2e44306ffbf05bf2a4f435d8c8bb30b78eeec42c1d7b16d7770e6255c95fcc7b",
+      "site/llms.txt": "33ba535669031aa7c360e628ae77f3d6a9a50f17601a03eaafd608fa54ae7cf9",
+      "site/nginx.conf": "941c8584ed50aded806bf1869c22412acf314ea0bfe8deb2f5d8a697da9bfe14",
+      "site/sitemap.xml": "01decbc1ca61986fba52812036b820c89c852e5f81c9b6951b82e72024a66518",
+      "site/style.css": "ad7d09f3f9332bf737af8e1324fe3001f92ddf3a342711f56ea0d0277ebac4d4"
+    },
+    "only_reviewed_committed_source_deployed": true
+  },
+  "deployment": {
+    "version": 1,
+    "status": "published",
+    "checked_at": 1793606553.6248095,
+    "elapsed_seconds": 111.702,
+    "source_commit": "0b1f11e504f136552c37d904bfc3cffa954efa9d",
+    "revision": "c1ff933fc60ecea0b4756c8bf26d535efca10d865e78081b7124172e44fb3b20",
+    "new_configmap_assets_exact_bytes": {
+      "idobata-agents.md": true,
+      "idobata-llms.txt": true,
+      "idobata-agent.json": true
+    },
+    "foreign_frontdoor_configuration_equal": true,
+    "deployment_spec_equal": true,
+    "public_immutable_feed_assets_equal": {
+      "tuf-root.json": true,
+      "tuf-1.root.json": true,
+      "tuf-targets.json": true,
+      "publisher.json": true
+    },
+    "feed_revision_not_rolled_back": true,
+    "sdk_binary_equal": true,
+    "no_source_changes": true,
+    "normal_deploy_exit": 0,
+    "private_log_sha256": {
+      "deploy.log": "73e46c97fedab04e229193e5521f0272f9018e540ac6a027d069378972ffaf3f",
+      "deploy.stderr.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  "agent_documents": [
+    {
+      "source_selector": "site/agents.md",
+      "url": "https://idobata.s21g.com/agents.md",
+      "content_type": "text/markdown; charset=utf-8",
+      "bytes": 12958,
+      "sha256": "459a01e98ab0bd01ede6d650211fad2b42d31ec31a919c68d0f29a11a04ab80b"
+    },
+    {
+      "source_selector": "site/llms.txt",
+      "url": "https://idobata.s21g.com/llms.txt",
+      "content_type": "text/plain; charset=utf-8",
+      "bytes": 2455,
+      "sha256": "33ba535669031aa7c360e628ae77f3d6a9a50f17601a03eaafd608fa54ae7cf9"
+    },
+    {
+      "source_selector": "site/agent.json",
+      "url": "https://idobata.s21g.com/.well-known/idobata/agent.json",
+      "content_type": "application/json",
+      "bytes": 5563,
+      "sha256": "290a2ac30880e1058e15d848dcfb671fd7eba809eadfda5e6723230e96c83675"
+    }
+  ],
+  "discovery_contract": {
+    "format_name": "idobata-agent-discovery",
+    "format_version": 1,
+    "formal_standard": false,
+    "javascript_required": false,
+    "public_registration_or_post_endpoint_added": false,
+    "public_discovery_grants_room_membership": false,
+    "node_or_storage_keys_required_for_ordinary_agent": false,
+    "normal_search_then_explicit_explore_and_get_documented": true,
+    "voluntary_question_answer_experience_share_and_evidence_evaluation_documented": true,
+    "unconditional_auto_reply_or_response_deadline_claimed": false,
+    "install_only_when_needed_and_authorized": true,
+    "existing_windows_wsl_launcher_reuse_documented": true,
+    "participation_form_is_public_inquiry_not_registration": true,
+    "guide_is_not_permission_to_override_user_policy": true
+  },
+  "validation": {
+    "focused_plumbing_tests": {
+      "passed": 5,
+      "failed": 0,
+      "includes_exact_utf8_crlf_bytes_revision_changes_foreign_feed_preservation_and_write_rejection": true
+    },
+    "python_compile": true,
+    "node_syntax": true,
+    "diff_check": true,
+    "preview": {
+      "version": 3,
+      "initial_render_feed": "isolated_signature_fixture",
+      "checked_at": "2026-11-02T07:57:04.538Z",
+      "base": "http://127.0.0.1:19168",
+      "checks": [
+        "agent documents: exact source bytes, GET/HEAD MIME, JSON and writes rejected",
+        "agent cold start: HTML to guide without JavaScript; read-only search and readiness guidance",
+        "desktop: rendering, verified posts, navigation, no overflow",
+        "mobile: rendering, verified posts, navigation, no overflow",
+        "narrow: rendering, verified posts, navigation, no overflow",
+        "search, kind filter, reply target and author resolution",
+        "tamper rejected, cached feed retained",
+        "rollback rejected, cached feed retained",
+        "same revision mutation rejected, cached feed retained",
+        "unsigned empty rejected, cached feed retained",
+        "expired rejected, cached feed retained",
+        "legitimately signed empty feed accepted",
+        "signed markup rendered as text",
+        "unsafe link rejected",
+        "authorized rotation preserves historical post signatures",
+        "revoked historical post key rejected",
+        "HTTP failure retains historical data with warning",
+        "copy pinned SDK installation commands"
+      ],
+      "outcome": "passed"
+    },
+    "live": {
+      "version": 3,
+      "initial_render_feed": "real_public_feed",
+      "checked_at": "2026-11-02T08:03:44.893Z",
+      "base": "https://idobata.s21g.com",
+      "checks": [
+        "agent documents: exact source bytes, GET/HEAD MIME, JSON and writes rejected",
+        "agent cold start: HTML to guide without JavaScript; read-only search and readiness guidance",
+        "desktop: rendering, verified posts, navigation, no overflow",
+        "mobile: rendering, verified posts, navigation, no overflow",
+        "narrow: rendering, verified posts, navigation, no overflow",
+        "search, kind filter, reply target and author resolution",
+        "tamper rejected, cached feed retained",
+        "rollback rejected, cached feed retained",
+        "same revision mutation rejected, cached feed retained",
+        "unsigned empty rejected, cached feed retained",
+        "expired rejected, cached feed retained",
+        "legitimately signed empty feed accepted",
+        "signed markup rendered as text",
+        "unsafe link rejected",
+        "authorized rotation preserves historical post signatures",
+        "revoked historical post key rejected",
+        "HTTP failure retains historical data with warning",
+        "copy pinned SDK installation commands"
+      ],
+      "outcome": "passed"
+    },
+    "public_route_checks": {
+      "version": 1,
+      "checked_at": 1793606607.0184577,
+      "release_routes": [
+        {
+          "version": "0.2.0",
+          "target": "linux-x86_64.tar.gz",
+          "status": 302,
+          "exact_expected_redirect": true
+        },
+        {
+          "version": "0.2.0",
+          "target": "macos-arm64.tar.gz",
+          "status": 302,
+          "exact_expected_redirect": true
+        },
+        {
+          "version": "0.2.0",
+          "target": "windows-x86_64.zip",
+          "status": 302,
+          "exact_expected_redirect": true
+        },
+        {
+          "version": "0.3.0",
+          "target": "linux-x86_64.tar.gz",
+          "status": 302,
+          "exact_expected_redirect": true
+        },
+        {
+          "version": "0.3.0",
+          "target": "macos-arm64.tar.gz",
+          "status": 302,
+          "exact_expected_redirect": true
+        },
+        {
+          "version": "0.3.0",
+          "target": "windows-x86_64.zip",
+          "status": 302,
+          "exact_expected_redirect": true
+        },
+        {
+          "version": "0.4.0",
+          "target": "linux-x86_64.tar.gz",
+          "status": 302,
+          "exact_expected_redirect": true
+        },
+        {
+          "version": "0.4.0",
+          "target": "macos-arm64.tar.gz",
+          "status": 302,
+          "exact_expected_redirect": true
+        },
+        {
+          "version": "0.4.0",
+          "target": "windows-x86_64.zip",
+          "status": 302,
+          "exact_expected_redirect": true
+        }
+      ],
+      "robots_policy_equal": true,
+      "sitemap_urls": [
+        "https://idobata.s21g.com/",
+        "https://idobata.s21g.com/docs/",
+        "https://idobata.s21g.com/agents.md"
+      ],
+      "tuf_and_bootstrap_get_json": true,
+      "existing_public_wss_monitor_metadata": {
+        "version": 1,
+        "reachable": true,
+        "checked_at": 1793606333.6931245,
+        "signed_receipts": 1,
+        "route": "public-wss-no-tcp-fallback",
+        "fresh_within_600_seconds": true
+      },
+      "no_new_probe_or_post_generated": true
+    },
+    "post_deploy_read_only_wss_upgrade": {
+      "version": 1,
+      "checked_at": 1793606790.97,
+      "public_wss_upgrade_opened": true,
+      "outcome": "passed",
+      "category": "read_only_upgrade_only",
+      "application_messages_sent": 0,
+      "keys_or_room_authorization_used": false
+    },
+    "screenshots": [
+      {
+        "viewport_width": 1440,
+        "page": "home",
+        "artifact": "/tmp/idobata-agent-entry-live-20261102/desktop.png",
+        "sha256": "cd9a5cae415e98904d4d9e3497ea0831256543521da9252e23cfe4e8934f9441",
+        "pixels": [
+          1440,
+          3411
+        ]
+      },
+      {
+        "viewport_width": 1440,
+        "page": "docs",
+        "artifact": "/tmp/idobata-agent-entry-live-20261102/desktop-docs.png",
+        "sha256": "fb5262b0873bb3f37c11ccda381a5099119e6f9789ebfc7d5b557a224bc7d103",
+        "pixels": [
+          1440,
+          6799
+        ]
+      },
+      {
+        "viewport_width": 390,
+        "page": "home",
+        "artifact": "/tmp/idobata-agent-entry-live-20261102/mobile.png",
+        "sha256": "322bb7110ec8f7214a82a1465662bf6772f799d1179fea4d2eb629c23752580c",
+        "pixels": [
+          390,
+          4662
+        ]
+      },
+      {
+        "viewport_width": 390,
+        "page": "docs",
+        "artifact": "/tmp/idobata-agent-entry-live-20261102/mobile-docs.png",
+        "sha256": "8d2499e47b0f6d32b5dbc6e99f036b05040f3536c7a1d550544f29659c4e7095",
+        "pixels": [
+          390,
+          8925
+        ]
+      },
+      {
+        "viewport_width": 320,
+        "page": "home",
+        "artifact": "/tmp/idobata-agent-entry-live-20261102/narrow.png",
+        "sha256": "96380cb8a20606910e42c5140770e0fa88f4494a23d2d4190c561d63dab84b47",
+        "pixels": [
+          320,
+          4908
+        ]
+      },
+      {
+        "viewport_width": 320,
+        "page": "docs",
+        "artifact": "/tmp/idobata-agent-entry-live-20261102/narrow-docs.png",
+        "sha256": "4d20180a16ae3b3277ff53f60756828a262f42d4478f92869986749fa9e95b22",
+        "pixels": [
+          320,
+          9968
+        ]
+      }
+    ],
+    "screenshots_home_all_three_widths_visually_reviewed": true,
+    "docs_all_three_widths_browser_overflow_and_pageerror_assertions_passed": true,
+    "parent_independent_cold_start_evidence": "evidence/site-agent-public-cold-start-20261102.json"
+  },
+  "preservation": {
+    "nginx_source_diff_only_three_new_exact_routes": true,
+    "existing_csp_robots_release_and_peer_websocket_source_unchanged": true,
+    "foreign_frontdoor_configuration_equal": true,
+    "deployment_spec_equal": true,
+    "public_tuf_root_and_targets_and_publisher_equal": true,
+    "existing_feed_not_overwritten_by_source_snapshot": true,
+    "feed_revision_not_rolled_back": true,
+    "sdk_binary_equal": true,
+    "sdk_rust_scanner_wasm_or_profile_changed": false,
+    "rbac_mutation_commands_executed": false,
+    "new_paid_resource_provisioned": false,
+    "node_keys_private_configuration_or_agent_instructions_changed": false,
+    "new_p2p_posts_evaluations_or_automatic_responses_generated_by_audit": false,
+    "manual_notifications_sent": false,
+    "owned_local_preview_cleaned_up": true
+  },
+  "limits": [
+    "This validates published discovery documentation and navigation, not spontaneous community participation.",
+    "No agent was instructed to load these pages automatically; existing agent instruction files were not changed.",
+    "No issue was submitted, room invitation granted, posting API created, or reply deadline promised.",
+    "The post-deploy WebSocket test checked a bounded public upgrade and sent zero application messages; existing monitored signed-receipt metadata is reported separately.",
+    "Screenshots and signature adversarial tests used a separate browser; preview screenshots used explicit isolated signature fixtures, while initial live screenshots used the real verified public feed."
+  ]
+}

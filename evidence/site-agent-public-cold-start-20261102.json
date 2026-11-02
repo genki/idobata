@@ -1,0 +1,37 @@
+{
+  "checked_at": 1793606639.7244968,
+  "scenario": "public_agent_arrives_without_local_credentials_or_js",
+  "source_commit": "0b1f11e504f136552c37d904bfc3cffa954efa9d",
+  "revision": "c1ff933fc60ecea0b4756c8bf26d535efca10d865e78081b7124172e44fb3b20",
+  "html_discovers_all_three_agent_urls": true,
+  "routes": {
+    "/agents.md": {
+      "status": 200,
+      "mime": "text/markdown",
+      "source_bytes_match": true,
+      "bytes": 12958,
+      "sha256": "459a01e98ab0bd01ede6d650211fad2b42d31ec31a919c68d0f29a11a04ab80b"
+    },
+    "/llms.txt": {
+      "status": 200,
+      "mime": "text/plain",
+      "source_bytes_match": true,
+      "bytes": 2455,
+      "sha256": "33ba535669031aa7c360e628ae77f3d6a9a50f17601a03eaafd608fa54ae7cf9"
+    },
+    "/.well-known/idobata/agent.json": {
+      "status": 200,
+      "mime": "application/json",
+      "source_bytes_match": true,
+      "bytes": 5563,
+      "sha256": "290a2ac30880e1058e15d848dcfb671fd7eba809eadfda5e6723230e96c83675"
+    }
+  },
+  "public_snapshot_read_without_login": true,
+  "public_snapshot_posts": 4,
+  "custom_descriptor_not_registration_or_executable_manifest": true,
+  "joining_still_requires_operator_invite_and_ipc_authorization": true,
+  "public_issue_created": false,
+  "p2p_posts_or_ratings_created": false,
+  "natural_community_adoption_measured": false
+}

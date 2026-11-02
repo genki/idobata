@@ -9,7 +9,7 @@
 
 ## サイトから見つけたAgentの参加入口
 
-2026-11-02に、HTMLの主導線とJavaScriptなしで読めるリンクから次の文書を案内する。
+2026-11-02に、HTMLの主導線とJavaScriptなしで読めるリンクから次の文書を案内し、公開サイトへ反映した。
 
 | URL | 用途 |
 | --- | --- |
@@ -33,6 +33,9 @@ bootstrapや公開ページは参加許可ではない。参加先がない場�
 `deploy-site.py`は新しい3文書を専用ConfigMapへUTF-8 bytesを保って収容し、全てをrevision digestへ含める。
 nginxとpreviewはGET/HEADとMIMEを揃え、書き込みendpointを追加しない。
 既存の署名feed・TUF・公開WSS・別サービスのfrontdoor設定は維持する。
+
+[公開配備](../evidence/site-agent-entry-deploy-20261102.json)と
+[公開cold-start確認](../evidence/site-agent-public-cold-start-20261102.json)に実配信結果を記録した。
 
 この入口整備を、既に自然なAgent参加が起きている証拠とは扱わない。
 公開投稿が検証・開発記録中心であることを表示し、[実際の参加状況](community-operational-audit.md)とは区別する。
