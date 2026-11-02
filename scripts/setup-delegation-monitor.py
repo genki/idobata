@@ -44,8 +44,13 @@ def transport(command):
              '-oForwardAgent=no', '-oControlMaster=no', '-oControlPath=none',
              '-F', '/Users/machinaai/.lima/dsh/ssh.config', 'lima-dsh',
              'sudo -n /usr/local/sbin/dsh-websh-exec ' + encoded]
-    return ['ssh', '-T', '-oBatchMode=yes', '-oConnectTimeout=12',
-            '-oForwardAgent=no', '-oControlMaster=no', '-oControlPath=none',
+    # 過負荷の踏み台で毎回認証せず、監視専用の接続だけを再利用する。
+    # VM内への転送許可や既存SSH設定は変更しない。
+    return ['ssh', '-T', '-oBatchMode=yes', '-oConnectTimeout=25',
+            '-oForwardAgent=no', '-oControlMaster=auto',
+            '-oControlPath=' + str(WATCH.ROOT/'dsh-monitor-%C'),
+            '-oControlPersist=180', '-oServerAliveInterval=10',
+            '-oServerAliveCountMax=2',
             'machinaai', shlex.join(guest)]
 
 

@@ -47,10 +47,18 @@ class DelegationWatchTests(unittest.TestCase):
         for key in ['doctor_argv', 'runner_argv']:
             argv = value[key]
             self.assertIn('-oForwardAgent=no', argv)
-            self.assertIn('-oConnectTimeout=12', argv)
+            self.assertIn('-oConnectTimeout=25', argv)
+            self.assertIn('-oControlMaster=auto', argv)
+            self.assertIn('-oControlPersist=180', argv)
+            self.assertIn('-oServerAliveInterval=10', argv)
+            self.assertIn('-oServerAliveCountMax=2', argv)
+            self.assertIn('-oControlPath=' + str(WATCH.ROOT/'dsh-monitor-%C'),
+                          argv)
             nested = shlex.split(argv[-1])
             self.assertEqual(nested[0], '/usr/bin/ssh')
             self.assertIn('lima-dsh', nested)
+            self.assertIn('-oControlMaster=no', nested)
+            self.assertIn('-oControlPath=none', nested)
             wrapper = shlex.split(nested[-1])
             self.assertEqual(wrapper[:3], ['sudo', '-n',
                                           '/usr/local/sbin/dsh-websh-exec'])
@@ -204,6 +212,12 @@ class DelegationWatchTests(unittest.TestCase):
         result = WATCH.observe(['fixed-ssh'], 'runner', 100, invoke)
         self.assertEqual(result['state'], 'failure')
         invoke.assert_called_once()
+
+    def test_success_preserves_persistent_transport(self):
+        with mock.patch.object(WATCH.os, 'killpg') as kill:
+            self.assertEqual(WATCH.bounded_call(
+                [sys.executable, '-c', 'print("{}")']), {})
+        kill.assert_not_called()
 
     def test_timeout_reaps_proxy_process_group(self):
         original = WATCH.os.killpg

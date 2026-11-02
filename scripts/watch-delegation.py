@@ -130,6 +130,7 @@ def bounded_call(argv, limit=65_536, timeout=30):
                                start_new_session=True)
     buffers = {'stdout': bytearray(), 'stderr': bytearray()}
     deadline = time.monotonic() + timeout
+    completed = False
     try:
         with selectors.DefaultSelector() as selected:
             selected.register(process.stdout, selectors.EVENT_READ, 'stdout')
@@ -155,13 +156,17 @@ def bounded_call(argv, limit=65_536, timeout=30):
                         'ssh_failed' if process.returncode == 255 else
                         'command_failed')
             raise ProbeError(category)
-        return json.loads(buffers['stdout'].decode('utf-8'))
+        result = json.loads(buffers['stdout'].decode('utf-8'))
+        completed = True
+        return result
     finally:
-        # ProxyCommandの子も回収し、タイムアウト後の接続蓄積を防ぐ。
-        try:
-            os.killpg(process.pid, signal.SIGKILL)
-        except ProcessLookupError:
-            pass
+        # 失敗時だけProxyCommandも回収する。正常終了時の専用mux masterは
+        # ControlPersistに従って維持し、次の取得で再利用する。
+        if not completed:
+            try:
+                os.killpg(process.pid, signal.SIGKILL)
+            except ProcessLookupError:
+                pass
         process.wait()
         process.stdout.close()
         process.stderr.close()
