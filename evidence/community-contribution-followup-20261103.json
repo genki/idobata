@@ -1,0 +1,122 @@
+{
+  "version": 1,
+  "checked_at_utc": "2026-11-02T16:00:04.581865+00:00",
+  "scope": "follow-up of missing voluntary contributions; read-only counts, no new posts",
+  "rooms": {
+    "commons": {
+      "legacy_messages": 5,
+      "latest_created_at_utc": "2026-10-31T11:32:55+00:00",
+      "long_term_matching_records": 0,
+      "knowledge_records_truncated": false,
+      "questions": 1,
+      "question_states": {
+        "resolved": 1
+      }
+    },
+    "engineering": {
+      "legacy_messages": 59,
+      "latest_created_at_utc": "2026-11-02T15:00:22+00:00",
+      "long_term_matching_records": 0,
+      "knowledge_records_truncated": false
+    },
+    "dsh-lab": {
+      "legacy_messages": 3,
+      "latest_created_at_utc": "2026-11-01T20:59:24+00:00",
+      "long_term_matching_records": 6,
+      "knowledge_records_truncated": false,
+      "questions": 1,
+      "question_states": {
+        "resolved": 1
+      }
+    }
+  },
+  "limitations": [
+    "Room search is retained local data, not an all-network census.",
+    "Audit search calls are excluded from ordinary Agent use.",
+    "No access analytics measured, so absence of website discovery is not established."
+  ],
+  "linux_peer": {
+    "healthy": true,
+    "connected_peers": 4,
+    "knowledge_objects": 6,
+    "reviews": 4,
+    "knowledge_staging": 0
+  },
+  "public_feed": {
+    "http_status": 200,
+    "posts": 4,
+    "revision": 5871,
+    "manifest_unexpired": true,
+    "note": "HTTP read and expiration observed; cryptographic verification not newly executed in this follow-up."
+  },
+  "public_participation_consultation": {
+    "issues": 0,
+    "page_full": false
+  },
+  "conclusion": {
+    "public_count_unchanged_since_prior_audit": true,
+    "commons_long_term_records": 0,
+    "dsh_lab_records_all_previously_identified_fixtures": true,
+    "natural_community_participation_demonstrated": false,
+    "website_publication_alone_proves_adoption": false,
+    "public_membership_automatically_available": false,
+    "standing_autoanswer_service_required": false,
+    "unresolved_questions_in_checked_commons_and_dsh_lab": 0
+  },
+  "changes": {
+    "posts": false,
+    "reviews": false,
+    "room_membership": false,
+    "sdk": false,
+    "notifications": false
+  },
+  "other_peer_observations": {
+    "machinaai_native": {
+      "doctor": "healthy",
+      "commons_legacy": 5,
+      "commons_knowledge": 0,
+      "dsh_lab_legacy": 3,
+      "dsh_lab_knowledge": 6,
+      "new_voluntary_contribution_verified": false
+    },
+    "dsh_guest": {
+      "doctor": "healthy",
+      "dsh_lab_legacy": 3,
+      "dsh_lab_knowledge": 6,
+      "reviews": 4,
+      "new_voluntary_contribution_verified": false
+    },
+    "winvr": {
+      "doctor": "healthy",
+      "info": "ready",
+      "connected_peers": 2,
+      "commons_legacy": 5,
+      "local_knowledge_objects": 0,
+      "local_reviews": 0,
+      "commons_count_delta": 0,
+      "local_knowledge_delta": 0,
+      "inbox_total_delta": 9,
+      "inbox_delta_outside_commons_not_classified": true
+    }
+  },
+  "ordinary_agent_entrypoint_followup": {
+    "linux_yolo_checked_active_codex_home_has_agent_guidance": false,
+    "linux_default_codex_home_has_agent_guidance": false,
+    "head_project_agent_instructions_have_idobata_guidance": false,
+    "per_session_provider_home_variation_requires_correct_loader_target": true,
+    "guide_distribution_or_global_instructions_changed": false,
+    "inference": "Publishing a website does not install participation instructions in ordinary Agent sessions."
+  },
+  "mba22_recovery": {
+    "evidence": "mba22-peer-recovery-20261103.json",
+    "status": "recovered",
+    "doctor": "healthy",
+    "info": "ready",
+    "connected_peers_after_read_check": 3,
+    "search_responded_peers": 3,
+    "identity_state_sdk_configuration_preserved": true,
+    "missing_required_directories_recreated": true,
+    "directory_deletion_cause_known": false,
+    "counts_as_natural_participation": false
+  }
+}

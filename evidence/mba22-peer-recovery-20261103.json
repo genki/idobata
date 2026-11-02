@@ -1,0 +1,111 @@
+{
+  "version": 1,
+  "checked_at": 1793635323.3009658,
+  "baseline": {
+    "job": {
+      "loaded": true,
+      "pid_present": false,
+      "last_exit_code": 78
+    },
+    "ordinary_cli_exit": 40,
+    "log_directory_missing": true,
+    "runtime_directory_missing": true
+  },
+  "created_directories": [
+    {
+      "role": "logs",
+      "created": true,
+      "service_owner": true,
+      "staff_group": true,
+      "mode": "0o700"
+    },
+    {
+      "role": "ipc_runtime",
+      "created": true,
+      "service_owner": true,
+      "staff_group": true,
+      "mode": "0o750"
+    }
+  ],
+  "keys_read_hashed_or_copied": false,
+  "mutable_state_restored": false,
+  "sdk_or_configuration_changed": false,
+  "kickstart_exit": 0,
+  "postcheck": {
+    "doctor_healthy": true,
+    "info_ready": true,
+    "sdk_version": "0.4.0",
+    "connected_peers": 1,
+    "operator_policy_version": 1,
+    "public_cache_available": true,
+    "public_cache_write_failed": false,
+    "ledger_hold_not_configured": true,
+    "authorized_rooms": 2,
+    "job": {
+      "loaded": true,
+      "pid_present": true,
+      "last_exit_code": null
+    },
+    "shared_ipc_socket": true
+  },
+  "preserved": {
+    "sdk": true,
+    "configuration": true,
+    "plist": true,
+    "launcher": true,
+    "key_metadata": true,
+    "home_owner_group_mode": true
+  },
+  "status": "recovered",
+  "host_label": "mac_mba",
+  "sdk_sha256": "4685daf4672b7254c266c71930130360438b0297be137adccb458b4cd91a9e4e",
+  "communication_check": {
+    "knowledge_peer_read": {
+      "exit": 0,
+      "status": "ok",
+      "responded_peers": 3,
+      "failed_peers": 0,
+      "partial": false,
+      "hits": 0
+    },
+    "info": {
+      "exit": 0,
+      "ready": true,
+      "connected_peers": 3,
+      "inbox_count": 57,
+      "outbox_count": 4
+    }
+  },
+  "scope": {
+    "existing_launchdaemon_only": true,
+    "room_membership_changed": false,
+    "new_posts_created": false,
+    "notifications_sent": false,
+    "source_files_changed": false,
+    "commit_created": false
+  },
+  "cause_assessment": {
+    "failure_prerequisites_confirmed": "The existing plist referenced a missing log parent, and the configured Unix socket parent was also missing. Restoring only those directories and restarting the existing job restored normal operation.",
+    "deletion_cause": "undetermined",
+    "normal_reboot_as_deletion_cause_established": false
+  },
+  "source_review": {
+    "installer": "scripts/install-peers.py:49",
+    "existing_installer_creates_log_and_runtime_directories": true,
+    "permissions_match_existing_installer": true,
+    "ipc_implementation": "crates/idobata/src/ipc.rs:serve",
+    "sdk_creates_missing_socket_parent": false,
+    "sdk_change_required_for_recovery": false,
+    "source_edit_performed": false,
+    "prevention_note": "The existing installer already creates both parents. The inspected repository paths do not establish why they disappeared; no SDK or provisioning code change was made."
+  },
+  "activity_classification": {
+    "operation": "explicit_peer_recovery",
+    "counted_as_natural_community_participation": false
+  },
+  "privacy": {
+    "bodies_in_evidence": false,
+    "original_peer_or_message_ids_in_evidence": false,
+    "key_bytes_opened_hashed_copied_or_restored": false
+  }
+}
