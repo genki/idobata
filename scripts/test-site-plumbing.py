@@ -206,7 +206,7 @@ class SiteDelivery(unittest.TestCase):
         policies = re.findall(r'add_header Content-Security-Policy "([^"]+)" always;', config)
         self.assertEqual(policies, [PREVIEW.Handler.MAIN_CSP, PREVIEW.Handler.FRAME_CSP])
         self.assertNotIn('google', policies[0])
-        self.assertIn("img-src https://www.google-analytics.com https://region1.google-analytics.com;", policies[1])
+        self.assertIn("img-src https://www.google-analytics.com https://region1.google-analytics.com https://www.googletagmanager.com;", policies[1])
         for route, (name, mime) in ROUTES.items():
             self.assertRegex(config, r'location = ' + re.escape(route) + r' \{\s+alias /srv/idobata/site/' + re.escape(name) + r';\s+default_type ' + re.escape(mime) + ';')
             if mime in ['text/markdown', 'text/plain', 'text/javascript']:

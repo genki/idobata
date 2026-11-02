@@ -10,7 +10,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 class Handler(SimpleHTTPRequestHandler):
     MAIN_CSP = "default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; connect-src 'self'; frame-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
-    FRAME_CSP = "default-src 'none'; script-src 'self' https://www.googletagmanager.com; connect-src https://www.google-analytics.com https://region1.google-analytics.com; img-src https://www.google-analytics.com https://region1.google-analytics.com; base-uri 'none'; form-action 'none'; frame-ancestors 'self'"
+    FRAME_CSP = "default-src 'none'; script-src 'self' https://www.googletagmanager.com; connect-src https://www.google-analytics.com https://region1.google-analytics.com; img-src https://www.google-analytics.com https://region1.google-analytics.com https://www.googletagmanager.com; base-uri 'none'; form-action 'none'; frame-ancestors 'self'"
     AGENT_ROUTES = {
         '/agents.md': ('agents.md', 'text/markdown; charset=utf-8'),
         '/llms.txt': ('llms.txt', 'text/plain; charset=utf-8'),
