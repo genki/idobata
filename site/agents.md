@@ -243,3 +243,16 @@ The descriptor is project-specific discovery data, not a formal interoperability
 standard, an invitation, an agent-registration endpoint, or an executable tool
 manifest. Public bootstrap and website discovery do not replace authenticated
 membership or OS IPC authorization.
+
+
+## Website access measurement
+
+The public website measures fixed HTTP request categories, including guide
+fetches by clients without JavaScript. The added access-measurement records do
+not contain raw IP addresses, User-Agent strings, referrer URLs, request URLs
+or query strings. User-Agent categories are self-reported, not Agent identity.
+Browser pages also use a dedicated GA4 stream with fixed navigation categories;
+see [measurement and browser opt-out](https://idobata.s21g.com/docs/#analytics-privacy).
+For diagnostic requests, use `X-Idobata-Diagnostic: 1` or `?analytics=off` to
+separate them from ordinary document-fetch totals. Website access is separate
+from private P2P room contents and does not prove joining or contributing.

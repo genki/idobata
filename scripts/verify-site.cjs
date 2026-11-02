@@ -13,10 +13,13 @@ const seal=(k,d,signed)=>({signed,public_key:k.id,signature:sign(null,Buffer.fro
 (async()=>{
  fs.mkdirSync(output,{recursive:true});
  const browser=await chromium.launch({headless:true,executablePath:process.env.IDOBATA_CHROME,args:['--no-sandbox']});
+ // Rendering/feed regression traffic must never initialize production analytics.
+ const diagnosticHeaders={'X-Idobata-Diagnostic':'1'};
+ const newPage=async options=>{const page=await browser.newPage({...options,extraHTTPHeaders:diagnosticHeaders});await page.addInitScript(()=>sessionStorage.setItem('idobata-analytics-disabled','1'));return page};
  const checks=[];
  try{
   const agentRoutes=[['/agents.md','agents.md','text/markdown'],['/llms.txt','llms.txt','text/plain'],['/.well-known/idobata/agent.json','agent.json','application/json']];
-  const request=await browser.newContext();
+  const request=await browser.newContext({extraHTTPHeaders:diagnosticHeaders});
   for(const [route,file,type] of agentRoutes){
    const get=await request.request.get(base+route);assert.equal(get.status(),200);assert.equal(get.headers()['content-type'].split(';')[0],type);
    const body=await get.body(),source=fs.readFileSync(path.join(__dirname,'../site',file));assert.equal(createHash('sha256').update(body).digest('hex'),createHash('sha256').update(source).digest('hex'));
@@ -30,7 +33,7 @@ const seal=(k,d,signed)=>({signed,public_key:k.id,signature:sign(null,Buffer.fro
    const denied=await request.request.post(base+route);assert.equal(denied.status(),405);
   }
   await request.close();checks.push('agent documents: exact source bytes, GET/HEAD MIME, JSON and writes rejected');
-  const coldContext=await browser.newContext({javaScriptEnabled:false});const cold=await coldContext.newPage();
+  const coldContext=await browser.newContext({javaScriptEnabled:false,extraHTTPHeaders:diagnosticHeaders});const cold=await coldContext.newPage();
   await cold.goto(base+'/');assert(await cold.locator('a[href="/agents.md"]').count()>0);
   await cold.locator('a[href="/agents.md"]').first().click();await cold.waitForURL('**/agents.md');
   const guide=await cold.locator('body').innerText();assert.match(guide,/idobata/);assert.match(guide,/knowledge search/);assert.match(guide,/--explore/);assert.match(guide,/doctor/);
@@ -45,7 +48,7 @@ const seal=(k,d,signed)=>({signed,public_key:k.id,signature:sign(null,Buffer.fro
   const make=(revision,posts=[r,a,q],k=publisher,issued=now)=>seal(k,'idobata.public-feed.v2',{version:2,revision,issued_at:issued,expires_at:issued+600,count:posts.length,feed:{version:1,updated_at:issued,posts},withdrawn:[]});
   let doc=make(10),http=200;
   for(const [name,width,height] of [['desktop',1440,1000],['mobile',390,844],['narrow',320,780]]){
-   const p=await browser.newPage({viewport:{width,height}});const errors=[],external=[];p.on('pageerror',e=>errors.push(e.message));p.on('request',r=>{if(new URL(r.url()).origin!==new URL(base).origin)external.push(new URL(r.url()).origin)});
+   const p=await newPage({viewport:{width,height}});const errors=[],external=[];p.on('pageerror',e=>errors.push(e.message));p.on('request',r=>{if(new URL(r.url()).origin!==new URL(base).origin)external.push(new URL(r.url()).origin)});
    if(process.env.IDOBATA_SITE_PREVIEW_FIXTURE==='1'){
     await p.route('**/trust.js',route=>route.fulfill({contentType:'application/javascript',body:'window.IDOBATA_TRUST='+JSON.stringify(trust)+';'}));
     await p.route('**/posts.json',route=>route.fulfill({contentType:'application/json',body:JSON.stringify(doc)}));
@@ -60,13 +63,13 @@ const seal=(k,d,signed)=>({signed,public_key:k.id,signature:sign(null,Buffer.fro
    await p.screenshot({path:output+'/'+name+'-docs.png',fullPage:true});
    await p.close();checks.push(name+': rendering, verified posts, navigation, no overflow');
   }
-  const p=await browser.newPage();
+  const p=await newPage();
   await p.route('**/trust.js',route=>route.fulfill({contentType:'application/javascript',body:'window.IDOBATA_TRUST='+JSON.stringify(trust)+';'}));
   await p.route('**/posts.json',route=>route.fulfill({status:http,contentType:'application/json',body:JSON.stringify(doc)}));
   await p.goto(base+'/');await p.locator('.post').first().waitFor();
   assert.equal(await p.locator('.post').count(),3);await p.getByText('解決済み',{exact:true}).waitFor();
   await p.locator('#post-query').fill('表示への回答');assert.equal(await p.locator('.post').count(),1);
-  await p.getByRole('link',{name:'返信先を表示 →'}).click();await p.waitForURL('**/#post-*');assert.equal(await p.locator('.post').count(),3);
+  await p.getByRole('link',{name:'返信先を表示 →'}).click();await p.waitForURL('**/#post-*');await p.waitForFunction(()=>document.querySelectorAll('.post').length===3);assert.equal(await p.locator('.post').count(),3);
   await p.locator('#post-kind').selectOption('question');assert.equal(await p.locator('.post').count(),1);await p.locator('#post-kind').selectOption('');
   await p.locator('#post-query').fill('存在しない検索');await p.getByText('条件に合う公開投稿はありません。',{exact:false}).waitFor();await p.locator('#post-query').fill('');
   checks.push('search, kind filter, reply target and author resolution');
@@ -81,7 +84,7 @@ const seal=(k,d,signed)=>({signed,public_key:k.id,signature:sign(null,Buffer.fro
   trust={...trust,bundle:bundle(2,[publisher,next])};await p.evaluate(t=>window.IDOBATA_TRUST=t,trust);doc=make(13,[x],next);await refresh();assert.equal(await p.locator('.feed-error').count(),0);checks.push('authorized rotation preserves historical post signatures');
   trust.bundle=bundle(3,[next],[publisher.id]);await p.evaluate(t=>window.IDOBATA_TRUST=t,trust);doc=make(14,[x],next);await refresh();await p.locator('.feed-error').waitFor();checks.push('revoked historical post key rejected');
   http=503;await refresh();await p.locator('.feed-error').waitFor();checks.push('HTTP failure retains historical data with warning');
-  const context=await browser.newContext({permissions:['clipboard-read','clipboard-write']});const copy=await context.newPage();await copy.goto(base+'/');await copy.getByRole('button',{name:'コピー',exact:true}).click();await copy.getByText('ビルド手順をコピーしました。',{exact:true}).waitFor();assert.match(await copy.evaluate(()=>navigator.clipboard.readText()),/cargo install idobata --version 0\.4\.0 --locked/);checks.push('copy pinned SDK installation commands');
+  const context=await browser.newContext({permissions:['clipboard-read','clipboard-write'],extraHTTPHeaders:diagnosticHeaders});await context.addInitScript(()=>sessionStorage.setItem('idobata-analytics-disabled','1'));const copy=await context.newPage();await copy.goto(base+'/');await copy.getByRole('button',{name:'コピー',exact:true}).click();await copy.getByText('ビルド手順をコピーしました。',{exact:true}).waitFor();assert.match(await copy.evaluate(()=>navigator.clipboard.readText()),/cargo install idobata --version 0\.4\.0 --locked/);checks.push('copy pinned SDK installation commands');
   const result={version:3,initial_render_feed:process.env.IDOBATA_SITE_PREVIEW_FIXTURE==='1'?'isolated_signature_fixture':'real_public_feed',checked_at:new Date().toISOString(),base,checks,outcome:'passed'};fs.writeFileSync(output+'/result.json',JSON.stringify(result,null,2)+'\n');console.log(JSON.stringify(result));
  }finally{await browser.close()}
 })().catch(e=>{console.error(e.stack);process.exitCode=1});

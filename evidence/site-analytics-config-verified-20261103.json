@@ -1,0 +1,53 @@
+{
+  "version": 1,
+  "checkedAt": "2026-11-02T16:25:50.510Z",
+  "mode": "apply",
+  "account": "accounts/2733799",
+  "site": "https://idobata.s21g.com",
+  "propertyDisplayName": "idobata.s21g.com - GA4",
+  "accountCount": 1,
+  "existingPropertyCount": 13,
+  "changes": [],
+  "plans": [],
+  "propertyId": "561646052",
+  "timeZone": "Asia/Tokyo",
+  "currencyCode": "JPY",
+  "streamId": "16255457325",
+  "measurementId": "G-Y6E4X6V45B",
+  "enhancedMeasurement": {
+    "streamEnabled": false,
+    "scrollsEnabled": false,
+    "outboundClicksEnabled": false,
+    "siteSearchEnabled": false,
+    "videoEngagementEnabled": false,
+    "fileDownloadsEnabled": false,
+    "pageChangesEnabled": false,
+    "formInteractionsEnabled": false
+  },
+  "googleSignalsState": "GOOGLE_SIGNALS_DISABLED",
+  "userProvidedData": {
+    "userProvidedDataCollectionEnabled": false,
+    "automaticallyDetectedDataCollectionEnabled": false,
+    "apiUpdateAvailable": false
+  },
+  "googleAdsLinkCount": 0,
+  "adsConfigurationLimit": "No generic ads-data-collection/personalization update field in the current Admin API. Client consent/flags and any required UI setting are separate.",
+  "eventCustomDimensions": [
+    {
+      "parameterName": "destination",
+      "scope": "EVENT",
+      "adsPersonalizationSetting": "not_applicable_EVENT_scope"
+    },
+    {
+      "parameterName": "source_category",
+      "scope": "EVENT",
+      "adsPersonalizationSetting": "not_applicable_EVENT_scope"
+    },
+    {
+      "parameterName": "page_kind",
+      "scope": "EVENT",
+      "adsPersonalizationSetting": "not_applicable_EVENT_scope"
+    }
+  ],
+  "apiPrivacyChecksPassed": true
+}

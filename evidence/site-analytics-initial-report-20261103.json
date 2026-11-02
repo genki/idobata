@@ -1,0 +1,82 @@
+{
+  "version": 1,
+  "fetchedAt": "2026-11-02T16:28:46.074Z",
+  "propertyId": "561646052",
+  "site": "https://idobata.s21g.com",
+  "range": {
+    "startDate": "2026-11-03",
+    "endDate": "2026-11-03"
+  },
+  "timeZone": "Asia/Tokyo",
+  "status": "completed",
+  "allowedEvents": [
+    "page_view",
+    "navigation_click"
+  ],
+  "reports": {
+    "totals": {
+      "status": "empty",
+      "rows": [],
+      "apiRowCount": 0,
+      "truncated": false,
+      "metadata": {
+        "timeZone": "Asia/Tokyo",
+        "currencyCode": "JPY"
+      }
+    },
+    "source_medium_channel": {
+      "status": "empty",
+      "rows": [],
+      "apiRowCount": 0,
+      "truncated": false,
+      "metadata": {
+        "timeZone": "Asia/Tokyo",
+        "currencyCode": "JPY"
+      }
+    },
+    "landing": {
+      "status": "empty",
+      "rows": [],
+      "apiRowCount": 0,
+      "truncated": false,
+      "metadata": {
+        "timeZone": "Asia/Tokyo",
+        "currencyCode": "JPY"
+      }
+    },
+    "source_categories": {
+      "status": "empty",
+      "rows": [],
+      "apiRowCount": 0,
+      "truncated": false,
+      "metadata": {
+        "timeZone": "Asia/Tokyo",
+        "currencyCode": "JPY"
+      }
+    },
+    "event_destinations": {
+      "status": "empty",
+      "rows": [],
+      "apiRowCount": 0,
+      "truncated": false,
+      "metadata": {
+        "timeZone": "Asia/Tokyo",
+        "currencyCode": "JPY"
+      }
+    }
+  },
+  "searchConsole": {
+    "status": "empty",
+    "site": "sc-domain:s21g.com",
+    "rows": [],
+    "metadata": {},
+    "queryTextRequested": false
+  },
+  "interpretation": [
+    "Empty means no reported rows, not proof of no visits. Recent data and custom dimensions may be delayed.",
+    "Thresholding, sampling and truncation are reported separately; API errors are never converted to zero.",
+    "No synthetic events are sent by these tools; QA must suppress collection before network dispatch.",
+    "Only fixed public categories are retained; unknown sources and paths are combined as other.",
+    "Users/sessions are analytics estimates, not authenticated Agent identities or P2P contributions."
+  ]
+}

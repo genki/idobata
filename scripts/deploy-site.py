@@ -16,6 +16,9 @@ FILES = {
     'idobata-agents.md': 'site/agents.md',
     'idobata-llms.txt': 'site/llms.txt',
     'idobata-agent.json': 'site/agent.json',
+    'idobata-analytics.js': 'site/analytics.js',
+    'idobata-analytics-frame.html': 'site/analytics-frame.html',
+    'idobata-analytics-sender.js': 'site/analytics-sender.js',
     'idobata-style.css': 'site/style.css',
     'idobata-app.js': 'site/app.js',
     'idobata-posts.json': 'site/posts.json',
@@ -28,6 +31,11 @@ AGENT_ROUTES = {
     '/llms.txt': ('idobata-llms.txt', 'text/plain'),
     '/.well-known/idobata/agent.json': ('idobata-agent.json', 'application/json'),
 }
+ANALYTICS_ROUTES = {
+    '/analytics.js': ('idobata-analytics.js', 'text/javascript'),
+    '/analytics-frame.html': ('idobata-analytics-frame.html', 'text/html'),
+    '/analytics-sender.js': ('idobata-analytics-sender.js', 'text/javascript'),
+}
 
 
 def run(args, data=None):
@@ -37,9 +45,10 @@ def run(args, data=None):
 
 def verify_agent_routes(address, assets):
     """Verify public GET bytes and HEAD MIME, without executing guide commands."""
-    for route, (name, expected_type) in AGENT_ROUTES.items():
+    for route, (name, expected_type) in {**AGENT_ROUTES, **ANALYTICS_ROUTES}.items():
         for head in [False, True]:
             command = ['curl', '--fail', '--silent', '--show-error', '--max-time', '10',
+                       '--header', 'X-Idobata-Diagnostic: 1',
                        '--resolve', 'idobata.s21g.com:443:' + address]
             if head:
                 command.append('--head')
@@ -186,6 +195,7 @@ def main():
             for address in ['34.19.105.162','34.53.30.187']:
                 for route in ['/', '/docs/', '/posts.json', '/revision.json']:
                     data=run(['curl','--fail','--silent','--show-error','--max-time','10',
+                              '--header','X-Idobata-Diagnostic: 1',
                               '--resolve','idobata.s21g.com:443:'+address,'https://idobata.s21g.com'+route])
                     if route=='/revision.json' and json.loads(data).get('revision')!=digest:
                         raise ValueError('revision反映待ち')

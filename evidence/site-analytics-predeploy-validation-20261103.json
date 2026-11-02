@@ -1,0 +1,70 @@
+{
+  "version": 1,
+  "checked_at": "2026-11-02T16:46:02.368899+00:00",
+  "analytics_browser": {
+    "version": 1,
+    "outcome": "passed",
+    "checked_at": "2026-11-02T16:44:18.661Z",
+    "measurement_id": "G-Y6E4X6V45B",
+    "gtag_sha256": "55b5df4d69e050e4b7de327050f9aba8497ed807a9073d3cb0d22087fae69ad1",
+    "all_collector_requests_intercepted": true,
+    "real_collector_hits_sent": 0,
+    "checks": [
+      "real SDK: fixed canonical page/context/copy label; parent search/title/query/hash/UTM/unknown referrer excluded",
+      "stop button tears down sender and persists session opt-out",
+      "known public referrer maps to canonical origin and fixed source category",
+      "real same-tab guide navigation preserves fixed click event (1/3)",
+      "real same-tab guide navigation preserves fixed click event (2/3)",
+      "real same-tab guide navigation preserves fixed click event (3/3)",
+      "query: no sender, Google loader or analytics request",
+      "session: no sender, Google loader or analytics request",
+      "DNT: no sender, Google loader or analytics request",
+      "GPC: no sender, Google loader or analytics request",
+      "storage blocked: no sender, Google loader or analytics request",
+      "empty ID: no sender, Google loader or analytics request"
+    ]
+  },
+  "site_regression": {
+    "version": 3,
+    "initial_render_feed": "isolated_signature_fixture",
+    "checked_at": "2026-11-02T16:41:22.781Z",
+    "checks": [
+      "agent documents: exact source bytes, GET/HEAD MIME, JSON and writes rejected",
+      "agent cold start: HTML to guide without JavaScript; read-only search and readiness guidance",
+      "desktop: rendering, verified posts, navigation, no overflow",
+      "mobile: rendering, verified posts, navigation, no overflow",
+      "narrow: rendering, verified posts, navigation, no overflow",
+      "search, kind filter, reply target and author resolution",
+      "tamper rejected, cached feed retained",
+      "rollback rejected, cached feed retained",
+      "same revision mutation rejected, cached feed retained",
+      "unsigned empty rejected, cached feed retained",
+      "expired rejected, cached feed retained",
+      "legitimately signed empty feed accepted",
+      "signed markup rendered as text",
+      "unsafe link rejected",
+      "authorized rotation preserves historical post signatures",
+      "revoked historical post key rejected",
+      "HTTP failure retains historical data with warning",
+      "copy pinned SDK installation commands"
+    ],
+    "outcome": "passed"
+  },
+  "focused_tests": {
+    "http_privacy_and_report": 8,
+    "site_delivery": 5,
+    "ga_configuration_and_report": 13,
+    "strict_cli_rejections": 2
+  },
+  "existing_nginx_candidate_checks": [
+    {
+      "exit": 0,
+      "syntax_ok": true
+    },
+    {
+      "exit": 0,
+      "syntax_ok": true
+    }
+  ],
+  "sdk_or_private_room_changes": false
+}

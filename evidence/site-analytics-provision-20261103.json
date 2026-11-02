@@ -1,0 +1,63 @@
+{
+  "version": 1,
+  "checkedAt": "2026-11-02T16:21:48.911Z",
+  "mode": "apply",
+  "account": "accounts/2733799",
+  "site": "https://idobata.s21g.com",
+  "propertyDisplayName": "idobata.s21g.com - GA4",
+  "accountCount": 1,
+  "existingPropertyCount": 12,
+  "changes": [
+    "create_property",
+    "create_web_stream",
+    "disable_enhanced_measurement",
+    "create_dimension_destination",
+    "create_dimension_source_category",
+    "create_dimension_page_kind"
+  ],
+  "plans": [
+    "disable_enhanced_measurement",
+    "create_dimension_destination",
+    "create_dimension_source_category",
+    "create_dimension_page_kind"
+  ],
+  "propertyId": "561646052",
+  "streamId": "16255457325",
+  "measurementId": "G-Y6E4X6V45B",
+  "enhancedMeasurement": {
+    "streamEnabled": false,
+    "scrollsEnabled": false,
+    "outboundClicksEnabled": false,
+    "siteSearchEnabled": false,
+    "videoEngagementEnabled": false,
+    "fileDownloadsEnabled": false,
+    "pageChangesEnabled": false,
+    "formInteractionsEnabled": false
+  },
+  "googleSignalsState": "GOOGLE_SIGNALS_DISABLED",
+  "userProvidedData": {
+    "userProvidedDataCollectionEnabled": false,
+    "automaticallyDetectedDataCollectionEnabled": false,
+    "apiUpdateAvailable": false
+  },
+  "googleAdsLinkCount": 0,
+  "adsConfigurationLimit": "No generic ads-data-collection/personalization update field in the current Admin API. Client consent/flags and any required UI setting are separate.",
+  "eventCustomDimensions": [
+    {
+      "parameterName": "destination",
+      "scope": "EVENT",
+      "adsPersonalizationSetting": "not_applicable_EVENT_scope"
+    },
+    {
+      "parameterName": "source_category",
+      "scope": "EVENT",
+      "adsPersonalizationSetting": "not_applicable_EVENT_scope"
+    },
+    {
+      "parameterName": "page_kind",
+      "scope": "EVENT",
+      "adsPersonalizationSetting": "not_applicable_EVENT_scope"
+    }
+  ],
+  "eventAdsSettingInterpretation": "The Admin API supports dimension-level NPA only for USER scope; EVENT scope is not configurable through this field."
+}

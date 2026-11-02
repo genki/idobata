@@ -6,6 +6,7 @@ import copy
 import importlib.util
 import io
 import json
+import re
 from pathlib import Path
 import subprocess
 import tempfile
@@ -25,6 +26,7 @@ def load(name):
 
 DEPLOY = load('deploy-site')
 PREVIEW = load('preview-site')
+ROUTES = {**DEPLOY.AGENT_ROUTES, **DEPLOY.ANALYTICS_ROUTES}
 
 
 class SiteDelivery(unittest.TestCase):
@@ -60,13 +62,18 @@ class SiteDelivery(unittest.TestCase):
             thread.start()
             try:
                 base = f'http://127.0.0.1:{server.server_port}'
-                for route, (name, expected_type) in DEPLOY.AGENT_ROUTES.items():
+                for route, (name, expected_type) in ROUTES.items():
                     filename = DEPLOY.FILES[name].split('/')[-1]
                     content = (self.site / filename).read_bytes()
                     for method in ['GET', 'HEAD']:
                         with urlopen(Request(base + route + '?preview=1', method=method)) as response:
                             self.assertEqual(response.status, 200)
                             self.assertEqual(response.headers.get_content_type(), expected_type)
+                            self.assertEqual(response.headers['Referrer-Policy'], 'no-referrer')
+                            self.assertEqual(response.headers['X-Content-Type-Options'], 'nosniff')
+                            frame = route == '/analytics-frame.html'
+                            self.assertEqual(response.headers['X-Frame-Options'], 'SAMEORIGIN' if frame else 'DENY')
+                            self.assertEqual(response.headers['Content-Security-Policy'], PREVIEW.Handler.FRAME_CSP if frame else PREVIEW.Handler.MAIN_CSP)
                             if expected_type.startswith('text/'):
                                 self.assertEqual(response.headers.get_content_charset(), 'utf-8')
                             self.assertEqual(int(response.headers['Content-Length']), len(content))
@@ -135,7 +142,7 @@ class SiteDelivery(unittest.TestCase):
                 return subprocess.CompletedProcess(command, 0, '', '')
             if command[0] == 'curl':
                 route = command[-1].removeprefix('https://idobata.s21g.com')
-                name, mime = DEPLOY.AGENT_ROUTES[route]
+                name, mime = ROUTES[route]
                 if mime.startswith('text/'):
                     mime += '; charset=utf-8'
                 body = b'headers-only' if '--head' in command else captured_assets[name].encode()
@@ -150,7 +157,7 @@ class SiteDelivery(unittest.TestCase):
         self.assertEqual([obj['metadata']['name'] for obj in applied], ['idobata-site'])
         self.assertNotIn('idobata-posts.json', captured_assets)
         self.assertNotIn('idobata-publisher.json', captured_assets)
-        for _, (name, _) in DEPLOY.AGENT_ROUTES.items():
+        for _, (name, _) in ROUTES.items():
             self.assertEqual(captured_assets[name].encode(), (self.root / DEPLOY.FILES[name]).read_bytes())
         config_patch = next(body for command, body in patched if 'configmap' in command)
         rendered = next(row['value'] for row in config_patch if row['path'] == '/data/nginx.conf')
@@ -169,7 +176,7 @@ class SiteDelivery(unittest.TestCase):
 
     def test_each_agent_asset_changes_deployment_revision(self):
         previous = self.apply_fixture()
-        for _, (name, _) in DEPLOY.AGENT_ROUTES.items():
+        for _, (name, _) in ROUTES.items():
             with (self.root / DEPLOY.FILES[name]).open('ab') as file:
                 file.write(b'\n')
             current = self.apply_fixture()
@@ -178,11 +185,11 @@ class SiteDelivery(unittest.TestCase):
 
     def test_public_verification_rejects_changed_bytes_or_mime(self):
         assets = {name: (self.root / DEPLOY.FILES[name]).read_bytes().decode()
-                  for name, _ in DEPLOY.AGENT_ROUTES.values()}
+                  for name, _ in ROUTES.values()}
         for fault in ['bytes', 'mime', 'charset']:
             def child(command, **_):
                 route = command[-1].removeprefix('https://idobata.s21g.com')
-                name, mime = DEPLOY.AGENT_ROUTES[route]
+                name, mime = ROUTES[route]
                 if mime.startswith('text/') and fault != 'charset':
                     mime += '; charset=utf-8'
                 body = assets[name].encode() + (b'changed' if fault == 'bytes' else b'')
@@ -196,12 +203,16 @@ class SiteDelivery(unittest.TestCase):
     def test_nginx_agent_aliases_and_existing_readonly_surface(self):
         source = Path(__file__).resolve().parents[1]
         config = (source / 'site/nginx.conf').read_text()
-        for route, (name, mime) in DEPLOY.AGENT_ROUTES.items():
-            self.assertIn(f'location = {route} {{ alias /srv/idobata/site/{name}; default_type {mime};', config)
-            if mime.startswith('text/'):
+        policies = re.findall(r'add_header Content-Security-Policy "([^"]+)" always;', config)
+        self.assertEqual(policies, [PREVIEW.Handler.MAIN_CSP, PREVIEW.Handler.FRAME_CSP])
+        self.assertNotIn('google', policies[0])
+        self.assertIn("img-src https://www.google-analytics.com https://region1.google-analytics.com;", policies[1])
+        for route, (name, mime) in ROUTES.items():
+            self.assertRegex(config, r'location = ' + re.escape(route) + r' \{\s+alias /srv/idobata/site/' + re.escape(name) + r';\s+default_type ' + re.escape(mime) + ';')
+            if mime in ['text/markdown', 'text/plain', 'text/javascript']:
                 self.assertIn(f'default_type {mime}; charset utf-8; charset_types {mime};', config)
         self.assertIn('if ($request_method !~ ^(GET|HEAD)$) { return 405; }', config)
-        self.assertIn("connect-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'", config)
+        self.assertIn("connect-src 'self'; frame-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'", config)
         self.assertEqual(config.count('return 302 https://github.com/genki/idobata/releases/download/'), 9)
         for route in ['/posts.json', '/publisher.json', '/updates/root.json', '/updates/targets.json',
                       '/updates/snapshot.json', '/updates/timestamp.json', '/.well-known/idobata/bootstrap.json']:

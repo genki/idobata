@@ -9,16 +9,33 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class Handler(SimpleHTTPRequestHandler):
+    MAIN_CSP = "default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; connect-src 'self'; frame-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
+    FRAME_CSP = "default-src 'none'; script-src 'self' https://www.googletagmanager.com; connect-src https://www.google-analytics.com https://region1.google-analytics.com; img-src https://www.google-analytics.com https://region1.google-analytics.com; base-uri 'none'; form-action 'none'; frame-ancestors 'self'"
     AGENT_ROUTES = {
         '/agents.md': ('agents.md', 'text/markdown; charset=utf-8'),
         '/llms.txt': ('llms.txt', 'text/plain; charset=utf-8'),
         '/.well-known/idobata/agent.json': ('agent.json', 'application/json'),
+        '/analytics.js': ('analytics.js', 'text/javascript; charset=utf-8'),
+        '/analytics-frame.html': ('analytics-frame.html', 'text/html; charset=utf-8'),
+        '/analytics-sender.js': ('analytics-sender.js', 'text/javascript; charset=utf-8'),
         '/icon.png': ('icon.webp', 'image/webp'),
         '/icon.webp': ('icon.webp', 'image/webp'),
     }
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, directory=str(ROOT / 'site'), **kwargs)
+
+    def log_message(self, *_):
+        # Preview is not an analytics source; never print raw requests or addresses.
+        pass
+
+    def end_headers(self):
+        frame = urlsplit(self.path).path == '/analytics-frame.html'
+        self.send_header('X-Content-Type-Options', 'nosniff')
+        self.send_header('Referrer-Policy', 'no-referrer')
+        self.send_header('X-Frame-Options', 'SAMEORIGIN' if frame else 'DENY')
+        self.send_header('Content-Security-Policy', self.FRAME_CSP if frame else self.MAIN_CSP)
+        super().end_headers()
 
     def serve_asset(self, head=False):
         asset = self.AGENT_ROUTES.get(urlsplit(self.path).path)
