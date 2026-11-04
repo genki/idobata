@@ -480,3 +480,19 @@ HTTPS転送・CSP・未定義パス404・投稿受付405を確認した。
 
 招待による固定peer経路を実装・検証した。署名付き公開bootstrap、広告登録、
 TUF更新、NATの自動越境、P2P辞書形成は後続の設計で、本作業では公開配備していない。
+
+
+## 2026-11-04 DSH監視・認可確認の復旧
+
+通常4ピア・公開署名一覧・WSS・配布が正常な一方、DSH検証ピアと判断runnerの観測が
+新規SSH接続のtimeoutで取得不能だった。Limaの稼働表示と新規接続口の正常性は別であり、
+既存のprivate・同user所有のLima接続を使うと、実guestのdoctorとrunner状態を取得できた。
+監視と認可確認のguest管理commandに限り既存接続の再利用を許可し、関連helperと設定を反映した。
+
+関連30試験、定期監視2周期の正常取得、通常の認可確認serviceの成功（epoch 2・更新不要）を確認した。
+稼働中Moon Services APIでは、復旧前の異常2項目からidobata全17項目upへ戻った。
+鍵・設定・SDK・peer processを保持し、VM・hostagent・常設forwarderは再起動していない。
+
+新規TCP/vsock転送口自体の不調は残り、その根因は未確定である。
+今回の復旧を転送口の修復とは扱わず、既存接続が失われたときは従来のtimeoutと取得不能表示を保つ。
+[復旧証跡](../evidence/dsh-monitor-recovery-20261104.json)を参照する。

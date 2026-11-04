@@ -58,7 +58,11 @@ class DelegationWatchTests(unittest.TestCase):
             self.assertEqual(nested[0], '/usr/bin/ssh')
             self.assertIn('lima-dsh', nested)
             self.assertIn('-oControlMaster=no', nested)
-            self.assertIn('-oControlPath=none', nested)
+            self.assertNotIn('-oControlPath=none', nested)
+            self.assertNotIn('-oControlMaster=auto', nested)
+            self.assertNotIn('-oStrictHostKeyChecking=no', nested)
+            self.assertEqual(nested[nested.index('-F')+1],
+                             '/Users/machinaai/.lima/dsh/ssh.config')
             wrapper = shlex.split(nested[-1])
             self.assertEqual(wrapper[:3], ['sudo', '-n',
                                           '/usr/local/sbin/dsh-websh-exec'])

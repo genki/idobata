@@ -51,6 +51,12 @@ class RenewalTests(unittest.TestCase):
         self.assertIn('ControlPath=none',argv);self.assertIn('machinaai',argv)
         self.assertIn('lima-dsh',argv[-1]);self.assertIn('sudo -n python3 -c',argv[-1])
         self.assertNotIn('-A',argv)
+        nested=__import__('shlex').split(argv[-1])
+        self.assertIn('ControlMaster=no',nested)
+        self.assertNotIn('ControlMaster=auto',nested)
+        self.assertNotIn('ControlPath=none',nested)
+        self.assertNotIn('StrictHostKeyChecking=no',nested)
+        self.assertEqual(nested[nested.index('-F')+1],'/Users/machinaai/.lima/dsh/ssh.config')
 
     def test_atomic_failure_preserves_prior_definition(self):
         with tempfile.TemporaryDirectory() as d:

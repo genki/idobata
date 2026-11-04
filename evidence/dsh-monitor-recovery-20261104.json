@@ -1,0 +1,315 @@
+{
+  "version": 1,
+  "verified_at": "2026-11-04T08:29:53.756875+00:00",
+  "scope": "dsh_management_monitor_and_ordinary_certificate_renewal",
+  "diagnosis": {
+    "initial_monitor_down_count": 2,
+    "affected_checks": [
+      "dsh_peer",
+      "dsh_runner"
+    ],
+    "outer_host_fresh_ssh_worked": true,
+    "guest_fresh_loopback_tcp_timed_out": true,
+    "existing_lima_master_check_succeeded": true,
+    "existing_lima_master_guest_command_succeeded": true,
+    "configured_control_socket_private_same_user": true,
+    "lima_version": "2.1.4",
+    "hostagent_fd_count_observed": 1195,
+    "listener_closed_socket_count_observed": 1149,
+    "hostagent_fd_count_does_not_prove_ssh_select_limit": true,
+    "underlying_new_tcp_vsock_fault_repaired": false,
+    "underlying_new_tcp_vsock_fault_cause": "unconfirmed"
+  },
+  "repair": {
+    "guest_management_commands_reuse_configured_existing_lima_master": true,
+    "guest_control_master": "no",
+    "agent_forwarding": false,
+    "new_master_created_by_management_commands": false,
+    "host_key_verification_weakened": false,
+    "outer_native_transport_policy_unchanged": true,
+    "watch_collector_own_service_restarted": true,
+    "renew_script_atomic_install_verified": true,
+    "renew_script_owner_mode_preserved": true,
+    "vm_restarted": false,
+    "hostagent_restarted": false,
+    "peer_service_restarted": false,
+    "existing_port_forwarders_restarted": false,
+    "sdk_changed": false,
+    "posts_or_runner_jobs_created": false,
+    "monitor_thresholds_changed": false
+  },
+  "ordinary_renewal": {
+    "forced": false,
+    "systemd_result": "success",
+    "exit_code": 0,
+    "normal_oneshot_state": "inactive/dead",
+    "status": "unchanged",
+    "epoch": 2,
+    "runner_certificate_current": true,
+    "previous_failed_result_cleared": true
+  },
+  "normal_watch_cycles": {
+    "sample_count": 2,
+    "distinct_checked_at": true,
+    "first_checked_at_utc": "2026-11-04T08:27:31.921526+00:00",
+    "last_checked_at_utc": "2026-11-04T08:28:02.258446+00:00",
+    "interval_seconds": 30.337,
+    "peer_up_count": 2,
+    "runner_expected_hold_count": 2,
+    "runner_hold_reason": "no_eligible_answer",
+    "stale_sample_count": 0
+  },
+  "manager_independent_confirmation": {
+    "moon_service_entries": 17,
+    "up": 17,
+    "down": 0,
+    "renew_systemd_success": true,
+    "installed_renew_source_equal": true,
+    "served_api_before": {
+      "checked_at": "2026-11-04T08:08:16.372190+00:00",
+      "snapshot_fetched_at": "2026-11-04T08:08:04.353Z",
+      "entries": [
+        {
+          "id": "idobata-feed",
+          "status": "up"
+        },
+        {
+          "id": "idobata-site",
+          "status": "up"
+        },
+        {
+          "id": "idobata-peer-linux",
+          "status": "up"
+        },
+        {
+          "id": "idobata-peer-mba22",
+          "status": "up"
+        },
+        {
+          "id": "idobata-peer-winvr",
+          "status": "up"
+        },
+        {
+          "id": "idobata-peer-machinaai",
+          "status": "up"
+        },
+        {
+          "id": "idobata-knowledge-storage",
+          "status": "up"
+        },
+        {
+          "id": "idobata-knowledge-replication",
+          "status": "up"
+        },
+        {
+          "id": "idobata-public-cache",
+          "status": "up"
+        },
+        {
+          "id": "idobata-ledger",
+          "status": "up"
+        },
+        {
+          "id": "idobata-delivery",
+          "status": "up"
+        },
+        {
+          "id": "idobata-stability",
+          "status": "up"
+        },
+        {
+          "id": "idobata-publication",
+          "status": "up"
+        },
+        {
+          "id": "idobata-public-route",
+          "status": "up"
+        },
+        {
+          "id": "idobata-release",
+          "status": "up"
+        },
+        {
+          "id": "idobata-dsh-peer",
+          "status": "down"
+        },
+        {
+          "id": "idobata-dsh-delegation",
+          "status": "down"
+        }
+      ],
+      "summary": [
+        {
+          "id": "idobata-feed",
+          "status": "up"
+        },
+        {
+          "id": "idobata-site",
+          "status": "up"
+        },
+        {
+          "id": "idobata",
+          "status": "degraded"
+        }
+      ]
+    },
+    "served_api_after": {
+      "checked_at": "2026-11-04T08:28:15.711068+00:00",
+      "snapshot_fetched_at": "2026-11-04T08:28:08.625Z",
+      "entries": [
+        {
+          "id": "idobata-feed",
+          "status": "up"
+        },
+        {
+          "id": "idobata-site",
+          "status": "up"
+        },
+        {
+          "id": "idobata-peer-linux",
+          "status": "up"
+        },
+        {
+          "id": "idobata-peer-mba22",
+          "status": "up"
+        },
+        {
+          "id": "idobata-peer-winvr",
+          "status": "up"
+        },
+        {
+          "id": "idobata-peer-machinaai",
+          "status": "up"
+        },
+        {
+          "id": "idobata-knowledge-storage",
+          "status": "up"
+        },
+        {
+          "id": "idobata-knowledge-replication",
+          "status": "up"
+        },
+        {
+          "id": "idobata-public-cache",
+          "status": "up"
+        },
+        {
+          "id": "idobata-ledger",
+          "status": "up"
+        },
+        {
+          "id": "idobata-delivery",
+          "status": "up"
+        },
+        {
+          "id": "idobata-stability",
+          "status": "up"
+        },
+        {
+          "id": "idobata-publication",
+          "status": "up"
+        },
+        {
+          "id": "idobata-public-route",
+          "status": "up"
+        },
+        {
+          "id": "idobata-release",
+          "status": "up"
+        },
+        {
+          "id": "idobata-dsh-peer",
+          "status": "up"
+        },
+        {
+          "id": "idobata-dsh-delegation",
+          "status": "up"
+        }
+      ],
+      "summary": [
+        {
+          "id": "idobata-feed",
+          "status": "up"
+        },
+        {
+          "id": "idobata-site",
+          "status": "up"
+        },
+        {
+          "id": "idobata",
+          "status": "up"
+        }
+      ]
+    }
+  },
+  "preservation": {
+    "key_bytes_read": false,
+    "key_metadata_equal": true,
+    "key_count": 2,
+    "state_file_set_equal": true,
+    "state_file_contents_equal": false,
+    "state_file_count": 7,
+    "sdk_binary_equal": true,
+    "peer_process_equal": true,
+    "unchanged_state_file_count": 6,
+    "config_equal": true,
+    "encrypted_runtime_state_changed": true,
+    "encrypted_runtime_state_size_equal": true,
+    "encrypted_runtime_state_owner_mode_equal": true,
+    "state_change_classification": "live_daemon_encrypted_state_changed_no_reset_performed"
+  },
+  "checks": [
+    {
+      "command": "python3 scripts/test-watch-delegation.py",
+      "passed": 16,
+      "failed": 0
+    },
+    {
+      "command": "python3 scripts/test-renew-dsh-lab.py",
+      "passed": 14,
+      "failed": 0
+    },
+    {
+      "check": "py_compile_changed_python_files",
+      "passed": true
+    },
+    {
+      "command": "git diff --check",
+      "passed": true
+    }
+  ],
+  "files": [
+    {
+      "path": "scripts/setup-delegation-monitor.py",
+      "sha256": "85b2cd8fa8cd18bea6f3599a588b061ef72ae3657ffc5c9fa41be940022d342d"
+    },
+    {
+      "path": "scripts/renew-dsh-lab.py",
+      "sha256": "1f9ea5e7495aea115a0a3881660e12628a8bbf232f09014453848e01084c4a3c"
+    },
+    {
+      "path": "scripts/test-watch-delegation.py",
+      "sha256": "730e9b013932fc482125a7ddbc0d7b0d66c32244a491b766d4359e80b16ea3b6"
+    },
+    {
+      "path": "scripts/test-renew-dsh-lab.py",
+      "sha256": "da2681d1b6b711d8db39b659b36db5b8784d3dc765c3677af19cede262be82bc"
+    },
+    {
+      "path": "docs/dsh-peer-operations.md",
+      "sha256": "6c4c82733df2e24196147049dc8d34eda8b9a13955239340607f6e656e938e1c"
+    }
+  ],
+  "limitations": [
+    "Existing canonical Lima master is a working management path; the new loopback TCP/vsock listener path remains unhealthy.",
+    "If that master is unavailable, the unchanged bounded fresh-connection fallback may fail; monitoring must then remain unavailable.",
+    "Encrypted runtime state changed while the same daemon remained running; no state reset or rollback was performed."
+  ],
+  "privacy": {
+    "key_bytes_or_key_hashes_read": false,
+    "raw_diagnostics_included": false,
+    "peer_ids_included": false,
+    "private_preservation_hashes_included": false
+  },
+  "source_frozen": true
+}

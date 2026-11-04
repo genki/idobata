@@ -37,10 +37,16 @@ Linux hubの公開WSS 443へoutbound接続する。native Machinaとの接続は
 | Linux専用SSH | `-L 127.0.0.1:39135:127.0.0.1:39135 machinaai` |
 | nativeの既存contact | `127.0.0.1:39113`、既存Linux→native転送を維持 |
 
-新しいSSHはControlMaster/ControlPathを共有せず、forward失敗時は終了し、keepaliveを使う。
+上記の常設portforward用SSHはControlMaster/ControlPathを共有せず、forward失敗時は終了し、keepaliveを使う。
 VMが停止しても接続の再試行だけを行い、VMやモデルを自動起動しない。
 guest自身の署名付きcontactとlisten portは異なるが、自分へのcontactをdialせず、他の2 keeperから直接到達できる。
 hubをlibp2p relayと仮定せず、3 keeper間の直接受領を検証する。
+
+監視と証明書更新のguest管理commandは、Limaの設定済みprivate・同user所有のcontrol socketを再利用できる。
+`ControlMaster=no`と`ForwardAgent=no`を保ち、新しいmasterを作らず、`ControlPath=none`で既存経路を無効化しない。
+外側のnative hostへの監視専用mux、常設portforward、hostkey設定は変更しない。
+既存masterが無いときは設定済みSSH先へ通常接続し、元のtimeout内に失敗すれば取得不能のまま扱う。
+既存muxで取得できたことを、新規TCP listenerの不調やVZ内部の資源滞留を直した証拠とはしない。
 
 専用service UIDのOUTPUTは、確立済み通信の返信、native Noiseのloopback TCP39113、public TCP443、固定public DNSだけを許可する。
 private/LAN/metadata宛の拒否はpublic443許可より前に置き、このUIDのIPv6 OUTPUTは拒否する。

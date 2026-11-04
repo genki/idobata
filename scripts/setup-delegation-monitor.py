@@ -41,9 +41,12 @@ WantedBy=multi-user.target
 def transport(command):
     encoded = base64.b64encode(command.encode()).decode()
     guest = ['/usr/bin/ssh', '-T', '-oBatchMode=yes', '-oConnectTimeout=5',
-             '-oForwardAgent=no', '-oControlMaster=no', '-oControlPath=none',
+             '-oForwardAgent=no', '-oControlMaster=no',
              '-F', '/Users/machinaai/.lima/dsh/ssh.config', 'lima-dsh',
              'sudo -n /usr/local/sbin/dsh-websh-exec ' + encoded]
+    # Keep Lima's configured, same-user private control socket available.
+    # ControlMaster=no reuses an existing master without creating a new one;
+    # absent masters still use the bounded normal SSH connection path.
     # 過負荷の踏み台で毎回認証せず、監視専用の接続だけを再利用する。
     # VM内への転送許可や既存SSH設定は変更しない。
     return ['ssh', '-T', '-oBatchMode=yes', '-oConnectTimeout=25',

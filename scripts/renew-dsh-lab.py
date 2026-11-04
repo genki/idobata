@@ -91,8 +91,10 @@ def remote_argv(code, guest=True):
     if guest:
         command = shlex.join(['/usr/bin/ssh', '-T', '-o', 'BatchMode=yes',
             '-o', 'ConnectTimeout=10', '-o', 'ForwardAgent=no', '-o', 'ControlMaster=no',
-            '-o', 'ControlPath=none', '-F', '/Users/machinaai/.lima/dsh/ssh.config',
+            '-F', '/Users/machinaai/.lima/dsh/ssh.config',
             'lima-dsh', command])
+        # Reuse Lima's existing private master; never become a new master.
+        # The outer host transport remains separately owned and unshared.
     return ['runuser', '-u', 'vagrant', '--', 'ssh', '-T', '-o', 'BatchMode=yes',
             '-o', 'ConnectTimeout=10', '-o', 'ForwardAgent=no', '-o', 'ControlMaster=no',
             '-o', 'ControlPath=none', 'machinaai', command]
