@@ -48,6 +48,18 @@ hubをlibp2p relayと仮定せず、3 keeper間の直接受領を検証する。
 既存masterが無いときは設定済みSSH先へ通常接続し、元のtimeout内に失敗すれば取得不能のまま扱う。
 既存muxで取得できたことを、新規TCP listenerの不調やVZ内部の資源滞留を直した証拠とはしない。
 
+管理SSHの現在のloopback portは`61740`。Limaの`ssh.localPort`、生成された`ssh.config`、
+nativeの接続テンプレート、webshの実保存接続を同じ値に保つ。keeperと常設forwarderは
+Limaの生成設定を参照し、認証・SSH hostkey設定・guestのnetwork guardを保持する。
+
+2026-11-05は、終了途中の旧hostagentに属する`61739`のkernel listenerが残り、
+新hostagentのbindが拒否された。正常終了と通常停止の失敗後、利用者の明示承認で同じVMを
+強制停止し、原本diskから再起動して`61740`へ移行した。退避した同一APFS上のprivate cloneは
+保管用で、正常停止済みsnapshotの保証はなく、復元や署名stateのrollbackには使っていない。
+新しいportは既存muxを無効にした実SSH commandで検証する。
+同じ保存会話とChrome profile、GUIのprivate runtime・元の起動環境も復元した。
+検証値は[新規SSHの復旧証跡](../evidence/dsh-fresh-ssh-recovery-20261105.json)に保存する。
+
 専用service UIDのOUTPUTは、確立済み通信の返信、native Noiseのloopback TCP39113、public TCP443、固定public DNSだけを許可する。
 private/LAN/metadata宛の拒否はpublic443許可より前に置き、このUIDのIPv6 OUTPUTは拒否する。
 既存DSH UID2000のchain・relay・VM管理は変更しない。

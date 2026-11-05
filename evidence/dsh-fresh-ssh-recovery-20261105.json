@@ -1,0 +1,193 @@
+{
+  "version": 1,
+  "status": "passed",
+  "verified_at": "2026-11-05T08:34:31.736778+00:00",
+  "resolution": {
+    "same_vm_recovered": true,
+    "old_ssh_port": 61739,
+    "current_loopback_ssh_port": 61740,
+    "old_kernel_listener_blocked_new_bind": true,
+    "old_port_kernel_cleanup_claimed": false,
+    "generated_config_native_template_and_websh_saved_connection_synchronized": true
+  },
+  "lifecycle": {
+    "user_explicit_force_approval": true,
+    "normal_stop_failed_before_force": true,
+    "approved_force_stop_calls": 2,
+    "original_disk_used": true,
+    "same_apfs_private_clone_retained": true,
+    "clean_shutdown_snapshot_claimed": false,
+    "backup_restore_or_state_rollback": false,
+    "whole_host_restarted": false,
+    "unrelated_vms_changed": false
+  },
+  "preservation": {
+    "identity_and_storage_key_metadata_equal": true,
+    "key_file_contents_or_hashes_read_by_repair": false,
+    "sdk_binary_equal": true,
+    "idobata_config_equal": true,
+    "room_certificate_epoch": 2,
+    "same_saved_conversation_id": true,
+    "chrome_profile_retained": true,
+    "dynamic_runtime_state_changes_expected": true,
+    "existing_conversation_file_size_equal": true
+  },
+  "transport": {
+    "fresh_ssh_control_master": "no",
+    "fresh_ssh_control_path": "none",
+    "initial_real_guest_command_passes": 3,
+    "later_real_guest_command_passes": 2,
+    "same_current_hostagent_during_observation": true,
+    "new_port_listener_owned_by_current_hostagent": true,
+    "observation_seconds": 30.14,
+    "fd_counts": [
+      33,
+      28
+    ],
+    "closed_socket_counts": [
+      0,
+      0
+    ]
+  },
+  "services": {
+    "normal_agent_doctor": "healthy",
+    "actual_firewall_checker_exit": 0,
+    "peer_and_guard_and_model_relays_active": true,
+    "ordinary_renewal_exit": 0,
+    "ordinary_renewal_result": "unchanged",
+    "runner_certificate_current": true,
+    "normal_watch_cycles": 2,
+    "watch_interval_seconds": 30.346,
+    "peer_up_samples": 2,
+    "runner_expected_hold_samples": 2,
+    "runner_hold_reason": "no_eligible_answer",
+    "stale_samples": 0
+  },
+  "gui": {
+    "existing_guarded_launcher_used": true,
+    "same_tui_session_live": true,
+    "private_runtime_and_documented_temporary_font_config_restored": true,
+    "permanent_linger_or_unit_enable_policy_changed": false,
+    "chrome_documented_flags_and_os_libraries_used": true,
+    "gai_existing_binary_and_conda_libraries_used": true,
+    "chrome_processes": 22,
+    "gai_processes": 1,
+    "sampled_app_guards_preserved": true,
+    "rfb_banner_valid": true,
+    "x11_connection_succeeded": true,
+    "gai_window_class_present": true,
+    "chrome_headful_metadata": true,
+    "chrome_metadata_http_status": 200,
+    "webdriver_loopback_status": 200,
+    "webdriver_ready": true,
+    "webdriver_sessions_created_by_repair": 0
+  },
+  "manager_independent_checks": {
+    "moon_services_total": 17,
+    "moon_services_up": 17,
+    "moon_services_down": 0,
+    "fresh_ssh_passed": true,
+    "websh_connections_preserved": 19,
+    "websh_only_target_port_changed": true,
+    "final_after_gui": {
+      "checked_at": "2026-11-05T08:37:43.739637+00:00",
+      "fresh_guest_ssh_control_path": "none",
+      "fresh_guest_ssh_exit": 0,
+      "elapsed_seconds": 2.521,
+      "served_api_fetched_at": "2026-11-05T08:37:34.415Z",
+      "served_entries": [
+        {
+          "id": "idobata-feed",
+          "status": "up"
+        },
+        {
+          "id": "idobata-site",
+          "status": "up"
+        },
+        {
+          "id": "idobata-peer-linux",
+          "status": "up"
+        },
+        {
+          "id": "idobata-peer-mba22",
+          "status": "up"
+        },
+        {
+          "id": "idobata-peer-winvr",
+          "status": "up"
+        },
+        {
+          "id": "idobata-peer-machinaai",
+          "status": "up"
+        },
+        {
+          "id": "idobata-knowledge-storage",
+          "status": "up"
+        },
+        {
+          "id": "idobata-knowledge-replication",
+          "status": "up"
+        },
+        {
+          "id": "idobata-public-cache",
+          "status": "up"
+        },
+        {
+          "id": "idobata-ledger",
+          "status": "up"
+        },
+        {
+          "id": "idobata-delivery",
+          "status": "up"
+        },
+        {
+          "id": "idobata-stability",
+          "status": "up"
+        },
+        {
+          "id": "idobata-publication",
+          "status": "up"
+        },
+        {
+          "id": "idobata-public-route",
+          "status": "up"
+        },
+        {
+          "id": "idobata-release",
+          "status": "up"
+        },
+        {
+          "id": "idobata-dsh-peer",
+          "status": "up"
+        },
+        {
+          "id": "idobata-dsh-delegation",
+          "status": "up"
+        }
+      ]
+    },
+    "websh_port_update": {
+      "target_id": "dsh-sandbox-machinaai",
+      "old_port": 61739,
+      "new_port": 61740,
+      "connection_count": 19,
+      "changed_clock_count": 1,
+      "remote_merge_succeeded": true,
+      "remote_other_data_unchanged": true,
+      "local_other_data_unchanged": true,
+      "local_clock_valid": true
+    }
+  },
+  "source": {
+    "head_port_only_commit": "9d2fe73e6c16a84ea6d1d418c50d3f15568dcd56",
+    "sdk_or_rust_logic_changed": false,
+    "head_existing_foreign_changes_preserved": true
+  },
+  "privacy": {
+    "peer_or_conversation_ids_included": false,
+    "credentials_or_key_hashes_included": false,
+    "screen_or_conversation_contents_included": false,
+    "manual_model_jobs_posts_or_notifications_created": false
+  },
+  "source_frozen": true
+}

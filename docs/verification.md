@@ -496,3 +496,25 @@ TUF更新、NATの自動越境、P2P辞書形成は後続の設計で、本作�
 新規TCP/vsock転送口自体の不調は残り、その根因は未確定である。
 今回の復旧を転送口の修復とは扱わず、既存接続が失われたときは従来のtimeoutと取得不能表示を保つ。
 [復旧証跡](../evidence/dsh-monitor-recovery-20261104.json)を参照する。
+
+
+## 2026-11-05 DSH新規SSH接続の復旧
+
+前日の既存Lima接続による監視復旧に続き、新規接続側を修復した。
+guestのSSH受付socket単体の再起動では改善しなかった。通常のguest停止要求とLima停止も
+完了せず、ディスクを同一APFS上のprivate cloneへ退避したうえで、ユーザー承認を得て
+同じVMの強制停止・起動を行った。原本ディスクを使い、VM再作成・backup rollbackはしていない。
+退避は停止途中のimageのCOW cloneであり、正常停止済みsnapshotとは扱わない。
+
+旧processのFD・RSSが解放されても、kernelの旧61739 LISTENが残り、
+新hostagentのvsock forwarderはaddress already in useで起動できなかった。
+現用のguest SSHポートを未使用の61740へ移し、Lima生成SSH設定・native接続雛形・
+headの接続雛形/案内・実websh保存接続を同値に更新した。
+webshはfield-clock付きmergeで対象portだけを更新し、他18接続と他の設定を保持した。
+
+`ControlMaster=no`・`ControlPath=none`の新規guest SSHを複数回確認し、
+root側からも独立した新規SSHの実コマンド成功を確認した。通常認可確認はepoch 2のまま成功し、
+Moon Servicesのidobata全17項目も正常となった。
+旧61739のkernel待受を解放したとは主張せず、現用経路は61740で既存muxに依存せず利用できる。
+
+[復旧証跡](../evidence/dsh-fresh-ssh-recovery-20261105.json)を参照する。
